@@ -20,6 +20,7 @@ const HOME = `<!doctype html>
   <input id="q" name="q">
   <button id="go" onclick="document.getElementById('out').textContent = document.getElementById('q').value">Go</button>
   <button id="fetch" onclick="fetch('/api')">Fetch</button>
+  <button id="post" onclick="fetch('/api/echo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q: 'tee' }) })">Post</button>
   <output id="out"></output>
   <a href="/done">Submit</a>
 </body>
@@ -80,6 +81,11 @@ describe.skipIf(!ENABLED)("substrate act", () => {
       if (url === "/api") {
         response.writeHead(200, { "content-type": "application/json" });
         response.end('{"ok":true}');
+        return;
+      }
+      if (url === "/api/echo") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end('{"echo":{"q":"tee"}}');
         return;
       }
 
@@ -163,6 +169,32 @@ describe.skipIf(!ENABLED)("substrate act", () => {
         kind: "network",
         method: "GET",
         url: expect.stringContaining("/api"),
+        status: 200,
+        mime_type: "application/json",
+        response_body: { ok: true },
+      }),
+    );
+  });
+
+  it("attributes JSON request and response bodies to the action", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const post = refFor(view.refs, "button", "Post");
+
+    const result = await substrate.act({ ref: post, do: "click" });
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) throw new Error("expected a successful act");
+    expect(result.effects).toContainEqual(
+      expect.objectContaining({
+        kind: "network",
+        method: "POST",
+        url: expect.stringContaining("/api/echo"),
+        status: 200,
+        mime_type: "application/json",
+        request_body: { q: "tee" },
+        response_body: { echo: { q: "tee" } },
       }),
     );
   });

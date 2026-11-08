@@ -86,7 +86,11 @@ animation does not block the caller.
 
 `act` returns what the action changed:
 
-- **`effects`**: `navigation`, `network` (method, URL, status), and `value`.
+- **`effects`**: `navigation`, `network`, and `value`.
+  - A `network` effect carries the method, URL, status, resource type, MIME
+    type, and parsed JSON request and response bodies. Only requests that
+    started during the action are included, so each one is attributed to the
+    action that caused it. Bodies over 256 KB are dropped.
 - **`delta`**: `{ navigation, entries[] }`, where entries are `added`,
   `removed`, or `changed` nodes by ref.
 
@@ -94,6 +98,20 @@ After an action the substrate re-captures the document and diffs the ref maps.
 A navigation returns `{ navigation: true, entries: [] }` because the caller
 should re-read. Non-navigation actions return a small diff; the fixture test
 asserts it stays under 15% of the document.
+
+## Network capture
+
+`PlaywrightEngine` listens to CDP `Network` events. `requestWillBeSent`
+records the method, URL, resource type, and JSON request body; a body CDP did
+not inline is fetched with `Network.getRequestPostData`. `responseReceived`
+adds the status and MIME type, and `loadingFinished` fetches a JSON response
+body with `Network.getResponseBody` before it is evicted.
+
+`dispatch` awaits the captures for the action's requests before returning, so
+the effects it reports are complete, not a promise of a body that arrives
+later. This is what makes a trace usable for lifting an `http` op: the
+request body is the template, and the response body is what `returns` can be
+inferred from.
 
 ## Not here yet
 

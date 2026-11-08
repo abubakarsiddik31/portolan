@@ -18,6 +18,16 @@ Locators resolve against the semantic snapshot: `test_id` matches the author's
 `role` matches with optional `name` or `name_re`. `ctx` and `attr` are
 extraction hints, not identity, so they are ignored here.
 
+## Routing
+
+`routeTo(map, from, to)` runs a breadth-first search over read ops only. It
+returns the shortest op sequence, `[]` when already in the target, or
+`undefined` when no read-only path exists. Writes and irreversible ops are
+never part of a route: the runtime may route to a precondition, but it never
+inserts an action the caller did not ask for.
+
+Broken ops are excluded; degraded ops are still routable.
+
 ## Not here yet
 
-The router, tiers, write safety, and extractors are T2.16–T2.24.
+Tiers, write safety, and extractors are T2.17–T2.24.

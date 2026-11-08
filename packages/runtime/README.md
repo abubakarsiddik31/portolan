@@ -115,7 +115,14 @@ intent with `view`, `act`, and `read`:
 - `begin({ sid, intent, effect })` returns `{ scope_id, allowed, expires }`.
 - While a write or irreversible scope is open, `blocksWrite(sid)` returns it,
   and the runtime refuses other write ops.
-- `close(scope_id, result?)` closes it and keeps the result for the trace.
+- `close(scope_id, result?)` closes it, stamps `ended_at`, and keeps the result.
+- `record(scope_id, entry)` appends a `view`, `act`, or `read` entry to the
+  scope's trace. It refuses once the scope is closed.
+
+Each entry carries what the compiler needs: the locator (`role`, `name`,
+`ordinal`), the value or key, the document and mutation counters, the URL,
+the map state before and after, the effects, and the delta. The trace is the
+raw material for segmenting a fallback run into ops.
 
 Scopes expire after 10 minutes by default.
 

@@ -74,6 +74,30 @@ On the dev fixtures, the store's five ops and the portal's two ops match their
 oracle signatures exactly. The wizard reports `file_path` as missing, because
 the substrate cannot upload yet.
 
+## Returns inference
+
+`inferReturns(view)` reads the post-state and builds an extractor plus a JSON
+Schema:
+
+- **Rows first.** A repeated test id inside a table or grid is stronger
+  evidence than a handful of scalar nodes. Table columns come from the header
+  row; a `data-*` attribute on a cell is carried into the locator. Card rows
+  group their descendants by role.
+- **Fields next.** A node with a stable test id and a value becomes a field,
+  e.g. `order-id` -> `order_id`.
+- **None last.** A page with no data region returns `{ kind: "none" }`.
+
+The inferred extractor is run against the same view before it is returned, so
+an inference that does not extract is discarded.
+
+`validateInferredReturns(inferred, view)` extracts and validates against the
+schema. On the fixtures, store search rows and portal filter rows validate on
+a held-back run with different data.
+
+`nameReturns({ model, inferred })` asks the model to rename the keys. Names
+must be unique snake_case and must exist in the inference; anything else is
+rejected.
+
 ## Local models
 
 The repair role is provider-agnostic. Any OpenAI-compatible endpoint works:

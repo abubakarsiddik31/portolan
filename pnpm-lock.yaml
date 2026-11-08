@@ -75,6 +75,9 @@ importers:
       '@portolan/runtime':
         specifier: workspace:*
         version: link:../packages/runtime
+      '@portolan/server':
+        specifier: workspace:*
+        version: link:../packages/portolan-server
       '@portolan/substrate':
         specifier: workspace:*
         version: link:../packages/substrate

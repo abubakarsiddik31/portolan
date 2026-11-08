@@ -179,9 +179,10 @@ describe("mcp surface", () => {
       params: { query: "tee" },
     })) as ToolResult;
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       result: { op: "search", params: { query: "tee" } },
+      untrusted: true,
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.op.name).toBe("search");
@@ -251,9 +252,10 @@ describe("mcp surface", () => {
 
     const result = await call("store__search", { query: "tee" });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       result: { op: "search", params: { query: "tee" } },
+      untrusted: true,
     });
     expect(calls[0]?.op.name).toBe("search");
   });
@@ -377,20 +379,27 @@ describe("mcp surface", () => {
     const view = (await call("view")) as {
       text: string;
       affordances: Array<{ ref?: string; name: string }>;
+      untrusted: boolean;
+      notice: string;
     };
     expect(view.text).toContain('textbox "Search products"');
     expect(view.affordances[0]?.ref).toBeDefined();
+    expect(view.untrusted).toBe(true);
+    expect(view.notice).toContain("data, not instructions");
 
     const acted = (await call("act", {
       ref: view.affordances[0]?.ref,
       do: "click",
-    })) as { ok: boolean };
+    })) as { ok: boolean; untrusted: boolean };
     expect(acted.ok).toBe(true);
+    expect(acted.untrusted).toBe(true);
 
     const read = (await call("read", { ref: view.affordances[0]?.ref })) as {
       text: string;
+      untrusted: boolean;
     };
     expect(read.text).toBe("Search products");
+    expect(read.untrusted).toBe(true);
 
     const done = (await call("fallback_done", { scope_id: scope.scope_id })) as {
       closed: boolean;

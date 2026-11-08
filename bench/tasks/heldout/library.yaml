@@ -62,8 +62,8 @@ templates:
 
   - id: library-loans-empty
     goal: "Open the loans page and confirm it is empty."
-    start: /loans
-    max_steps: 4
+    start: /
+    max_steps: 6
     params:
       - {}
       - {}

@@ -18,6 +18,7 @@
     "local:smoke": "vitest run bench/local/open-weights.test.ts",
     "oracle:mcp": "tsx oracle/main.ts",
     "oracle:smoke": "tsx oracle/live-smoke.ts",
+    "pilot": "tsx pilot/run.ts",
     "results:table": "tsx results/cli.ts",
     "webarena:check": "tsx webarena/check.ts",
     "webarena:reset": "bash webarena/reset.sh"

@@ -6,11 +6,10 @@ import {
   Substrate,
   type SubstrateView,
 } from "@portolan/substrate";
-import type { Site } from "../oracle/sites.js";
 import type { ToolBackend, ToolDef, ToolResult } from "./types.js";
 
 export type SubstrateBackendOptions = {
-  baseURLs: Record<Site, string>;
+  baseURLs: Record<string, string>;
   executablePath?: string;
   headless?: boolean;
 };
@@ -68,7 +67,7 @@ function optionalString(args: Record<string, unknown>, key: string): string | un
  * is the floor the compiler has to beat.
  */
 export class SubstrateBackend implements ToolBackend {
-  private readonly baseURLs: Record<Site, string>;
+  private readonly baseURLs: Record<string, string>;
   private readonly executablePath: string | undefined;
   private readonly headless: boolean;
   private engine: PlaywrightEngine | undefined;
@@ -85,9 +84,12 @@ export class SubstrateBackend implements ToolBackend {
     return TOOLS;
   }
 
-  async openSite(site: Site): Promise<ToolResult> {
+  async openSite(site: string): Promise<ToolResult> {
+    const base = this.baseURLs[site];
+    if (base === undefined) return { ok: false, text: `no base URL for "${site}"` };
+
     const engine = await this.ensureEngine();
-    await engine.navigate(this.baseURLs[site]);
+    await engine.navigate(base);
     return this.view();
   }
 

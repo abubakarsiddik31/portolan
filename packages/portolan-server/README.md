@@ -48,9 +48,13 @@ The stdio server exposes the portable surface:
 | `view()` | ranked affordances with refs |
 | `act(ref, do, value?, key?)` | one substrate action |
 | `read(ref?)` | the page or one node's text |
-| `fallback_done(scope_id, result?)` | closes the scope |
+| `fallback_done(scope_id, result?)` | closes the scope and returns its trace |
 
 `view`, `act`, and `read` need a `substrateFactory` in `McpDeps`. While a write scope is open, `call` refuses other write ops with `precondition_failed`; reads still work.
+
+When a scope is active, `view`, `act`, and `read` record a trace entry: locator,
+value, document and mutation counters, URL, map state before and after, effects,
+and delta. `fallback_done` returns the entries with `started_at` and `ended_at`.
 
 The HTTP server exposes the same surface at `POST /mcp` (Streamable HTTP) when it is created with a map store.
 

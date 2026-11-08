@@ -1,6 +1,60 @@
 import { randomUUID } from "node:crypto";
 
+import type { Delta, Effect } from "@portolan/substrate";
+
 export type FallbackEffect = "read" | "write" | "irreversible";
+
+export type TraceLocator = {
+  role: string;
+  name: string;
+  ordinal: number;
+};
+
+export type TraceView = {
+  kind: "view";
+  at: string;
+  doc: number;
+  v: number;
+  url: string;
+  state?: string;
+  affordances: number;
+};
+
+export type TraceAct = {
+  kind: "act";
+  at: string;
+  ref: string;
+  do: string;
+  value?: string;
+  key?: string;
+  locator?: TraceLocator;
+  doc: number;
+  v: number;
+  url: string;
+  before_state?: string;
+  after_state?: string;
+  effects: Effect[];
+  delta: Delta;
+};
+
+export type TraceRead = {
+  kind: "read";
+  at: string;
+  ref?: string;
+  text: string;
+};
+
+export type TraceEntry = TraceView | TraceAct | TraceRead;
+
+export type Trace = {
+  scope_id: string;
+  sid: string;
+  intent: string;
+  effect: FallbackEffect;
+  started_at: string;
+  ended_at?: string;
+  entries: TraceEntry[];
+};
 
 export type FallbackScope = {
   id: string;
@@ -9,6 +63,9 @@ export type FallbackScope = {
   effect: FallbackEffect;
   allowed: ["view", "act", "read"];
   expiresAt: number;
+  started_at: string;
+  ended_at?: string;
+  trace: TraceEntry[];
   result?: unknown;
 };
 
@@ -42,6 +99,8 @@ export class FallbackScopes {
       effect: input.effect ?? "write",
       allowed: ALLOWED,
       expiresAt: now() + (input.ttlMs ?? DEFAULT_TTL_MS),
+      started_at: new Date(now()).toISOString(),
+      trace: [],
     };
 
     this.scopes.set(scope.id, scope);
@@ -81,7 +140,17 @@ export class FallbackScopes {
 
     this.scopes.delete(id);
     if (result !== undefined) scope.result = result;
+    scope.ended_at = new Date().toISOString();
     return scope;
+  }
+
+  /** Append one fallback action to a scope's trace. */
+  record(id: string, entry: TraceEntry): boolean {
+    const scope = this.scopes.get(id);
+    if (scope === undefined) return false;
+
+    scope.trace.push(entry);
+    return true;
   }
 
   /** The scope that should block a write, if any. */

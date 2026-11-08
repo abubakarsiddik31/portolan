@@ -11,14 +11,21 @@ import {
   validateJsonSchema,
 } from "@portolan/protocol";
 import {
+  type FallbackScope,
   FallbackScopes,
   MemoryWriteLedger,
+  recognizeState,
   runWrite,
   type WriteExecution,
   type WriteFailureCode,
   type WriteLedger,
 } from "@portolan/runtime";
-import { rankAffordances, renderAffordances, type Substrate } from "@portolan/substrate";
+import {
+  rankAffordances,
+  renderAffordances,
+  type Snapshot,
+  type Substrate,
+} from "@portolan/substrate";
 import { z } from "zod";
 
 import { notReadyExecutor, type OpAudit, type OpExecutor } from "./executor.js";
@@ -247,14 +254,31 @@ export function createMcpServer(deps: McpDeps): McpServer {
     );
   }
 
-  async function substrateFor(): Promise<FallbackSubstrate | undefined> {
+  function currentSession(): SessionRecord | undefined {
     if (currentSid === undefined) return undefined;
 
     const session = deps.sessions.get(currentSid);
     if (session === undefined || session.closed_at !== undefined) return undefined;
-    if (deps.substrateFactory === undefined) return undefined;
+    return session;
+  }
+
+  async function substrateFor(): Promise<FallbackSubstrate | undefined> {
+    const session = currentSession();
+    if (session === undefined || deps.substrateFactory === undefined) return undefined;
 
     return deps.substrateFactory(session);
+  }
+
+  function activeScope(): FallbackScope | undefined {
+    return currentSid === undefined ? undefined : scopes.active(currentSid);
+  }
+
+  /** The map state a snapshot is in, when the session is pinned to a map. */
+  function stateOf(session: SessionRecord | undefined, snapshot: Snapshot): string | undefined {
+    if (session?.site === undefined || session.map_version === undefined) return undefined;
+
+    const map = deps.maps.getVersion(session.site, session.map_version);
+    return map === undefined ? undefined : recognizeState(map, snapshot)?.state.id;
   }
 
   function clearNativeTools(): void {
@@ -406,6 +430,21 @@ export function createMcpServer(deps: McpDeps): McpServer {
       const ranked = rankAffordances(snapshot.nodes, { refs });
       const rendered = renderAffordances(ranked.affordances);
 
+      const scope = activeScope();
+      if (scope !== undefined) {
+        const state = stateOf(currentSession(), snapshot);
+
+        scopes.record(scope.id, {
+          kind: "view",
+          at: new Date().toISOString(),
+          doc: snapshot.doc,
+          v: snapshot.v,
+          url: snapshot.url,
+          ...(state !== undefined ? { state } : {}),
+          affordances: ranked.affordances.length,
+        });
+      }
+
       return text(
         JSON.stringify({
           url: snapshot.url,
@@ -445,12 +484,48 @@ export function createMcpServer(deps: McpDeps): McpServer {
         return failure("op_broken", "file uploads are not supported by fallback act yet");
       }
 
+      const session = currentSession();
+      const scope = activeScope();
+      const before = substrate.state();
+      const beforeState = before === undefined ? undefined : stateOf(session, before.snapshot);
+      const locator = before?.refs.byRef.get(input.ref);
+
       const result = await substrate.act({
         ref: input.ref,
         do: input.do,
         value: input.value,
         key: input.key,
       });
+
+      if (scope !== undefined && result.ok) {
+        const after = substrate.state();
+        const afterState = after === undefined ? undefined : stateOf(session, after.snapshot);
+
+        scopes.record(scope.id, {
+          kind: "act",
+          at: new Date().toISOString(),
+          ref: input.ref,
+          do: input.do,
+          ...(input.value !== undefined ? { value: input.value } : {}),
+          ...(input.key !== undefined ? { key: input.key } : {}),
+          ...(locator !== undefined
+            ? {
+                locator: {
+                  role: locator.role,
+                  name: locator.name,
+                  ordinal: locator.ordinal,
+                },
+              }
+            : {}),
+          doc: result.doc,
+          v: result.v,
+          url: result.url,
+          ...(beforeState !== undefined ? { before_state: beforeState } : {}),
+          ...(afterState !== undefined ? { after_state: afterState } : {}),
+          effects: result.effects,
+          delta: result.delta,
+        });
+      }
 
       return text(JSON.stringify(result));
     },
@@ -468,7 +543,19 @@ export function createMcpServer(deps: McpDeps): McpServer {
         return failure("op_broken", "fallback substrate is not available");
       }
 
-      return text(JSON.stringify(await substrate.read(ref)));
+      const result = await substrate.read(ref);
+
+      const scope = activeScope();
+      if (scope !== undefined) {
+        scopes.record(scope.id, {
+          kind: "read",
+          at: new Date().toISOString(),
+          ...(ref !== undefined ? { ref } : {}),
+          text: result.text,
+        });
+      }
+
+      return text(JSON.stringify(result));
     },
   );
 
@@ -492,6 +579,10 @@ export function createMcpServer(deps: McpDeps): McpServer {
           scope_id,
           closed: true,
           intent: closed.intent,
+          effect: closed.effect,
+          started_at: closed.started_at,
+          ...(closed.ended_at !== undefined ? { ended_at: closed.ended_at } : {}),
+          entries: closed.trace,
         }),
       );
     },

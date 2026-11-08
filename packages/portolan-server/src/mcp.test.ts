@@ -14,10 +14,10 @@ import { SessionStore } from "./store.js";
 
 const MAPS = join(import.meta.dirname, "../../../maps");
 
-const BUTTON: SemanticNode = {
+const SEARCH: SemanticNode = {
   nodeId: "b",
-  role: "button",
-  name: "Continue",
+  role: "textbox",
+  name: "Search products",
   backendNodeId: 10,
   ignored: false,
   visible: true,
@@ -30,11 +30,11 @@ function fakeSubstrate(): FallbackSubstrate {
   const snapshot = {
     doc: 1,
     v: 0,
-    url: "http://x/",
+    url: "http://127.0.0.1:4100/",
     title: "",
-    nodes: [BUTTON],
+    nodes: [SEARCH],
   };
-  const refs = buildRefMap([BUTTON], 1);
+  const refs = buildRefMap([SEARCH], 1);
 
   return {
     view: async () => ({ snapshot, refs }),
@@ -43,12 +43,12 @@ function fakeSubstrate(): FallbackSubstrate {
       ok: true,
       doc: 1,
       v: 1,
-      url: "http://x/",
+      url: "http://127.0.0.1:4100/",
       title: "",
       effects: [],
       delta: { navigation: false, entries: [] },
     }),
-    read: async (ref?: string) => ({ text: ref === undefined ? "page text" : "Continue" }),
+    read: async (ref?: string) => ({ text: ref === undefined ? "page text" : "Search products" }),
   };
 }
 
@@ -375,7 +375,7 @@ describe("mcp surface", () => {
       text: string;
       affordances: Array<{ ref?: string; name: string }>;
     };
-    expect(view.text).toContain('button "Continue"');
+    expect(view.text).toContain('textbox "Search products"');
     expect(view.affordances[0]?.ref).toBeDefined();
 
     const acted = (await call("act", {
@@ -387,12 +387,32 @@ describe("mcp surface", () => {
     const read = (await call("read", { ref: view.affordances[0]?.ref })) as {
       text: string;
     };
-    expect(read.text).toBe("Continue");
+    expect(read.text).toBe("Search products");
 
     const done = (await call("fallback_done", { scope_id: scope.scope_id })) as {
       closed: boolean;
+      started_at: string;
+      ended_at: string;
+      entries: Array<{
+        kind: string;
+        state?: string;
+        locator?: { role: string; name: string; ordinal: number };
+        before_state?: string;
+        after_state?: string;
+      }>;
     };
     expect(done.closed).toBe(true);
+    expect(done.started_at).toBeTypeOf("string");
+    expect(done.ended_at).toBeTypeOf("string");
+    expect(done.entries.map((entry) => entry.kind)).toEqual(["view", "act", "read"]);
+    expect(done.entries[0]?.state).toBe("catalog");
+    expect(done.entries[1]?.locator).toEqual({
+      role: "textbox",
+      name: "Search products",
+      ordinal: 0,
+    });
+    expect(done.entries[1]?.before_state).toBe("catalog");
+    expect(done.entries[1]?.after_state).toBe("catalog");
   });
 
   it("refuses another write while a write scope is open", async () => {

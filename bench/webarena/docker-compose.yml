@@ -1,0 +1,17 @@
+services:
+  shopping:
+    image: ${SHOPPING_IMAGE:-shopping_final_0712}
+    container_name: shopping
+    ports:
+      - "7770:80"
+    pull_policy: never
+    restart: unless-stopped
+
+  gitlab:
+    image: ${GITLAB_IMAGE:-gitlab-populated-final-port8023}
+    container_name: gitlab
+    command: ["/opt/gitlab/embedded/bin/runsvdir-start"]
+    ports:
+      - "8023:8023"
+    pull_policy: never
+    restart: unless-stopped

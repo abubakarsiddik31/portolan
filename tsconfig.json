@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/protocol" },
     { "path": "packages/model" },
+    { "path": "packages/substrate" },
     { "path": "packages/portolan-server" },
     { "path": "bench" }
   ]

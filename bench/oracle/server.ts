@@ -100,6 +100,46 @@ export async function buildOracleServer(options: OracleServerOptions): Promise<O
     },
   );
 
+  server.tool(
+    "evaluate",
+    "Evaluate a JavaScript expression in the open page. Returns { ok, value }.",
+    { expression: z.string().min(1) },
+    async ({ expression }) => {
+      if (!currentSite) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({ ok: false, error: "call open_site first" }),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const page = await pageFor(session, currentSite);
+        const value = await page.evaluate(expression);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({ ok: true, value }) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
   return {
     server,
     close: () => closeOracleSession(session),

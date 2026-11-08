@@ -1,7 +1,8 @@
 {
   "name": "@portolan/protocol",
   "version": "0.0.0",
-  "private": true,
+  "description": "Portolan protocol types, schemas, and map loader.",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,6 +15,22 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abubakarsiddik31/portolan.git",
+    "directory": "packages/protocol"
+  },
+  "homepage": "https://github.com/abubakarsiddik31/portolan#readme",
+  "bugs": {
+    "url": "https://github.com/abubakarsiddik31/portolan/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsc -b"
   },

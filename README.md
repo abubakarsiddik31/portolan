@@ -57,6 +57,8 @@ open_site("acme-store")
 | [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) | Schedule to v0.1.0 (Mar 2, 2027): release criteria, milestones, ~95 tasks with estimates and dependencies, gates, risks, commit and PR conventions |
 | [docs/DECISIONS.md](./docs/DECISIONS.md) | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic; MCP + Skills), ADR-004 (name), one-line rationale for other choices |
 | [docs/SUBSTRATE.md](./docs/SUBSTRATE.md) | The stateful browser layer underneath: engine adapter, semantic engine, refs, effects, hibernation, meter |
+| [docs/CONFIG.md](./docs/CONFIG.md) | Every config option with its type, default, and the command that reads it |
+| [docs/PACKAGING.md](./docs/PACKAGING.md) | The npm packages, the publish metadata, and the Docker image with Chromium |
 | [docs/ANALYSIS.md](./docs/ANALYSIS.md) | Market evidence, cost model, competitive landscape, reasoning trail (v1 → v4), falsification criteria |
 | [PRD.md](./PRD.md) | v0.1 requirements. Partly superseded by ADR-002; its verbs and architecture now describe the substrate. Rewrite pending. |
 | [docs/archive/BUILD_PLAN_v1.md](./docs/archive/BUILD_PLAN_v1.md) | The v1 plan (affordance browser) and its adversarial review, written under the old name Facet, kept for the record |

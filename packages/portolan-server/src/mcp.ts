@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   type ErrorCode,
@@ -16,7 +18,7 @@ import {
 } from "@portolan/runtime";
 import { z } from "zod";
 
-import { notReadyExecutor, type OpExecutor } from "./executor.js";
+import { notReadyExecutor, type OpAudit, type OpExecutor } from "./executor.js";
 import { type MapStore, renderMap } from "./maps.js";
 import type { SessionStore } from "./store.js";
 
@@ -90,6 +92,8 @@ export function createMcpServer(deps: McpDeps): McpServer {
 
     deps.sessions.touch(session.sid);
 
+    let auditInfo: OpAudit | undefined;
+
     const runExecutor = (
       target: OpDef,
       targetParams: Record<string, unknown>,
@@ -103,6 +107,12 @@ export function createMcpServer(deps: McpDeps): McpServer {
         params: targetParams,
         confirm,
         idempotencyKey,
+        audit:
+          target === opDef
+            ? (info) => {
+                auditInfo = info;
+              }
+            : undefined,
       });
 
     if (opDef.effect === "read") {
@@ -134,6 +144,22 @@ export function createMcpServer(deps: McpDeps): McpServer {
                 ? { outcome: "done", result: envelope.result }
                 : { outcome: "unknown" };
             },
+    });
+
+    deps.sessions.recordAudit({
+      id: randomUUID(),
+      sid: session.sid,
+      site: map.site,
+      op: opDef.name,
+      effect: opDef.effect,
+      params,
+      ...(input.idempotency_key !== undefined ? { idempotency_key: input.idempotency_key } : {}),
+      ...(auditInfo?.tier !== undefined ? { tier: auditInfo.tier } : {}),
+      ...(auditInfo?.beforeState !== undefined ? { before_state: auditInfo.beforeState } : {}),
+      ...(auditInfo?.afterState !== undefined ? { after_state: auditInfo.afterState } : {}),
+      ...(auditInfo?.requests !== undefined ? { requests: auditInfo.requests } : {}),
+      outcome: safety.ok ? "done" : safety.code === "unknown_outcome" ? "unknown" : "not_done",
+      created_at: new Date().toISOString(),
     });
 
     return text(

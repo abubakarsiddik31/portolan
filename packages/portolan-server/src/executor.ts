@@ -1,5 +1,12 @@
 import type { OpDef, ResultEnvelope, SessionRecord, SiteMap } from "@portolan/protocol";
 
+export type OpAudit = {
+  tier?: "webmcp" | "url" | "http" | "ui";
+  beforeState?: string;
+  afterState?: string;
+  requests?: Array<{ method: string; url: string; status?: number }>;
+};
+
 export type OpExecutorInput = {
   session: SessionRecord;
   map: SiteMap;
@@ -7,6 +14,8 @@ export type OpExecutorInput = {
   params: Record<string, unknown>;
   confirm?: boolean;
   idempotencyKey?: string;
+  /** Optional: report how the op ran, for the audit log. */
+  audit?: (info: OpAudit) => void;
 };
 
 /**

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { CreateSessionRequest, SessionRecord } from "@portolan/protocol";
+import type { AuditRecord, CreateSessionRequest, SessionRecord } from "@portolan/protocol";
 import Database from "better-sqlite3";
 
 type SessionRow = {
@@ -43,6 +43,23 @@ export class SessionStore {
         closed_at TEXT
       );
       CREATE INDEX IF NOT EXISTS sessions_open ON sessions (closed_at);
+
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id TEXT PRIMARY KEY,
+        sid TEXT NOT NULL,
+        site TEXT NOT NULL,
+        op TEXT NOT NULL,
+        effect TEXT NOT NULL,
+        tier TEXT,
+        params TEXT NOT NULL,
+        idempotency_key TEXT,
+        before_state TEXT,
+        after_state TEXT,
+        outcome TEXT NOT NULL,
+        requests TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS audit_sid ON audit_log (sid, created_at);
     `);
   }
 
@@ -96,6 +113,39 @@ export class SessionStore {
     return result.changes > 0;
   }
 
+  recordAudit(record: AuditRecord): void {
+    this.db
+      .prepare(
+        `INSERT INTO audit_log
+          (id, sid, site, op, effect, tier, params, idempotency_key,
+           before_state, after_state, outcome, requests, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        record.id,
+        record.sid,
+        record.site,
+        record.op,
+        record.effect,
+        record.tier ?? null,
+        JSON.stringify(record.params),
+        record.idempotency_key ?? null,
+        record.before_state ?? null,
+        record.after_state ?? null,
+        record.outcome,
+        record.requests === undefined ? null : JSON.stringify(record.requests),
+        record.created_at,
+      );
+  }
+
+  listAudit(sid: string): AuditRecord[] {
+    const rows = this.db
+      .prepare("SELECT * FROM audit_log WHERE sid = ? ORDER BY created_at, id")
+      .all(sid) as AuditRow[];
+
+    return rows.map(toAuditRecord);
+  }
+
   listOpen(): SessionRecord[] {
     const rows = this.db
       .prepare("SELECT * FROM sessions WHERE closed_at IS NULL ORDER BY created_at")
@@ -120,6 +170,45 @@ function toRecord(row: SessionRow): SessionRecord {
   if (row.map_version !== null) record.map_version = row.map_version;
   if (row.state !== null) record.state = row.state;
   if (row.closed_at !== null) record.closed_at = row.closed_at;
+
+  return record;
+}
+
+type AuditRow = {
+  id: string;
+  sid: string;
+  site: string;
+  op: string;
+  effect: string;
+  tier: string | null;
+  params: string;
+  idempotency_key: string | null;
+  before_state: string | null;
+  after_state: string | null;
+  outcome: string;
+  requests: string | null;
+  created_at: string;
+};
+
+function toAuditRecord(row: AuditRow): AuditRecord {
+  const record: AuditRecord = {
+    id: row.id,
+    sid: row.sid,
+    site: row.site,
+    op: row.op,
+    effect: row.effect as AuditRecord["effect"],
+    params: JSON.parse(row.params) as Record<string, unknown>,
+    outcome: row.outcome as AuditRecord["outcome"],
+    created_at: row.created_at,
+  };
+
+  if (row.tier !== null) record.tier = row.tier as NonNullable<AuditRecord["tier"]>;
+  if (row.idempotency_key !== null) record.idempotency_key = row.idempotency_key;
+  if (row.before_state !== null) record.before_state = row.before_state;
+  if (row.after_state !== null) record.after_state = row.after_state;
+  if (row.requests !== null) {
+    record.requests = JSON.parse(row.requests) as AuditRecord["requests"];
+  }
 
   return record;
 }

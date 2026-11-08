@@ -75,6 +75,45 @@ describe("session store", () => {
     expect(store.listOpen().map((session) => session.sid)).toEqual([openSession.sid]);
   });
 
+  it("records and lists audit entries", () => {
+    const store = open();
+    const session = store.create({ site: "store" });
+
+    store.recordAudit({
+      id: "a1",
+      sid: session.sid,
+      site: "store",
+      op: "checkout",
+      effect: "irreversible",
+      tier: "ui",
+      params: { card: "4242" },
+      idempotency_key: "order-1",
+      before_state: "cart",
+      after_state: "order",
+      outcome: "done",
+      requests: [{ method: "POST", url: "/api/checkout", status: 200 }],
+      created_at: "2026-11-08T00:00:00Z",
+    });
+
+    expect(store.listAudit(session.sid)).toEqual([
+      {
+        id: "a1",
+        sid: session.sid,
+        site: "store",
+        op: "checkout",
+        effect: "irreversible",
+        tier: "ui",
+        params: { card: "4242" },
+        idempotency_key: "order-1",
+        before_state: "cart",
+        after_state: "order",
+        outcome: "done",
+        requests: [{ method: "POST", url: "/api/checkout", status: 200 }],
+        created_at: "2026-11-08T00:00:00Z",
+      },
+    ]);
+  });
+
   it("survives a reopen", () => {
     const dir = mkdtempSync(join(tmpdir(), "portolan-"));
     dirs.push(dir);

@@ -19,6 +19,7 @@ const HOME = `<!doctype html>
   <label for="q">Search</label>
   <input id="q" name="q">
   <button id="go" onclick="document.getElementById('out').textContent = document.getElementById('q').value">Go</button>
+  <button id="fetch" onclick="fetch('/api')">Fetch</button>
   <output id="out"></output>
   <a href="/done">Submit</a>
 </body>
@@ -76,6 +77,11 @@ describe.skipIf(!ENABLED)("substrate act", () => {
         response.end(BLOCKED);
         return;
       }
+      if (url === "/api") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end('{"ok":true}');
+        return;
+      }
 
       response.writeHead(404).end();
     });
@@ -127,6 +133,40 @@ describe.skipIf(!ENABLED)("substrate act", () => {
     ).resolves.toBe("tee");
   });
 
+  it("reports a value effect and a small delta for a fill", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const search = refFor(view.refs, "textbox", "Search");
+
+    const result = await substrate.act({ ref: search, do: "fill", value: "tee" });
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) throw new Error("expected a successful act");
+    expect(result.effects).toContainEqual(expect.objectContaining({ kind: "value", value: "tee" }));
+    expect(result.delta.navigation).toBe(false);
+    expect(result.delta.entries.length / view.snapshot.nodes.length).toBeLessThanOrEqual(0.15);
+  });
+
+  it("records a network effect", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const fetchButton = refFor(view.refs, "button", "Fetch");
+
+    const result = await substrate.act({ ref: fetchButton, do: "click" });
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) throw new Error("expected a successful act");
+    expect(result.effects).toContainEqual(
+      expect.objectContaining({
+        kind: "network",
+        method: "GET",
+        url: expect.stringContaining("/api"),
+      }),
+    );
+  });
+
   it("waits for a navigation and advances the document", async () => {
     const { engine, substrate } = current();
     await engine.navigate(`${baseUrl}/`);
@@ -139,6 +179,11 @@ describe.skipIf(!ENABLED)("substrate act", () => {
     if (!result.ok) throw new Error("expected a successful act");
     expect(result.url).toBe(`${baseUrl}/done`);
     expect(result.doc).toBeGreaterThan(before.snapshot.doc);
+    expect(result.effects).toContainEqual(
+      expect.objectContaining({ kind: "navigation", to: `${baseUrl}/done` }),
+    );
+    expect(result.delta.navigation).toBe(true);
+    expect(result.delta.entries).toEqual([]);
   });
 
   it("reports a stale ref after a navigation", async () => {

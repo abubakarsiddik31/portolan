@@ -1,10 +1,11 @@
-import type { Affordance, Snapshot } from "@portolan/substrate";
+import type { Affordance, RefMap, Snapshot } from "@portolan/substrate";
 import {
   buildRefMap,
   findChrome,
   PlaywrightEngine,
   rankAffordances,
   renderAffordances,
+  Substrate,
 } from "@portolan/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -91,6 +92,13 @@ describe.skipIf(!ENABLED)("fixture affordances", () => {
 
   function has(list: Affordance[], role: string, name: string): boolean {
     return list.some((affordance) => affordance.role === role && affordance.name === name);
+  }
+
+  function refFor(refs: RefMap, role: string, name: string): string {
+    for (const entry of refs.byRef.values()) {
+      if (entry.role === role && entry.name === name) return entry.ref;
+    }
+    throw new Error(`no ${role} named "${name}"`);
   }
 
   function target(snapshot: Snapshot, role: string, name: string): number {
@@ -203,6 +211,34 @@ describe.skipIf(!ENABLED)("fixture affordances", () => {
     ).toBe(true);
     expect(has(step3.list, "button", "Submit application")).toBe(true);
     expect(step3.tokens).toBeLessThanOrEqual(800);
+  });
+
+  it("classifies the add-to-cart effects", async () => {
+    const substrate = new Substrate(current());
+    await current().navigate(`${store}/p/p_101`);
+    const view = await substrate.view();
+
+    const variant = refFor(view.refs, "combobox", "Size / color");
+    const qty = refFor(view.refs, "spinbutton", "Quantity");
+    const add = refFor(view.refs, "button", "Add to cart");
+
+    expect(
+      await substrate.act({ ref: variant, do: "select", value: "v_101_m_blue" }),
+    ).toMatchObject({ ok: true });
+    expect(await substrate.act({ ref: qty, do: "fill", value: "1" })).toMatchObject({
+      ok: true,
+    });
+
+    const result = await substrate.act({ ref: add, do: "click" });
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) throw new Error("expected a successful act");
+
+    expect(result.effects).toContainEqual(expect.objectContaining({ kind: "navigation" }));
+    expect(result.effects).toContainEqual(
+      expect.objectContaining({ kind: "network", method: "POST" }),
+    );
+    expect(result.delta.navigation).toBe(true);
   });
 
   it("captures the portal login and the authenticated ledger", async () => {

@@ -82,7 +82,20 @@ ancestors. After a click, check, or press it waits up to 250ms for a main-frame
 navigation, then for load and a short network-idle window. A long poll or
 animation does not block the caller.
 
+## Effects and delta
+
+`act` returns what the action changed:
+
+- **`effects`**: `navigation`, `network` (method, URL, status), and `value`.
+- **`delta`**: `{ navigation, entries[] }`, where entries are `added`,
+  `removed`, or `changed` nodes by ref.
+
+After an action the substrate re-captures the document and diffs the ref maps.
+A navigation returns `{ navigation: true, entries: [] }` because the caller
+should re-read. Non-navigation actions return a small diff; the fixture test
+asserts it stays under 15% of the document.
+
 ## Not here yet
 
-Effects and deltas are T2.14. This package is the transport, the capture, the
-addressing layer, and the fallback verbs, not the op runtime.
+This package is the transport, the capture, the addressing layer, and the
+fallback verbs. The op runtime and the compiler are separate packages.

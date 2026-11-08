@@ -3,9 +3,11 @@ import { type Browser, type CDPSession, chromium, type Frame, type Page } from "
 import {
   type Action,
   type DispatchResult,
+  type Effect,
   type Engine,
   EngineError,
   type NavigateResult,
+  type NetworkEffect,
   type SemanticNode,
   type Snapshot,
 } from "./engine.js";
@@ -33,6 +35,16 @@ type RawAxNode = {
   backendDOMNodeId?: number;
   properties?: AxProperty[];
   childIds?: string[];
+};
+
+type RequestEvent = {
+  requestId: string;
+  request: { method: string; url: string };
+};
+
+type ResponseEvent = {
+  requestId: string;
+  response: { status: number };
 };
 
 type DomSnapshotResult = {
@@ -67,6 +79,9 @@ type CallResult = {
 export class PlaywrightEngine implements Engine {
   private readonly timeoutMs: number;
   private doc = 0;
+  private v = 0;
+  private readonly network = new Map<string, NetworkEffect>();
+  private networkOrder: string[] = [];
 
   private constructor(
     private readonly browser: Browser,
@@ -92,6 +107,14 @@ export class PlaywrightEngine implements Engine {
 
     page.on("framenavigated", (frame) => {
       if (frame === page.mainFrame()) engine.doc += 1;
+    });
+
+    void cdp.send("Network.enable").catch(() => {});
+    cdp.on("Network.requestWillBeSent", (event) => {
+      engine.recordRequest(event as unknown as RequestEvent);
+    });
+    cdp.on("Network.responseReceived", (event) => {
+      engine.recordResponse(event as unknown as ResponseEvent);
     });
 
     return engine;
@@ -131,6 +154,7 @@ export class PlaywrightEngine implements Engine {
 
     return {
       doc: this.doc,
+      v: this.v,
       url: this.page.url(),
       title: await this.page.title(),
       nodes: ax.nodes.map((node) => toSemanticNode(node, layout)),
@@ -138,6 +162,10 @@ export class PlaywrightEngine implements Engine {
   }
 
   async dispatch(action: Action): Promise<DispatchResult> {
+    const beforeUrl = this.page.url();
+    const beforeDoc = this.doc;
+    const networkMark = this.networkOrder.length;
+
     switch (action.do) {
       case "click":
         await this.click(action.backendNodeId);
@@ -163,11 +191,16 @@ export class PlaywrightEngine implements Engine {
         break;
     }
 
+    this.v += 1;
+    const effects = this.effectsSince(networkMark, action, beforeUrl, beforeDoc);
+
     return {
       ok: true,
       doc: this.doc,
+      v: this.v,
       url: this.page.url(),
       title: await this.page.title(),
+      effects,
     };
   }
 
@@ -230,6 +263,58 @@ export class PlaywrightEngine implements Engine {
     }
 
     return response.result.value as T;
+  }
+
+  private effectsSince(
+    mark: number,
+    action: Action,
+    beforeUrl: string,
+    beforeDoc: number,
+  ): Effect[] {
+    const effects: Effect[] = [];
+
+    if (this.doc !== beforeDoc || this.page.url() !== beforeUrl) {
+      effects.push({
+        kind: "navigation",
+        from: beforeUrl,
+        to: this.page.url(),
+        doc: this.doc,
+      });
+    }
+
+    for (const requestId of this.networkOrder.slice(mark)) {
+      const effect = this.network.get(requestId);
+      if (effect !== undefined) effects.push(effect);
+    }
+
+    if (action.do === "fill" || action.do === "select") {
+      effects.push({
+        kind: "value",
+        backendNodeId: action.backendNodeId,
+        value: action.value,
+      });
+    }
+
+    return effects;
+  }
+
+  private recordRequest(event: RequestEvent): void {
+    this.network.set(event.requestId, {
+      kind: "network",
+      method: event.request.method,
+      url: event.request.url,
+    });
+    this.networkOrder.push(event.requestId);
+
+    if (this.networkOrder.length > 500) {
+      const oldest = this.networkOrder.shift();
+      if (oldest !== undefined) this.network.delete(oldest);
+    }
+  }
+
+  private recordResponse(event: ResponseEvent): void {
+    const effect = this.network.get(event.requestId);
+    if (effect !== undefined) effect.status = event.response.status;
   }
 
   private async click(backendNodeId: number): Promise<void> {

@@ -15,6 +15,7 @@ import { BrowserRegistry } from "./browsers.js";
 import type { CanaryScheduler } from "./canary.js";
 import { notReadyExecutor, type OpExecutor } from "./executor.js";
 import { mergeHealth } from "./health.js";
+import type { Logger } from "./log.js";
 import type { MapStore } from "./maps.js";
 import { createMcpServer } from "./mcp.js";
 import type { SessionStore } from "./store.js";
@@ -37,6 +38,8 @@ export type ServerOptions = {
   recoverSessions?: boolean;
   /** Browser resources owned by sessions. */
   browsers?: BrowserRegistry;
+  /** Structured lifecycle events. */
+  log?: Logger;
 };
 
 /**
@@ -55,11 +58,13 @@ export function createServer(options: ServerOptions): FastifyInstance {
   if (options.recoverSessions !== false) {
     // A restart means the previous process's browsers are gone; no session
     // from that process can be resumed safely.
-    options.store.closeAllOpen();
+    const recovered = options.store.closeAllOpen();
+    if (recovered > 0) options.log?.info("session.recovered", { count: recovered });
   }
 
   const sweep = setInterval(() => {
-    options.store.sweepExpired(ttl);
+    const swept = options.store.sweepExpired(ttl);
+    if (swept.length > 0) options.log?.info("session.swept", { count: swept.length });
   }, options.cleanupIntervalMs ?? 60_000);
   sweep.unref();
 
@@ -87,8 +92,10 @@ export function createServer(options: ServerOptions): FastifyInstance {
 
   app.addHook("onClose", async () => {
     clearInterval(sweep);
-    options.store.closeAllOpen();
+    const closed = options.store.closeAllOpen();
+    const engineCount = browsers.size();
     await browsers.closeAll();
+    options.log?.info("server.closed", { sessions: closed, browsers: engineCount });
   });
 
   options.canary?.start();
@@ -122,6 +129,7 @@ export function createServer(options: ServerOptions): FastifyInstance {
 
     const open = options.store.countOpen();
     if (open >= cap) {
+      options.log?.warn("session.cap_reached", { open, cap });
       reply.code(429).send(
         failure("precondition_failed", "session limit reached", {
           reason: "session_limit",
@@ -132,7 +140,12 @@ export function createServer(options: ServerOptions): FastifyInstance {
       return;
     }
 
-    reply.code(201).send({ ok: true, result: options.store.create(parsed.data) });
+    const session = options.store.create(parsed.data);
+    options.log?.info("session.created", {
+      sid: session.sid,
+      ...(session.site !== undefined ? { site: session.site } : {}),
+    });
+    reply.code(201).send({ ok: true, result: session });
   });
 
   app.get<{ Params: { sid: string } }>("/v1/sessions/:sid", async (request, reply) => {
@@ -163,6 +176,7 @@ export function createServer(options: ServerOptions): FastifyInstance {
     }
 
     await browsers.close(sid);
+    options.log?.info("session.closed", { sid });
     return { ok: true, result: { sid, closed: true } };
   });
 

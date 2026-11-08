@@ -1,0 +1,27 @@
+{
+  "name": "@portolan/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "portolan": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "doctor": "node dist/bin.js doctor"
+  },
+  "dependencies": {
+    "@portolan/substrate": "workspace:*"
+  }
+}

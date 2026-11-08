@@ -15,6 +15,7 @@
     "fixtures:support:v2": "tsx fixtures/server.ts --fixture support --variant v2 --port 4123",
     "fixtures:wizard": "tsx fixtures/server.ts --fixture wizard --port 4101",
     "fixtures:wizard:v2": "tsx fixtures/server.ts --fixture wizard --variant v2 --port 4111",
+    "heldout:compile": "tsx heldout/compile.ts",
     "local:smoke": "vitest run bench/local/open-weights.test.ts",
     "oracle:mcp": "tsx oracle/main.ts",
     "oracle:smoke": "tsx oracle/live-smoke.ts",

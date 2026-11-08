@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { makeRunResult, type RunInput } from "./schema.js";
+import { writeFinalTable } from "./score.js";
 import { appendResult, readResults } from "./store.js";
 import { renderTable, summarizeByArm, writeTable } from "./table.js";
 
@@ -114,6 +115,27 @@ describe("run results", () => {
     const file = join(tempDir(), "table.md");
     writeTable([makeRunResult(input())], file);
     expect(readFileSync(file, "utf8")).toContain("| B | 1 | 100.0% |");
+  });
+
+  it("regenerates the final table from raw results", () => {
+    const file = join(tempDir(), "results.jsonl");
+    appendResult(file, makeRunResult(input({ run_id: "1", template_id: "template-a" })));
+    appendResult(
+      file,
+      makeRunResult(input({ run_id: "2", template_id: "template-a", success: false })),
+    );
+    appendResult(
+      file,
+      makeRunResult(input({ run_id: "3", template_id: "template-b", task_id: "template-b#1" })),
+    );
+
+    const results = readResults(file);
+    const out = join(tempDir(), "final-table.md");
+    writeFinalTable(results, out, { resamples: 100, seed: 1 });
+
+    const table = readFileSync(out, "utf8");
+    expect(table).toContain("| Arm | Runs | Templates | Success (95% CI)");
+    expect(table).toContain("| B | 3 | 2 |");
   });
 
   it("rejects an invalid row", () => {

@@ -1,0 +1,44 @@
+# Results
+
+Raw runs are JSONL, one `RunResult` per line. The table generator reads them
+and writes both a compact table and the final table with confidence intervals:
+
+```sh
+pnpm results:table
+# reads  bench/results/results.jsonl
+# writes bench/results/table.md
+#        bench/results/final-table.md
+```
+
+Arguments are `input`, `table`, `final`:
+
+```sh
+pnpm results:table bench/results/results.jsonl bench/results/table.md bench/results/final-table.md
+```
+
+## Scoring
+
+`scoreByArm` groups runs by template first, then arm. Each template gets a
+success rate, a cost per completed task, and steps per task; the arm's number
+is the mean of its template numbers.
+
+`bootstrapInterval` resamples **templates**, not runs. Runs of the same
+template are correlated, so resampling runs would overstate the evidence. The
+default is 2,000 resamples at 95%; the seed is fixed so a regenerated table is
+byte-identical.
+
+The final table shows the estimate and the interval:
+
+```
+| Arm | Runs | Templates | Success (95% CI) | $/completed (95% CI) | Steps/task (95% CI) |
+```
+
+A `—` in `$/completed` means no run of any template in that arm completed.
+
+## Raw results
+
+`appendResult` validates every row with `runResultSchema` before appending, and
+`readResults` validates every line on read. A malformed line names its line
+number and refuses to produce a table.
+
+`bench/results/results.jsonl` is not committed yet; the benchmark runs fill it.

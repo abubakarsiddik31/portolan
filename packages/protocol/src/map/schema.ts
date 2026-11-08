@@ -53,8 +53,10 @@ export const MAP_SCHEMA = {
       additionalProperties: false,
       anyOf: [
         { type: "object", properties: { role: {} }, required: ["role"] },
+        { type: "object", properties: { label: {} }, required: ["label"] },
         { type: "object", properties: { test_id: {} }, required: ["test_id"] },
       ],
+      dependentRequired: { name: ["role"], name_re: ["role"] },
       not: {
         type: "object",
         properties: { name: {}, name_re: {} },
@@ -62,12 +64,14 @@ export const MAP_SCHEMA = {
       },
       properties: {
         role: { type: "string", minLength: 1 },
+        label: { type: "string", minLength: 1 },
         name: { type: "string", minLength: 1 },
         name_re: { type: "string", minLength: 1 },
         ctx: { type: "string", minLength: 1 },
         ordinal: { type: "integer", minimum: 0 },
         test_id: { type: "string", minLength: 1 },
         attr: { enum: ["name", "value", "text", "href"] },
+        pattern: { type: "string", minLength: 1 },
       },
     },
 
@@ -100,6 +104,53 @@ export const MAP_SCHEMA = {
               additionalProperties: { $ref: "#/$defs/locator" },
             },
           },
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind"],
+          properties: {
+            kind: { const: "composite" },
+            fields: {
+              type: "object",
+              minProperties: 1,
+              additionalProperties: { $ref: "#/$defs/locator" },
+            },
+            rows: {
+              type: "object",
+              additionalProperties: false,
+              required: ["as", "container", "row", "cols"],
+              properties: {
+                as: {
+                  type: "string",
+                  pattern: "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                },
+                container: { $ref: "#/$defs/locator" },
+                row: { $ref: "#/$defs/locator" },
+                cols: {
+                  type: "object",
+                  minProperties: 1,
+                  additionalProperties: { $ref: "#/$defs/locator" },
+                },
+              },
+            },
+          },
+          anyOf: [
+            { type: "object", properties: { fields: {} }, required: ["fields"] },
+            { type: "object", properties: { rows: {} }, required: ["rows"] },
+          ],
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind"],
+          properties: { kind: { const: "download" } },
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind"],
+          properties: { kind: { const: "none" } },
         },
       ],
     },

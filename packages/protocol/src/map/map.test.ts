@@ -379,3 +379,90 @@ describe("write safety", () => {
     expect(() => loadMap(map)).toThrow(/unknown op "does_not_exist"/);
   });
 });
+
+describe("extractor shapes", () => {
+  it("accepts a label locator for a form field", () => {
+    const map = clone(STORE_MAP);
+    opAt(map, 3).impls = [
+      {
+        tier: "ui",
+        steps: [{ do: "fill", target: { label: "Full name" }, value: "{name}" }],
+        extract: { kind: "none" },
+      },
+    ];
+
+    expect(() => loadMap(map)).not.toThrow();
+  });
+
+  it("rejects a name without a role", () => {
+    const map = clone(STORE_MAP);
+    opAt(map, 3).impls = [
+      {
+        tier: "ui",
+        steps: [{ do: "click", target: { name: "Place order" } }],
+        extract: { kind: "none" },
+      },
+    ];
+
+    expect(() => loadMap(map)).toThrow(MapValidationError);
+  });
+
+  it("accepts composite, download, and none extractors", () => {
+    const map = clone(STORE_MAP);
+    opAt(map, 1).impls = [
+      {
+        tier: "url",
+        route: "/cart",
+        extract: {
+          kind: "composite",
+          fields: { subtotal: { test_id: "cart-subtotal" } },
+          rows: {
+            as: "items",
+            container: { test_id: "cart-table" },
+            row: { test_id: "cart-row" },
+            cols: { name: { role: "link" } },
+          },
+        },
+      },
+    ];
+    opAt(map, 0).impls = [{ tier: "url", route: "/cart", extract: { kind: "download" } }];
+    opAt(map, 3).impls = [
+      {
+        tier: "ui",
+        steps: [{ do: "click", target: { label: "Sign in" } }],
+        extract: { kind: "none" },
+      },
+    ];
+
+    expect(() => loadMap(map)).not.toThrow();
+  });
+
+  it("rejects a composite with neither fields nor rows", () => {
+    const map = clone(STORE_MAP);
+    opAt(map, 1).impls = [
+      {
+        tier: "url",
+        route: "/cart",
+        extract: { kind: "composite" } as never,
+      },
+    ];
+
+    expect(() => loadMap(map)).toThrow(MapValidationError);
+  });
+
+  it("rejects an invalid locator pattern", () => {
+    const map = clone(STORE_MAP);
+    opAt(map, 0).impls = [
+      {
+        tier: "url",
+        route: "/search?q={query}",
+        extract: {
+          kind: "fields",
+          fields: { id: { role: "link", attr: "href", pattern: "(" } },
+        },
+      },
+    ];
+
+    expect(() => loadMap(map)).toThrow(/invalid regular expression/);
+  });
+});

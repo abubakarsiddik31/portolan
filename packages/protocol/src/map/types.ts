@@ -18,11 +18,17 @@ export type OpStatus = "verified" | "degraded" | "broken";
  *
  * Never a CSS selector and never a ref: refs die with the document, and
  * selectors encode styling. A locator resolves against the live semantic
- * model at call time. `test_id` is a stable hook the app author publishes for
- * automation; it is used only when a page has no reliable role or name.
+ * model at call time. Use exactly one of:
+ *
+ * - `role` (+ `name` / `name_re`) for anything with an accessible role
+ * - `label` for a form field, resolved like `getByLabel`
+ * - `test_id` for a stable hook the app author publishes for automation
+ *
+ * `test_id` is not a CSS selector: it is an intentional, stable contract.
  */
 export type Locator = {
   role?: string;
+  label?: string;
   name?: string;
   name_re?: string;
   /** Human hint for disambiguation, e.g. "product card". */
@@ -31,6 +37,12 @@ export type Locator = {
   test_id?: string;
   /** Which value to read. Only meaningful inside an extractor. */
   attr?: "name" | "value" | "text" | "href";
+  /**
+   * Applied to the extracted string; the first capture group, or the whole
+   * match when there is none, becomes the value. Used to pull an id out of a
+   * URL, e.g. `/p/([^/]+)$` on `/p/p_101`.
+   */
+  pattern?: string;
 };
 
 export type FieldExtractor = {
@@ -45,7 +57,35 @@ export type RowsExtractor = {
   cols: Record<string, Locator>;
 };
 
-export type Extractor = FieldExtractor | RowsExtractor;
+/** Scalar fields and one row list, for results like `{ subtotal, items[] }`. */
+export type CompositeExtractor = {
+  kind: "composite";
+  fields?: Record<string, Locator>;
+  rows?: {
+    /** Key the row array is returned under. */
+    as: string;
+    container: Locator;
+    row: Locator;
+    cols: Record<string, Locator>;
+  };
+};
+
+/** The op's result is the file the browser downloaded. */
+export type DownloadExtractor = {
+  kind: "download";
+};
+
+/** The op returns an empty object, e.g. sign-in. */
+export type NoneExtractor = {
+  kind: "none";
+};
+
+export type Extractor =
+  | FieldExtractor
+  | RowsExtractor
+  | CompositeExtractor
+  | DownloadExtractor
+  | NoneExtractor;
 
 export type WebmcpImpl = {
   tier: "webmcp";

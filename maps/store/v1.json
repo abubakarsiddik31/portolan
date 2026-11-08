@@ -1,0 +1,389 @@
+{
+  "site": "store",
+  "origins": ["http://127.0.0.1:4100"],
+  "version": 1,
+  "states": [
+    {
+      "id": "catalog",
+      "url": "/",
+      "marks": [{ "label": "Search products" }]
+    },
+    {
+      "id": "results",
+      "url": "/search",
+      "marks": [{ "test_id": "product-grid" }]
+    },
+    {
+      "id": "product",
+      "url": "/p/:id",
+      "marks": [{ "test_id": "product-detail" }]
+    },
+    {
+      "id": "cart",
+      "url": "/cart",
+      "marks": [{ "role": "heading", "name": "Your cart" }]
+    },
+    {
+      "id": "checkout",
+      "url": "/checkout",
+      "marks": [{ "role": "button", "name": "Place order" }]
+    },
+    {
+      "id": "order",
+      "url": "/orders/:id",
+      "marks": [{ "test_id": "order-id" }]
+    }
+  ],
+  "ops": [
+    {
+      "name": "search",
+      "version": 1,
+      "summary": "Search products.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "minLength": 1 }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "name": { "type": "string" },
+            "price": { "type": "string" }
+          },
+          "required": ["id", "name", "price"],
+          "additionalProperties": false
+        }
+      },
+      "from": ["catalog", "results"],
+      "to": ["results"],
+      "post": [{ "kind": "state", "state": "results" }],
+      "effect": "read",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/search?q={query}",
+          "extract": {
+            "kind": "rows",
+            "container": { "test_id": "product-grid" },
+            "row": { "role": "article" },
+            "cols": {
+              "id": {
+                "role": "link",
+                "attr": "href",
+                "pattern": "/p/([^/]+)$"
+              },
+              "name": { "role": "link" },
+              "price": { "role": "paragraph", "ordinal": 1 }
+            }
+          }
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "name": "get_product",
+      "version": 1,
+      "summary": "Read a product and its variants.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "product_id": { "type": "string", "minLength": 1 }
+        },
+        "required": ["product_id"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "price": { "type": "string" },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "label": { "type": "string" }
+              },
+              "required": ["id", "label"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["name", "price", "variants"],
+        "additionalProperties": false
+      },
+      "from": ["catalog", "results", "product"],
+      "to": ["product"],
+      "post": [{ "kind": "state", "state": "product" }],
+      "effect": "read",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/p/{product_id}",
+          "extract": {
+            "kind": "composite",
+            "fields": {
+              "name": { "role": "heading", "ordinal": 0 },
+              "price": { "role": "paragraph", "ordinal": 2 }
+            },
+            "rows": {
+              "as": "variants",
+              "container": { "label": "Size / color" },
+              "row": { "role": "option" },
+              "cols": {
+                "id": { "role": "option", "attr": "value" },
+                "label": { "role": "option", "attr": "text" }
+              }
+            }
+          }
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "name": "add_to_cart",
+      "version": 1,
+      "summary": "Add a variant to the cart.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "product_id": { "type": "string", "minLength": 1 },
+          "variant_id": { "type": "string", "minLength": 1 },
+          "qty": { "type": "integer", "minimum": 1, "maximum": 10 }
+        },
+        "required": ["product_id", "variant_id", "qty"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "qty": { "type": "integer" },
+            "total": { "type": "string" }
+          },
+          "required": ["name", "qty", "total"],
+          "additionalProperties": false
+        }
+      },
+      "from": ["product"],
+      "to": ["cart"],
+      "post": [{ "kind": "state", "state": "cart" }],
+      "effect": "write",
+      "impls": [
+        {
+          "tier": "ui",
+          "steps": [
+            {
+              "do": "select",
+              "target": { "label": "Size / color" },
+              "value": "{variant_id}"
+            },
+            {
+              "do": "fill",
+              "target": { "label": "Quantity" },
+              "value": "{qty}"
+            },
+            {
+              "do": "click",
+              "target": { "role": "button", "name": "Add to cart" }
+            },
+            { "do": "await_state", "state": "cart" }
+          ],
+          "extract": {
+            "kind": "rows",
+            "container": { "test_id": "cart-table" },
+            "row": { "test_id": "cart-row" },
+            "cols": {
+              "name": { "role": "link" },
+              "qty": { "role": "spinbutton", "attr": "value" },
+              "total": { "role": "cell", "ordinal": 3 }
+            }
+          }
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "name": "view_cart",
+      "version": 1,
+      "summary": "Read the cart.",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "subtotal": { "type": "string" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "qty": { "type": "integer" },
+                "total": { "type": "string" }
+              },
+              "required": ["name", "qty", "total"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["subtotal", "items"],
+        "additionalProperties": false
+      },
+      "from": ["catalog", "product", "cart"],
+      "to": ["cart"],
+      "post": [{ "kind": "state", "state": "cart" }],
+      "effect": "read",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/cart",
+          "extract": {
+            "kind": "composite",
+            "fields": {
+              "subtotal": { "test_id": "cart-subtotal" }
+            },
+            "rows": {
+              "as": "items",
+              "container": { "test_id": "cart-table" },
+              "row": { "test_id": "cart-row" },
+              "cols": {
+                "name": { "role": "link" },
+                "qty": { "role": "spinbutton", "attr": "value" },
+                "total": { "role": "cell", "ordinal": 3 }
+              }
+            }
+          }
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "name": "checkout",
+      "version": 1,
+      "summary": "Place an order.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "email": { "type": "string", "minLength": 3 },
+          "address": { "type": "string", "minLength": 1 },
+          "city": { "type": "string", "minLength": 1 },
+          "postal": { "type": "string", "minLength": 1 },
+          "card": { "type": "string", "minLength": 12 }
+        },
+        "required": ["name", "email", "address", "city", "postal", "card"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "order_id": { "type": "string" }
+        },
+        "required": ["order_id"],
+        "additionalProperties": false
+      },
+      "from": ["cart"],
+      "to": ["order"],
+      "post": [
+        { "kind": "state", "state": "order" },
+        { "kind": "url", "pattern": "^/orders/ord_" }
+      ],
+      "effect": "irreversible",
+      "confirm": true,
+      "impls": [
+        {
+          "tier": "ui",
+          "steps": [
+            {
+              "do": "fill",
+              "target": { "label": "Full name" },
+              "value": "{name}"
+            },
+            {
+              "do": "fill",
+              "target": { "label": "Email" },
+              "value": "{email}"
+            },
+            {
+              "do": "fill",
+              "target": { "label": "Address" },
+              "value": "{address}"
+            },
+            {
+              "do": "fill",
+              "target": { "label": "City" },
+              "value": "{city}"
+            },
+            {
+              "do": "fill",
+              "target": { "label": "Postal code" },
+              "value": "{postal}"
+            },
+            {
+              "do": "fill",
+              "target": { "label": "Card number" },
+              "value": "{card}"
+            },
+            {
+              "do": "click",
+              "target": { "role": "button", "name": "Place order" }
+            },
+            { "do": "await_state", "state": "order" }
+          ],
+          "extract": {
+            "kind": "fields",
+            "fields": {
+              "order_id": { "test_id": "order-id", "attr": "text" }
+            }
+          }
+        }
+      ],
+      "status": "verified"
+    }
+  ],
+  "entities": {
+    "Product": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "string" }
+      },
+      "required": ["id", "name", "price"],
+      "additionalProperties": false
+    },
+    "CartItem": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "qty": { "type": "integer" },
+        "total": { "type": "string" }
+      },
+      "required": ["name", "qty", "total"],
+      "additionalProperties": false
+    },
+    "Order": {
+      "type": "object",
+      "properties": {
+        "order_id": { "type": "string" }
+      },
+      "required": ["order_id"],
+      "additionalProperties": false
+    }
+  },
+  "compiled_from": [],
+  "verified_at": "2026-11-08T00:00:00Z"
+}

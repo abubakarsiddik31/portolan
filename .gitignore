@@ -9,7 +9,11 @@
 # Node
 node_modules/
 dist/
+*.tsbuildinfo
 *.log
+
+# Test output
+coverage/
 
 # Python
 __pycache__/

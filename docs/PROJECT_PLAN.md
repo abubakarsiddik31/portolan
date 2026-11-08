@@ -28,7 +28,7 @@
 | R9 | Benchmark report published with methods and raw data | T7.03 |
 | R10 | License chosen; trademark search done; npm scope and GitHub org secured | T7.05, T7.06 |
 
-**Not in v0.1.0:** hosted runtime, billing, `freeze`/`hibernate`, SkillWeaver-style exploration, WebMCP tier, Lightpanda tier, human "record a workflow" UI. These are v0.2+ (§9).
+**Not in v0.1.0:** hosted runtime, billing, `freeze`/`hibernate`, SkillWeaver-style exploration, WebMCP tier, Lightpanda tier, human "record a workflow" UI, and the human cockpit. These are v0.2+ (§9). The cockpit is the first post-release workstream (ADR-007) and must not delay a gate.
 
 ---
 
@@ -327,4 +327,15 @@ Co-Authored-By: …   (when applicable)
 
 ## 9. After v0.1.0 (not scheduled)
 
-`freeze`/`hibernate`; WebMCP tier; SkillWeaver-style exploration; recorded-workflow UI; hosted runtime and billing; Lightpanda tier (after license review); vertical map library growth; multi-tab sessions.
+The cockpit is the first post-release workstream (ADR-007). It is a projection of the session event log, not a second browser, and it must not delay a gate.
+
+| ID | Task | Effort | Depends on | Done criteria |
+|---|---|---|---|---|
+| T8.01 | Session event log: append-only schema, writer, reader, replay | 5h | T2.06 | Every observation, action, effect and write is an event; replay is lossless |
+| T8.02 | Control bus: `control_owner`, pause/resume, takeover | 4h | T8.01 | The agent cannot act while a human owns control; release re-observes and bumps `v` |
+| T8.03 | Cockpit package: live viewport, timeline, inspector | 10h | T8.01 | A human can watch a session and inspect every step |
+| T8.04 | Redaction and local auth for the cockpit | 4h | T8.03 | Secrets are masked; localhost plus a session token only |
+| T8.05 | Takeover UX and conflict tests | 4h | T8.02, T8.03 | A human can take over a paused session; refs are invalidated on release |
+| T8.06 | Replay and audit export | 3h | T8.01 | A session can be replayed and exported as JSONL |
+
+Also after v0.1.0: `freeze`/`hibernate`; WebMCP tier; SkillWeaver-style exploration; recorded-workflow UI; hosted runtime and billing; Lightpanda tier (after license review); vertical map library growth; multi-tab sessions.

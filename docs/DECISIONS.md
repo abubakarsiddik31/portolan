@@ -227,6 +227,125 @@ The project, repository, CLI, packages, MCP server and skills are named **Portol
 
 ---
 
+## ADR-007 — One session, two projections: agent-native execution with a human-visible cockpit
+
+**Status:** Accepted, 2026-11-08
+**Deciders:** Abubakar Siddik
+**Related:** ADR-001, ADR-002; `docs/VISION.md`; `docs/SUBSTRATE.md`; `docs/BUILD_PLAN.md` §9; `docs/PROJECT_PLAN.md` §9
+
+### Context
+
+Two shapes dominate the market, and both are wrong for a platform team.
+
+- **A human UI forced onto an agent.** The model receives a DOM dump or a screenshot and infers what a person would click. State lives in the conversation, the bill grows with the step count, and the interaction is a translation of a human interface.
+- **A black-box agent.** The model gets a clean API, but a human cannot see what it is doing, cannot stop it, and cannot explain a failed write.
+
+The current plan listed "a human-facing browser UI" as a non-goal. That protected the build from scope creep, but it also removed the trust surface a buyer needs before allowing writes. The direction has changed: the human view is not the product, but it is a first-class projection of the product.
+
+### Decision
+
+1. **One session, one append-only event log.** Every observation, action, effect, state transition and write is an event. The log is the source of truth and the audit trail.
+2. **Two projections.** The agent projection is the map, typed ops, affordances, deltas and effects. The human projection is a live viewport, action timeline, inspector and audit log. Neither is derived from the other; both are derived from the event log.
+3. **Explicit control ownership.** `control_owner: "agent" | "human"`. A human takeover pauses the agent, grants input control, and on release forces a re-observation, bumps the document version, and invalidates refs.
+4. **The runtime is headless-first.** The cockpit is an optional package that attaches to a session. Nothing in the runtime depends on it.
+5. **The cockpit ships after v0.1.0.** The event log and control protocol are foundational and land in P2; the cockpit is a v0.2 workstream and must not delay G0/G1.
+
+### Rationale
+
+- **Trust is a feature.** A platform team will not let an agent near a payment form it cannot watch. The cockpit is the difference between a demo and a procurement approval.
+- **Debugging is a feature.** A failed op is a sequence of events, not a stack trace. Replay is the support tool.
+- **Takeover needs one state.** A separate viewer browser would diverge from the agent's page within one action. One session is the only way to make "stop and take over" safe.
+- **Open source needs a demo surface.** People adopt what they can watch. The cockpit is the best explanation of the interaction model.
+- **It preserves the thesis.** The agent still uses maps, not screens. The human view is a projection, not the interface the agent uses.
+
+### Consequences
+
+**Positive**
+- A single event model gives replay, audit, canaries and the cockpit for free.
+- Human oversight becomes a protocol feature, not a UI hack.
+- The open-source cockpit is an adoption channel and a community contribution surface.
+
+**Negative**
+- New event schema, streaming transport, redaction rules and a control protocol.
+- The cockpit is real product surface: auth, redaction, latency, accessibility.
+- Takeover introduces concurrency and conflict resolution between agent and human.
+
+**Mitigations**
+- Event schema is versioned and additive; the log is JSONL/SQLite, not a message bus.
+- Screenshots on action/state change by default; screencast only in watch mode.
+- The cockpit is local-only by default, bound to localhost with a session token, and redacts secrets.
+- The control lock is explicit; the agent cannot act while `control_owner` is `human`.
+
+### Alternatives rejected
+
+| Alternative | Why rejected |
+|---|---|
+| **No human view** | Black box; blocks writes and enterprise adoption. |
+| **A separate viewer browser** | Diverges from the agent's session; takeover is unsafe; two sources of truth. |
+| **Screenshot-only viewer** | Good for watching, useless for inspecting state, effects or a failed write. |
+| **VNC / noVNC** | Heavy, exposes a full desktop, and still does not show typed ops or effects. |
+| **Cockpit in v0.1.0** | Would delay the gates and turn a runtime into a browser product. |
+
+### Revisit triggers
+
+1. **The cockpit delays a gate.** Cut it from the critical path; keep the event log.
+2. **Takeover conflicts cost success rate.** Restrict takeover to paused sessions first.
+3. **Streaming cost dominates.** Drop to action-triggered screenshots only.
+4. **A client provides its own cockpit.** Keep the event log; expose it over a stable API.
+
+---
+
+## ADR-008 — Open source: Apache-2.0 runtime, MIT cockpit, CC-BY map spec
+
+**Status:** Accepted, 2026-11-08
+**Deciders:** Abubakar Siddik
+**Related:** ADR-004, ADR-007; `docs/VISION.md`; `LICENSE`; `SECURITY.md`
+
+### Context
+
+Portolan's distribution depends on agents and clients adopting a protocol and a map format. A proprietary runtime would make every integration a vendor negotiation. The durable asset is not the source code; it is the verified map library, the safety model, and the published benchmark.
+
+### Decision
+
+- **Runtime, SDK, CLI, skills:** Apache-2.0.
+- **Human cockpit:** MIT.
+- **Protocol and map spec:** CC-BY-4.0.
+- **Open formats:** MCP for execution, Agent Skills for knowledge, JSON maps in git.
+- **No AGPL dependency in the default path.** Lightpanda remains an optional adapter until counsel clears it.
+- **Verified maps are signed** and carry replay history before they receive the badge.
+- **Business model:** hosted runtime, concurrency, observability, vertical map packs, support. Never per-browser-hour; never the source code.
+
+### Rationale
+
+- **Adoption is the moat.** A protocol only matters when other people implement it. Apache-2.0 removes the legal friction.
+- **Maps are the compounding asset.** Code can be copied; a verified, canaried map library for one vertical cannot be copied without the runs.
+- **Open source improves safety.** A write path that many people can inspect is more trustworthy than one that is hidden.
+- **The buyer already chose a model and a client.** An open runtime fits; a proprietary one asks them to switch.
+
+### Consequences
+
+- Community maps need review, signing and a canary history; an unsigned map is not verified.
+- The cockpit becomes a community surface with its own maintainers and accessibility bar.
+- The project needs governance: a contributing guide, a security policy, a code of conduct and a release process.
+- The business must sell operations and trust, not access to code.
+
+### Alternatives rejected
+
+| Alternative | Why rejected |
+|---|---|
+| **AGPL runtime** | Blocks enterprise adoption and the hosted model; the network clause is a legal tax on every customer. |
+| **Open-core with a closed runtime** | The protocol is the distribution; a closed core makes every integration a negotiation. |
+| **Proprietary map registry** | The registry is the asset, but locking it prevents the community from growing it. |
+| **MIT everywhere** | No patent grant for the runtime; Apache-2.0 is the better default for infrastructure. |
+
+### Revisit triggers
+
+1. **A major contributor requires a different license.** Revisit with counsel, not in a PR.
+2. **Community maps create a security incident.** Tighten signing and review before widening contribution.
+3. **The hosted business cannot fund the commons.** Add a foundation or a sponsorship model, not a license change.
+
+---
+
 ## Related decisions (one-line rationale)
 
 | Decision | Why |

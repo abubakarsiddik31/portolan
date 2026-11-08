@@ -143,6 +143,17 @@ JSONL is the source of truth and reloads losslessly. HAR is a projection:
 view and read entries do not appear, and request timings are zero because the
 engine settles on network idle rather than timing each request.
 
+## Redaction
+
+`redactRecord` replaces credential keys (`password`, `card`, `token`, `secret`,
+`api_key`, `authorization`, and similar) recursively. `redactTrace` also
+redacts the value of an action whose accessible name is a credential, a later
+read of that ref, and the request and response bodies of its network effects.
+
+`TraceStore` applies `redactTrace` before writing JSONL and before exporting
+HAR, so a login request body or a password fill cannot survive in either. The
+audit log applies `redactRecord` at the storage boundary.
+
 ## Not here yet
 
 A durable write ledger and the audit log are T2.23–T2.24; download capture is

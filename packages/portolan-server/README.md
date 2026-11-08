@@ -32,6 +32,22 @@ Every response, including errors, uses the protocol envelope:
 Malformed JSON and schema violations are `invalid_request` with
 `details.issues`. An unknown or already-closed session is `session_not_found`.
 
+## Credentials
+
+`createCredentialStore()` returns a chain: environment first, then the OS
+keychain.
+
+- **Environment:** `PORTOLAN_<SITE>_<KEY>`, e.g. `PORTOLAN_STORE_API_KEY`.
+- **macOS:** `security find-generic-password -s portolan:<site>:<key> -w`.
+- **Linux:** `secret-tool lookup service portolan site <site> key <key>`.
+
+The site is part of the lookup, so a credential for one site is not visible
+under another. A missing entry is `undefined`, not an error.
+
+The audit log redacts credential keys (`password`, `card`, `token`, `secret`,
+`api_key`, `authorization`, and similar) before writing, so a checkout or a
+login does not store the value that was passed.
+
 ## Canary and op health
 
 `CanaryScheduler` runs read ops on an interval and records one status per op

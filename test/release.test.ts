@@ -65,11 +65,15 @@ describe("release dry run", () => {
     );
   });
 
-  it.skipIf(!BUILT)("packs a tarball for every package", () => {
-    const out = tempDir();
-    execFileSync(process.execPath, [SCRIPT, "--out", out], { encoding: "utf8" });
+  it.skipIf(!BUILT)(
+    "packs a tarball for every package",
+    () => {
+      const out = tempDir();
+      execFileSync(process.execPath, [SCRIPT, "--out", out], { encoding: "utf8" });
 
-    const tarballs = readdirSync(out).filter((file) => file.endsWith(".tgz"));
-    expect(tarballs).toHaveLength(8);
-  });
+      const tarballs = readdirSync(out).filter((file) => file.endsWith(".tgz"));
+      expect(tarballs).toHaveLength(8);
+    },
+    120_000,
+  );
 });

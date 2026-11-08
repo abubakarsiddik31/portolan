@@ -34,6 +34,26 @@ exactly like a recorded run.
 A failed act is fed back to the model but not recorded: a stale ref is a retry,
 not a step in the intent.
 
+## Segmenter
+
+`segmentTrace(trace, map)` cuts a run at state and URL changes, then merges
+pieces that belong to one op according to the map's `from`/`to` sets:
+
+- **Store:** the five UI pieces map to `search`, `get_product`, `add_to_cart`,
+  `open_checkout`, and `checkout`.
+- **Wizard:** three step changes merge into one `submit_application`, because
+  that op runs from `step1` to `done`.
+- **Portal:** login and a same-state filter stay separate; the filter changes
+  the URL even though the state stays `invoices`.
+
+A candidate is only chosen when the from/to match is unique. When several ops
+share the same boundaries, the segment is marked ambiguous and left for the
+model.
+
+`labelSegments({ model, map, segments })` asks the model once for a label per
+segment: `reuse` an existing op, `extend` one, or `propose` a new one. The
+deterministic candidate is a hint, not an answer.
+
 ## Local models
 
 The repair role is provider-agnostic. Any OpenAI-compatible endpoint works:

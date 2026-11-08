@@ -1,16 +1,11 @@
-import { type RepairDecision, repairIntent } from "@portolan/compiler";
-import {
-  createModelPort,
-  type ModelConfig,
-  type ModelPort,
-  type ObjectRequest,
-  type Usage,
-} from "@portolan/model";
+import { repairIntent } from "@portolan/compiler";
+import { createModelPort, type ModelConfig } from "@portolan/model";
 import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { buildStoreApp } from "../fixtures/store/v1/app.js";
+import { createRepairScript } from "./scripted-model.js";
 
 const CHROME = findChrome();
 const ENABLED =
@@ -19,63 +14,6 @@ const ENABLED =
 const LOCAL_BASE = process.env.PORTOLAN_LOCAL_BASE_URL;
 const LOCAL_MODEL = process.env.PORTOLAN_LOCAL_MODEL;
 const LIVE = ENABLED && LOCAL_BASE !== undefined && LOCAL_MODEL !== undefined;
-
-const USAGE: Usage = {
-  input: 0,
-  cached_input: 0,
-  output: 0,
-  provider: "scripted",
-  model: "scripted",
-};
-
-type ScriptStep =
-  | { kind: "act"; role: string; name: string; do: "click" | "fill"; value?: string }
-  | { kind: "done"; answer: string };
-
-/**
- * Resolve a role and name to the ref in the observation, the same way a model
- * reads the affordance list. The prompt has one line per affordance:
- * `e1a2b textbox "Search products"`.
- */
-function refFromPrompt(prompt: string, role: string, name: string): string {
-  const needle = `${role} ${JSON.stringify(name)}`;
-  const line = prompt.split("\n").find((candidate) => candidate.includes(needle));
-  const ref = line?.trim().split(" ")[0];
-
-  if (ref === undefined || ref.length === 0) {
-    throw new Error(`no ${role} named "${name}" in the observation`);
-  }
-
-  return ref;
-}
-
-function scriptedRepair(steps: ScriptStep[]): ModelPort {
-  let index = 0;
-
-  return {
-    async object<T>(req: ObjectRequest): Promise<{ value: T; usage: Usage }> {
-      const step = steps[index];
-      index += 1;
-      if (step === undefined) throw new Error("repair script ran out of steps");
-
-      const decision: RepairDecision =
-        step.kind === "done"
-          ? { thought: "Done.", tool: "done", answer: step.answer }
-          : {
-              thought: `${step.do} ${step.role} "${step.name}".`,
-              tool: "act",
-              ref: refFromPrompt(req.prompt, step.role, step.name),
-              do: step.do,
-              ...(step.value !== undefined ? { value: step.value } : {}),
-            };
-
-      return { value: decision as T, usage: USAGE };
-    },
-    async agent() {
-      throw new Error("the repair script does not implement agent()");
-    },
-  };
-}
 
 async function listen(app: FastifyInstance): Promise<string> {
   await app.listen({ port: 0, host: "127.0.0.1" });
@@ -118,7 +56,7 @@ describe.skipIf(!ENABLED)("headless repair", () => {
     await engine.navigate(store);
 
     const result = await repairIntent({
-      model: scriptedRepair([
+      model: createRepairScript([
         {
           kind: "act",
           role: "textbox",

@@ -1,5 +1,6 @@
 import { reapOrphans } from "@portolan/substrate";
 
+import { createLogger } from "./log.js";
 import { createServer } from "./server.js";
 import { SessionStore } from "./store.js";
 
@@ -14,7 +15,8 @@ if (instanceId !== undefined && instanceId !== "") {
   reapOrphans(instanceId);
 }
 
-const app = createServer({ store, logger: true });
+const log = createLogger({ base: { service: "portolan-server" } });
+const app = createServer({ store, logger: true, log });
 
 const shutdown = async (): Promise<void> => {
   try {

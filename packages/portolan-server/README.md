@@ -64,6 +64,29 @@ Recovery closes rows, not OS processes. A runtime killed with `SIGKILL` leaves
 its Chromium children behind; call `reapOrphans(instanceId)` from
 `@portolan/substrate` at startup to kill them before opening new browsers.
 
+## Logs
+
+`createLogger()` writes one JSON object per line:
+
+```ts
+import { createLogger } from "@portolan/server";
+
+const log = createLogger({ base: { service: "portolan-server" } });
+log.info("session.created", { sid: "..." });
+// {"ts":"...","level":"info","event":"session.created","service":"portolan-server","sid":"..."}
+```
+
+- **Levels:** `debug`, `info` (default), `warn`, `error`; lines below the
+  level are dropped.
+- **Redaction:** every field is redacted by key, recursively, so `password`,
+  `token`, `api_key`, and the rest of `SENSITIVE_KEYS` never reach the line.
+- **Child loggers:** `log.child({ sid })` merges fields into every line.
+- **Events:** `createServer` emits `session.recovered`, `session.swept`,
+  `session.created`, `session.closed`, `session.cap_reached`, and
+  `server.closed`.
+
+Fastify's own request log is separate; pass `logger: true` to enable it.
+
 ## Credentials
 
 `createCredentialStore()` returns a chain: environment first, then the OS

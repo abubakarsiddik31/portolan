@@ -1,45 +1,47 @@
-# Facet
+# Portolan
 
-> **The web, one facet at a time.**
+> **Chart the web once. Every agent sails it.**
 
-A stateful browser that synthesizes a temporary API for any website and talks to agents in **affordances, effects, and deltas** — so a web task costs cents, not dollars.
+*Formerly Facet. Why the name: [ADR-004](./docs/DECISIONS.md).*
+
+Portolan turns a website into a **map an agent can call**: the site's states, and typed operations like `search(query)`, `add_to_cart(product_id, size)` or `export(filter)` that move between them. Agents call operations instead of looking at screens and clicking. Maps are learned from real runs, verified by replay, and repaired when the site changes. Portolan works with **any model and any MCP client**: MCP carries execution and safety, Agent Skills carry the know-how.
 
 ---
 
 ## Status
 
-**Pre-build. Documentation only. No code yet.**
-
-This repository exists to carry a complete, researched product thesis into the build session. Everything needed to start is here: the PRD, the market analysis, the reasoning trail, and the decisions already made.
+**Pre-build. Documentation and build plan only. No code yet.**
 
 | | |
 |---|---|
 | Stage | Pre-build / validated on paper, unvalidated in code |
 | Date of analysis | 2026-11-08 |
-| Next milestone | 20-task benchmark + cost meter (see [PRD §10](./PRD.md#10-launch-gates)) |
-| Blocking question | Stateful vs stateless default session model |
+| Current plan | [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) (what and how) · [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) (when and who) |
+| First release | v0.1.0 public alpha, target **Tue 2027-03-02** |
+| First gate | Day 2: hand-written ops must beat the best free tool by ≥3x on steps and ≥5x on cost, or we stop |
+| Key decisions | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic; MCP + Skills), ADR-004 (name) in [docs/DECISIONS.md](./docs/DECISIONS.md) |
 
 ---
 
 ## The thesis in one paragraph
 
-Agents today are handed documents — DOM dumps and screenshots — and asked to infer an API. That is why a 30-step task bills ~450k input tokens and grows quadratically: the state lives in the conversation, so every step re-sends every previous observation. Facet moves the state into the browser. The agent holds a session handle and stable element references; the browser holds the page, history, and network. Steps become stateless, O(n²) collapses to O(n), and the per-task bill drops roughly 40x. Cheap compute is a constraint we satisfy, not the pitch.
+Agents today are handed screens, DOM dumps, or element lists and asked to work out, click by click, what a website can do. Every click is a model step, and steps are what cost money, time and reliability. Compact page views help each step but don't remove any, and free tools already provide them. Portolan removes the steps: it gives the agent a map of the site, with named states and typed operations, and executes each operation through the cheapest path that has been verified (a URL, the site's own API request, or a semantic UI program), falling back to a step-by-step agent only when no operation fits. A ten-click checkout becomes three calls with typed results. Writes are governed: effects are declared, irreversible operations need confirmation, and a write with an unknown outcome is never silently retried.
 
-**Facet is not a cheaper Chromium.** It is an interaction model that happens to need a browser.
+**Portolan is not a browser for agents.** It is an API layer for websites that happens to run on one.
 
 ---
 
-## The product surface: five verbs
+## What an agent sees
 
-```jsonc
-goto   →  affordances        // ranked, typed, token-budgeted action list
-act    →  effects + delta    // what changed structurally, never a full snapshot
-read   →  markdown           // explicit, separate from acting
-sleep  →  snapshot to disk   // idle time becomes free
-wake   →  restore in ~15ms   // resume mid-task, no restart
 ```
-
-The agent never sees HTML. It asks *what can I do here*, does it, and is told *what changed*.
+open_site("acme-store")
+→ acme-store · map v14 · verified 2h ago · you are in: home (logged_in)
+  search(query, page=1)                 → [{id, name, price, url}]       read
+  add_to_cart(product_id, size, qty=1)  → {cart_count, subtotal}         write
+  view_cart()                           → {items[], subtotal}            read
+  checkout(shipping_id, payment_id)     → {order_id}                     irreversible · needs confirm
+  fallback: view() / act() / read()
+```
 
 ---
 
@@ -47,8 +49,13 @@ The agent never sees HTML. It asks *what can I do here*, does it, and is told *w
 
 | File | What's in it |
 |---|---|
-| [PRD.md](./PRD.md) | Product requirements: problem, goals, five verbs, architecture, P0–P2 requirements, metrics, launch gates, risks, phases |
-| [docs/ANALYSIS.md](./docs/ANALYSIS.md) | The full research and reasoning: market evidence, funding, pricing, cost model math, competitive landscape, the reasoning trail, rejected paths, falsification criteria, sources |
+| [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) | **Start here.** Map model, op runtime, write safety, compiler, agent surface, stack, benchmark, gates, 15-day build order, landscape |
+| [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) | Schedule to v0.1.0 (Mar 2, 2027): release criteria, milestones, ~95 tasks with estimates and dependencies, gates, risks, commit and PR conventions |
+| [docs/DECISIONS.md](./docs/DECISIONS.md) | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic; MCP + Skills), ADR-004 (name), one-line rationale for other choices |
+| [docs/SUBSTRATE.md](./docs/SUBSTRATE.md) | The stateful browser layer underneath: engine adapter, semantic engine, refs, effects, hibernation, meter |
+| [docs/ANALYSIS.md](./docs/ANALYSIS.md) | Market evidence, cost model, competitive landscape, reasoning trail (v1 → v4), falsification criteria |
+| [PRD.md](./PRD.md) | v0.1 requirements. Partly superseded by ADR-002; its verbs and architecture now describe the substrate. Rewrite pending. |
+| [docs/archive/BUILD_PLAN_v1.md](./docs/archive/BUILD_PLAN_v1.md) | The v1 plan (affordance browser) and its adversarial review, written under the old name Facet, kept for the record |
 
 ---
 
@@ -56,53 +63,48 @@ The agent never sees HTML. It asks *what can I do here*, does it, and is told *w
 
 These were argued through and should not be re-litigated without new evidence.
 
-1. **Do not write a rendering engine.** Rent engines behind a four-method adapter (`navigate`, `snapshot`, `dispatch_input`, `evaluate`). Start on Playwright/Chromium; swap to Lightpanda when its JS coverage justifies it.
-2. **North star is `$ per completed task`.** Not browser-hours, not tokens. It is the metric nobody else in the category publishes, and it is the metric the buyer already tracks.
-3. **Never price per browser-hour.** Hosted browsers sell at $0.02–$0.10/hr. That is the commodity the product escapes.
-4. **A stateful browser is the mechanism.** State lives in the session, not in the agent's context. This is the entire cost argument.
-5. **Cost may not buy success rate.** Any optimization that loses more than 2 points of task success is rejected.
-6. **Launch gate is 5x cost reduction, not 2x.** At 1.5x we have a feature incumbents ship in a quarter.
+1. **Do not write a rendering engine.** Rent engines behind a four-method adapter. Playwright/Chromium first.
+2. **The product is the map, not the browser** (ADR-002). Typed operations cut steps; compact observations only cut tokens per step.
+3. **Sessions are stateful** (ADR-001). A map needs a live session to recognize state, route to preconditions, and run UI operations.
+4. **No LLM in the hot path.** A verified operation runs deterministically. When no operation fits, the **caller's own agent** finishes the step with Portolan's fallback tools.
+5. **Provider- and LLM-agnostic** (ADR-003). The offline compiler reaches models through one `ModelPort` (Anthropic, OpenAI, Google, any OpenAI-compatible endpoint including local models). Every gate must hold on at least two providers.
+6. **MCP executes, Skills teach.** A portable MCP surface works on every client; one `portolan` skill plus a generated skill per site explain when and how to use each site. Safety is enforced by the server, never by a skill.
+7. **Write safety beats completion.** Declared effects, confirmation for irreversible operations, idempotency checks, and `unknown_outcome` instead of blind retries.
+8. **North star is `$ per completed task`**, with steps, success rate, and drift survival published alongside it.
+9. **Never price per browser-hour.**
 
 ---
 
 ## Open questions
 
-1. **Stateful vs stateless default.** Stateful wins the cost argument; stateless wins adoption (`browser-use` users expect a function call). Current lean: stateful default, `ephemeral` compatibility mode.
-2. **Protocol carrier.** HTTP/JSON for performance vs MCP-first for reach. Possibly MCP as a thin wrapper (already P1/R15).
-3. **Ref stability contract.** How much re-render churn can an element ref survive before re-observation is mandatory?
-4. **Open-source `facetd`?** Lean: open protocol, hosted runtime.
-5. **First vertical.** Support ops, procurement, or insurance eligibility — which proves outcomes fastest?
-6. **Trademark.** "Facet" collides with a wealth-management brand. Verify class 9/42 before committing to the name.
+1. **First vertical.** Where map quality and write safety matter most: insurance eligibility, procurement portals, logistics carriers, or support ops?
+2. **Who builds maps in the product:** compiled from agent runs (the plan's default), recorded by customers, or curated by us per vertical?
+3. **Open-source the runtime?** Lean: open map format and runtime, hosted compiler and verified map library.
+4. **ToS posture** for in-page calls to sites' private endpoints. Counsel before any hosted offering.
+5. **Trademark and name clearance.** Renamed from Facet to Portolan (ADR-004). Run a proper class 9/42 search, and resolve the npm `portolan` package (an unrelated UI-flow format, Aug 2026) and the `Portolan: Local Dev Servers` Mac app before launch.
 
 ---
 
 ## Start here (new session prompt)
 
-Paste this into a fresh session pointed at this repository:
-
-> Read `README.md`, `PRD.md`, and `docs/ANALYSIS.md` in full before writing anything.
+> Read `README.md`, `docs/DECISIONS.md`, `docs/BUILD_PLAN.md`, and `docs/SUBSTRATE.md` in full before writing anything.
 >
-> We are building **Facet**, starting at PRD §8 P0 (R1–R11) and PRD §13 Phase P0.
+> We are building **Portolan**, a site-map runtime: agents call typed operations from a verified map of each site. Follow `docs/BUILD_PLAN.md` §11 in order. TypeScript on Node 24 LTS, pnpm monorepo, Fastify + Zod, Ajv for map schemas, Playwright/Chromium + CDP for the substrate, MCP TS SDK for the agent surface, Agent Skills (`SKILL.md`) for site knowledge, Vercel AI SDK behind `ModelPort` for any model, SQLite + map files in git.
 >
-> Build in this order:
-> 1. Protocol skeleton (`facetd`) — the eight verbs in PRD Appendix A, HTTP/JSON, typed errors.
-> 2. The **cost meter** — every response returns `{tokens, ms, mb}`. This is non-negotiable and comes before any optimization.
-> 3. The **20-task benchmark harness** (PRD §10) with a `browser-use` + Playwright baseline, so cost-per-completed-task is measured, not asserted.
-> 4. Then the semantic layer: affordance extraction, stable refs, effect classification, token budgets.
+> Day 1–2 come first and decide everything: run `browser-use` and `agent-browser` on 3 dev fixtures with billed usage **on two providers**, then hand-write ops for those fixtures and run them over MCP. **If hand-written ops don't give ≥3x fewer steps and ≥5x lower cost than `agent-browser` (Gate G0), stop and report.**
 >
-> Constraints: engine access only through the four-method adapter. No rendering engine. No pricing by browser-hour. Every claim in the PRD marked [H] is a hypothesis — the benchmark decides.
->
-> Open question to resolve with me first: whether the default session model is stateful or stateless (see README Open Questions #1).
+> Constraints: no vendor SDK outside `packages/model`; no LLM in a verified op call; MCP tools follow the portable schema profile; writes default to the UI tier and are never auto-retried after an unknown outcome; tune only on dev fixtures; dollars come from billed usage, not our meter.
 
 ---
 
 ## Definition of done for the first build session
 
-- [ ] `facetd` serves the eight verbs and rejects malformed input with typed errors
-- [ ] Every response carries a reproducible `{tokens, ms, mb}` meter
-- [ ] 20 real tasks defined, each with a pass/fail predicate
-- [ ] Baseline numbers captured for `browser-use` + Playwright
-- [ ] Facet numbers captured on the same tasks
-- [ ] A single table showing: $/task, tokens/step, steps/task, success rate, p50 latency
+- [ ] G0 recorded on two providers: arms A (`browser-use`), B (`agent-browser`), D-oracle (hand-written ops) on 3 dev fixtures
+- [ ] Map JSON Schema v0; runtime runs the oracle maps with identical results
+- [ ] Compiler produces verified maps from fallback traces on held-out sites, with no human edits (G1)
+- [ ] Drift run on v2 fixtures: repair rate, zero duplicate writes, drift-day success (G2)
+- [ ] `portolan` skill + generated site skills validate; MCP conformance passes in Claude Code, Codex CLI, and one more client
+- [ ] Cross-model transfer measured: maps compiled with one model, used by agents on another
+- [ ] One table: success, steps/task, $/task (vs A and B, compile cost amortized), op coverage, compile yield, tier mix, drift survival, repair time
 
-If that table shows less than 5x, we stop. That is the point of building the meter first.
+If G0 fails, we stop on Day 2. That is the point of testing perfect maps before building the compiler.

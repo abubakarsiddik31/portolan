@@ -1,4 +1,4 @@
-# Facet — Research & Analysis
+# Portolan — Research & Analysis
 
 **Date:** 2026-11-08
 **Purpose:** Record the market evidence and the reasoning used to decide whether "a browser for agents that is cheap to run and token-efficient" is worth building, and what shape it should take.
@@ -21,7 +21,7 @@ The original thesis — *a browser for agents that is cheaper to run* — fails 
 
 What survived is an **interaction-model** thesis, not a compute thesis:
 
-> The browser should hold the state; the agent should hold only a handle. Then agents receive affordances, effects, and deltas instead of documents — and cost per completed task falls ~40x.
+> The browser should hold the state; the agent should hold only a handle. Then agents receive affordances, effects, and deltas instead of documents — the observation term shrinks ~40x, and cost per completed task falls by a smaller factor that the benchmark must measure (target ≥5x).
 
 That reframing attacks the 93% (tokens and steps) instead of the 7% (compute), which is the only place a new entrant can win.
 
@@ -69,7 +69,7 @@ That is the unit economics of selling browser transport. It is not a failure of 
 ### 3.3 Demand signals (negative)
 
 - **OpenAI sunset ChatGPT Atlas on 2026-08-09, 292 days after launch**, folding browsing into a desktop app and a Chrome extension. If the most distributed AI company on earth could not retain users on an agentic browser surface, the consumer version of this thesis is dead.
-- Consumer "agentic browsers" (Atlas, Comet, Dia) are browsers *for humans with an agent attached* — the opposite architecture from what Facet proposes, and the one that just failed.
+- Consumer "agentic browsers" (Atlas, Comet, Dia) are browsers *for humans with an agent attached* — the opposite architecture from what Portolan proposes, and the one that just failed.
 - Perplexity Comet has not published meaningful user counts; the category's consumer metrics are opaque, which usually means unflattering.
 
 ### 3.4 Market-sizing caveat — do not build a plan on these
@@ -99,19 +99,21 @@ An independent, reproducible teardown of `browser-use` per-task cost reports:
 
 This single finding reframes the entire product. The customer's bill is dominated by what the agent *reads*, not by what the machine *runs*.
 
-### 4.3 The accumulation problem (the real mechanism)
+### 4.3 Observation size (the real mechanism)
 
-The naive loop re-sends the whole conversation each step: system prompt + all prior observations + all prior actions. Cost is therefore superlinear in step count.
+Approximate observation tokens for a 30-step task **[H]**, counting only the current page state sent at each step:
 
-Approximate arithmetic for a 30-step task **[H]**:
-
-| Approach | Tokens / step | Total input tokens | Cost @ $3/M |
+| Approach | Observation tokens / step | × 30 steps | Cost @ $3/M |
 |---|---|---|---|
-| Raw HTML + screenshot history | ~15,000 | ~450,000 | ~$1.35 |
-| Accessibility tree, re-sent each step | ~6,000 | ~180,000 | ~$0.54 |
+| Raw HTML + screenshot | ~15,000 | ~450,000 | ~$1.35 |
+| Accessibility tree, full each step | ~6,000 | ~180,000 | ~$0.54 |
 | **Affordances + deltas, state in browser** | **~300** | **~9,000** | **~$0.03** |
 
-Roughly **40x**. The mechanism is not "smaller pages" — it is that **steps stop carrying history**, because history lives in the session.
+That is roughly **40x on the observation term**. Three corrections to how this was first stated:
+
+1. **The table is linear.** Each total is per-step size × 30. The 40x comes entirely from smaller observations, not from removing history.
+2. **History belongs to the harness, not the browser.** If the agent loop keeps every prior tool result, cost grows quadratically for every approach, including Portolan; deltas shrink the constant, not the exponent. Portolan can't force a caller to drop history. What statefulness buys is the small observation itself: deltas and short stable refs need a server-held "before."
+3. **The whole-task ratio is lower than 40x.** Every step also pays for the system prompt, tool schemas, goal, action log, and output tokens (priced ~5x input), and prompt caching discounts re-sent prefixes. None of that shrinks with Portolan. The realistic whole-task ratio is unknown until measured; `BUILD_PLAN.md` §9.0 measures the ceiling on Day 1 before any Portolan code is written.
 
 ### 4.4 The three levers
 
@@ -122,7 +124,7 @@ cost = steps × tokens_per_step × token_price  +  browser_minutes × $/min
 - **Compute work** attacks the last term: ~7% of spend.
 - **Interaction model** attacks the first two: ~93% of spend.
 
-Facet attacks the first two. Compute efficiency is a hygiene requirement, not the product.
+Portolan attacks the first two. Compute efficiency is a hygiene requirement, not the product.
 
 ---
 
@@ -136,7 +138,11 @@ Facet attacks the first two. Compute efficiency is a hygiene requirement, not th
 | Firecrawl / Exa / Jina | Excellent read/scrape | Read-only; no session, no interaction |
 | Playwright MCP / Vercel agent-browser | A11y-tree snapshots, refs | Snapshot-per-step; no effects; no hibernation |
 | WebMCP (W3C draft, Google + Microsoft) | Sites expose typed tools | Requires site cooperation; years from coverage |
-| **Facet** | Affordances + effects + deltas + hibernation + engine-agnostic | New session model to adopt; JS fidelity bounded by engine |
+| WALT (Salesforce, ICLR 2026), SkillWeaver (OSU/CMU) | Research: compile site functionality into callable tools/APIs | No serving runtime, write safety, or drift handling |
+| Integuru, Parse | Site → typed API from network traffic; Parse serves it over MCP with repair | Network-layer; writes unsafe without client logic; no state model |
+| Notte Functions, workflow-use, Airtop, Komos | Record or describe a task → deterministic workflow/endpoint, agent fallback | One task → one script; no shared map |
+| Stagehand caching | Cached selectors per action, LLM fallback | Action-level; agent still takes every step |
+| **Portolan (v4)** | Site map: states + typed ops + effects; tiered execution; compiled, verified, repaired | Crowded technique; must win on state model, write safety, drift numbers, and a vertical library |
 
 ### 5.1 Moat assessment — honest
 
@@ -147,6 +153,8 @@ There is **no moat today**: no network effects, no switching costs (CDP is open)
 
 Thin for an infrastructure company. Reasonable for a product company with a published benchmark.
 
+**Update after v4 (ADR-002).** A library of **verified site maps** for one vertical is a better candidate than either: it compounds with use (every run and every repair improves it), it is costly to rebuild, and its quality is measurable (op success, drift survival, repair time). The compilation technique itself is not a moat; WALT and SkillWeaver publish it.
+
 ### 5.2 The standards threat
 
 WebMCP is a **W3C draft authored by Google and Microsoft**, with a Chrome implementation behind a flag. If sites declare their own tools, runtime synthesis becomes less necessary. Do not fight this — **support it as a fast path** (PRD R20). A startup cannot win a standards war; it can ride one.
@@ -155,7 +163,7 @@ WebMCP is a **W3C draft authored by Google and Microsoft**, with a Chrome implem
 
 ## 6. Reasoning trail
 
-The thesis changed three times. Recording this matters, because the discarded versions are the ones a new team will drift back toward.
+The thesis changed four times. Recording this matters, because the discarded versions are the ones a new team will drift back toward.
 
 ### v1 — "A browser engine built for agents, cheaper to run"
 **Killed by:** commodity pricing ($0.02/hr), token-dominated cost (93%), and Lightpanda occupying the exact position for free with $4.5M raised.
@@ -164,7 +172,10 @@ The thesis changed three times. Recording this matters, because the discarded ve
 **Partially true, insufficient as a product.** The insight is correct (most agent traffic is read-only and needs no browser), but Tier 0 is already a crowded, well-funded category (Firecrawl $75M, Exa, Jina). The ladder is a *feature* of the chosen product, not the product.
 
 ### v3 — "A stateful browser that synthesizes a temporary API for any site"
-**Survived.** It sits in the unoccupied space between Chrome-in-a-trench-coat (gives a document) and WebMCP (requires site cooperation). It attacks the 93% rather than the 7%. And it produces a number nobody else publishes: **$ per completed task**.
+**Survived the market test, then drifted in planning.** It sits in the unoccupied space between Chrome-in-a-trench-coat (gives a document) and WebMCP (requires site cooperation), and it attacks the 93% rather than the 7%. But the v1 build plan implemented it as compact affordances and deltas per step. The adversarial review (`docs/archive/BUILD_PLAN_v1.md` §15) found that saves tokens per step, which free tools (`agent-browser`, Playwright MCP) already do; the estimate was ~1.15x over them.
+
+### v4 — "A site-map runtime: agents call typed operations, not screens"
+**Current thesis (ADR-002).** This is what v3's one-liner meant. Each site is served as a map of states and typed operations, executed through the cheapest verified tier, compiled from runs, and repaired on drift. It cuts **steps**, which neither free snapshot tools nor falling token prices erase. The pattern is crowded (§5), so the bet is narrower: state model, write safety, published verification/drift numbers, and one vertical's map library. `docs/BUILD_PLAN.md` gates it on Day 2 with hand-written ops before any compiler is built.
 
 ---
 
@@ -184,8 +195,9 @@ The thesis changed three times. Recording this matters, because the discarded ve
 
 ## 8. Assumptions and falsification
 
-### What must be true for Facet to be a company
+### What must be true for Portolan to be a company
 
+0. **(v4)** Perfect hand-written ops cut steps ≥3x and cost ≥5x vs the best free tool; compiled maps reach ≥60% of that; drift is repaired automatically ≥80% of the time with zero duplicate writes. **[H]** Gates G0–G2 in `BUILD_PLAN.md`.
 1. Cost per **completed** task can improve ≥5x on real workloads, not benchmarks. **[H]**
 2. Success rate holds within 2 points of baseline while doing so. **[H]**
 3. The semantic/affordance layer generalizes across long-tail sites without per-site work. **[H]**
@@ -229,9 +241,9 @@ Stop if any of these hold after the benchmark:
 1. **Stateful vs stateless default.** Cost argument favours stateful; adoption favours stateless. Lean: stateful default + ephemeral mode.
 2. **Protocol carrier.** HTTP/JSON vs MCP-first. Lean: HTTP core, MCP wrapper.
 3. **Ref stability contract.** How much churn before mandatory re-observation?
-4. **Open-source `facetd` or not?** Lean: open protocol, hosted runtime.
+4. **Open-source `portolan-server` or not?** Lean: open protocol, hosted runtime.
 5. **First vertical.** Support ops vs procurement vs insurance eligibility.
-6. **Trademark clearance** for "Facet" in classes 9/42.
+6. **Trademark clearance** for "Portolan" in classes 9/42 (renamed from Facet; see ADR-004).
 
 ---
 
@@ -272,8 +284,19 @@ Retrieved 2026-11-08. Prices and funding change; re-verify before citing externa
 - Jina Reader: https://jina.ai/reader/
 - Jina pricing: https://www.usagepricing.com/blueprint/jina-ai
 
+**Site-to-API and tool learning (v4)**
+- WALT (ICLR 2026): https://iclr.cc/virtual/2026/poster/10008481 · https://github.com/SalesforceAIResearch/WALT
+- SkillWeaver: https://osu-nlp-group.github.io/SkillWeaver · https://huggingface.co/papers/2504.07079
+- Integuru: https://hn.svelte.dev/item/41983409
+- Parse: https://docs.parse.bot
+- Notte Functions: https://www.notte.cc/blog/notte-functions
+- browser-use workflow-use: https://cdn.jsdelivr.net/gh/browser-use/workflow-use@main/README.md
+- Stagehand caching: https://docs.stagehand.dev/v4/best-practices/caching
+- API Anything: https://hoangyell.com/api-anything-explained/
+
 **Standards**
 - WebMCP: https://www.webmcp.md/
+- WebMCP status, July 2026: https://www.spronta.com/blog/state-of-webmcp-july-2026/
 - WebMCP technical notes (W3C CG): https://w3c-cg.github.io/aikr/webMCP/webmcp-technical-notes.html
 
 **Negative signals**

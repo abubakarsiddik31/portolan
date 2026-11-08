@@ -23,6 +23,7 @@
     "n3": "tsx n3/run.ts",
     "oracle:mcp": "tsx oracle/main.ts",
     "oracle:smoke": "tsx oracle/live-smoke.ts",
+    "perf": "tsx perf/run.ts",
     "pilot": "tsx pilot/run.ts",
     "results:table": "tsx results/cli.ts",
     "webarena:check": "tsx webarena/check.ts",

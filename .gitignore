@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Rust / Zig (future engine adapter work)
+target/
+zig-cache/
+zig-out/
+
+# Local scratch
+scratch/
+*.local.md

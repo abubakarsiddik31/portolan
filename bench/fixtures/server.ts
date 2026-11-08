@@ -1,4 +1,5 @@
 import { buildStoreApp } from "./store/v1/app.js";
+import { buildWizardApp } from "./wizard/v1/app.js";
 
 function readArg(name: string, fallback: string): string {
   const index = process.argv.indexOf(name);
@@ -6,14 +7,24 @@ function readArg(name: string, fallback: string): string {
   return value ?? fallback;
 }
 
-const fixture = readArg("--fixture", "store");
-const port = Number(readArg("--port", fixture === "store" ? "4100" : "4101"));
+const fixtures = {
+  store: { build: buildStoreApp, label: "store v1", port: "4100" },
+  wizard: { build: buildWizardApp, label: "wizard v1", port: "4101" },
+} as const;
 
-if (fixture !== "store") {
-  console.error(`unknown fixture "${fixture}"; the store is the only v1 fixture so far (T1.04)`);
+type FixtureName = keyof typeof fixtures;
+
+const fixture = readArg("--fixture", "store") as FixtureName;
+const entry = fixtures[fixture];
+
+if (!entry) {
+  console.error(
+    `unknown fixture "${fixture}"; expected one of ${Object.keys(fixtures).join(", ")}`,
+  );
   process.exit(1);
 }
 
-const app = await buildStoreApp({ logger: true });
+const port = Number(readArg("--port", entry.port));
+const app = await entry.build({ logger: true });
 await app.listen({ host: "127.0.0.1", port });
-console.log(`store v1 listening on http://127.0.0.1:${port}`);
+console.log(`${entry.label} listening on http://127.0.0.1:${port}`);

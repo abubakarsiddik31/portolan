@@ -103,7 +103,7 @@ describe("session store", () => {
         op: "checkout",
         effect: "irreversible",
         tier: "ui",
-        params: { card: "4242" },
+        params: { card: "[redacted]" },
         idempotency_key: "order-1",
         before_state: "cart",
         after_state: "order",

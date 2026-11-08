@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { AuditRecord, CreateSessionRequest, SessionRecord } from "@portolan/protocol";
+import { redactRecord } from "@portolan/runtime";
 import Database from "better-sqlite3";
 import type { OpHealthRecord } from "./health.js";
 
@@ -140,7 +141,7 @@ export class SessionStore {
         record.op,
         record.effect,
         record.tier ?? null,
-        JSON.stringify(record.params),
+        JSON.stringify(redactRecord(record.params)),
         record.idempotency_key ?? null,
         record.before_state ?? null,
         record.after_state ?? null,

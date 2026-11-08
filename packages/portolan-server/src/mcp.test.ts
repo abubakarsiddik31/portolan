@@ -358,7 +358,7 @@ describe("mcp surface", () => {
       after_state: "order",
       outcome: "done",
       idempotency_key: "order-1",
-      params: checkoutParams(),
+      params: { ...checkoutParams(), card: "[redacted]" },
       requests: [{ method: "POST", url: "/api/checkout", status: 200 }],
     });
   });

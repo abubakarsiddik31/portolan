@@ -112,6 +112,41 @@ describe("TraceStore", () => {
     await expect(store.all()).rejects.toThrow(/traces\.jsonl:2/);
   });
 
+  it("redacts credentials before writing the JSONL and HAR", async () => {
+    const store = new TraceStore(dir);
+    const trace = sample();
+    trace.entries.push({
+      kind: "act",
+      at: "2026-01-01T00:00:04.000Z",
+      ref: "e9",
+      do: "fill",
+      value: "hunter2",
+      locator: { role: "textbox", name: "Password", ordinal: 0 },
+      doc: 1,
+      v: 3,
+      url: "https://shop.test/login",
+      effects: [
+        {
+          kind: "network",
+          method: "POST",
+          url: "https://shop.test/login",
+          status: 200,
+          request_body: { email: "ada@example.com", password: "hunter2" },
+        },
+      ],
+      delta: { navigation: false, entries: [] },
+    });
+
+    await store.append(trace);
+    const raw = await readFile(join(dir, "traces.jsonl"), "utf8");
+    expect(raw).not.toContain("hunter2");
+    expect(raw).toContain("[redacted]");
+
+    const harPath = await store.writeHar(trace);
+    const har = await readFile(harPath, "utf8");
+    expect(har).not.toContain("hunter2");
+  });
+
   it("writes a HAR file next to the trace", async () => {
     const store = new TraceStore(dir);
     const trace = sample();

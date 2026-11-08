@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { NetworkEffect } from "@portolan/substrate";
 
 import type { Trace, TraceEntry } from "./fallback.js";
+import { redactTrace } from "./redact.js";
 
 /** One JSON line per trace. Append-only, so a run is never rewritten. */
 export const TRACE_FILE = "traces.jsonl";
@@ -105,7 +106,7 @@ export class TraceStore {
   /** Append one trace as a JSON line. Returns the file it wrote. */
   async append(trace: Trace): Promise<string> {
     await mkdir(this.dir, { recursive: true });
-    await appendFile(this.file(), `${JSON.stringify(trace)}\n`, "utf8");
+    await appendFile(this.file(), `${JSON.stringify(redactTrace(trace))}\n`, "utf8");
     return this.file();
   }
 
@@ -146,7 +147,7 @@ export class TraceStore {
     const target = path ?? join(this.dir, `${trace.scope_id}.har`);
 
     await mkdir(this.dir, { recursive: true });
-    await writeFile(target, `${JSON.stringify(toHar(trace), null, 2)}\n`, "utf8");
+    await writeFile(target, `${JSON.stringify(toHar(redactTrace(trace)), null, 2)}\n`, "utf8");
     return target;
   }
 }

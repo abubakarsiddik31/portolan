@@ -1,0 +1,295 @@
+{
+  "site": "library",
+  "origins": ["http://127.0.0.1:4120"],
+  "version": 5,
+  "states": [
+    {
+      "id": "catalog",
+      "url": "/",
+      "marks": [
+        {
+          "role": "textbox",
+          "name": "Search books"
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "url": "/search",
+      "marks": [
+        {
+          "test_id": "book-grid"
+        }
+      ]
+    },
+    {
+      "id": "book",
+      "url": "/books/:id",
+      "marks": [
+        {
+          "test_id": "book-detail"
+        }
+      ]
+    },
+    {
+      "id": "loans",
+      "url": "/loans",
+      "marks": [
+        {
+          "role": "heading",
+          "name": "Your loans"
+        }
+      ]
+    }
+  ],
+  "ops": [
+    {
+      "name": "search",
+      "version": 1,
+      "summary": "Search the library catalog.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "heading": {
+              "type": "string"
+            },
+            "link": {
+              "type": "string"
+            },
+            "link_href": {
+              "type": "string"
+            },
+            "StaticText": {
+              "type": "string"
+            },
+            "StaticText_2": {
+              "type": "string"
+            },
+            "StaticText_3": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "heading",
+            "link",
+            "link_href",
+            "StaticText",
+            "StaticText_2",
+            "StaticText_3"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "from": ["catalog", "results"],
+      "to": ["results"],
+      "post": [],
+      "effect": "read",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/catalog?q={query}",
+          "extract": {
+            "kind": "rows",
+            "container": {
+              "test_id": "book-grid"
+            },
+            "row": {
+              "test_id": "book-card"
+            },
+            "cols": {
+              "heading": {
+                "role": "heading",
+                "ordinal": 0
+              },
+              "link": {
+                "role": "link",
+                "ordinal": 0
+              },
+              "link_href": {
+                "role": "link",
+                "ordinal": 0,
+                "attribute": "href",
+                "pattern": "/([^/]+)$"
+              },
+              "StaticText": {
+                "role": "StaticText",
+                "ordinal": 0
+              },
+              "StaticText_2": {
+                "role": "StaticText",
+                "ordinal": 1
+              },
+              "StaticText_3": {
+                "role": "StaticText",
+                "ordinal": 2
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_book",
+      "version": 1,
+      "summary": "Read one book and its availability.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["book_id"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "loans_link": {
+            "type": "string"
+          },
+          "borrow_book": {
+            "type": "string"
+          }
+        },
+        "required": ["loans_link", "borrow_book"],
+        "additionalProperties": false
+      },
+      "from": ["catalog", "results", "book"],
+      "to": ["book"],
+      "post": [
+        {
+          "kind": "state",
+          "state": "book"
+        }
+      ],
+      "effect": "read",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/books/{book_id}",
+          "extract": {
+            "kind": "fields",
+            "fields": {
+              "loans_link": {
+                "test_id": "loans-link",
+                "attr": "text"
+              },
+              "borrow_book": {
+                "test_id": "borrow-book",
+                "attr": "text"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "borrow",
+      "version": 1,
+      "summary": "Borrow an available book.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["book_id"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "loan": {
+              "type": "string"
+            },
+            "borrowed": {
+              "type": "string"
+            }
+          },
+          "required": ["title", "loan", "borrowed"],
+          "additionalProperties": false
+        }
+      },
+      "from": ["book"],
+      "to": ["loans"],
+      "post": [
+        {
+          "kind": "state",
+          "state": "loans"
+        }
+      ],
+      "effect": "write",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "ui",
+          "steps": [
+            {
+              "do": "click",
+              "target": {
+                "role": "button",
+                "name": "Borrow",
+                "ordinal": 0
+              }
+            }
+          ],
+          "extract": {
+            "kind": "rows",
+            "container": {
+              "test_id": "loan-table"
+            },
+            "row": {
+              "test_id": "loan-row"
+            },
+            "cols": {
+              "title": {
+                "role": "cell",
+                "ordinal": 0
+              },
+              "loan": {
+                "role": "cell",
+                "ordinal": 1
+              },
+              "borrowed": {
+                "role": "cell",
+                "ordinal": 2
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "entities": {},
+  "compiled_from": [
+    "seed:library",
+    "trace:repair:search",
+    "trace:repair:get_book",
+    "trace:repair:borrow"
+  ],
+  "verified_at": "2026-11-08T20:41:45.309Z"
+}

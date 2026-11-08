@@ -22,6 +22,14 @@
     "doctor": "node dist/bin.js doctor"
   },
   "dependencies": {
+    "@portolan/compiler": "workspace:*",
+    "@portolan/protocol": "workspace:*",
+    "@portolan/runtime": "workspace:*",
+    "@portolan/server": "workspace:*",
+    "@portolan/skills": "workspace:*",
     "@portolan/substrate": "workspace:*"
+  },
+  "devDependencies": {
+    "fastify": "5.12.8"
   }
 }

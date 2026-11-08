@@ -35,7 +35,16 @@ export async function pageFor(session: OracleSession, site: Site): Promise<Page>
 
 export async function closeOracleSession(session: OracleSession): Promise<void> {
   for (const context of session.contexts.values()) {
-    await context.close();
+    try {
+      await context.close();
+    } catch {
+      // The client may already have closed the context while the server
+      // was shutting down. Closing an already-closed context is a no-op.
+    }
   }
-  await session.browser.close();
+  try {
+    await session.browser.close();
+  } catch {
+    // Same for the browser process.
+  }
 }

@@ -14,7 +14,11 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 
 const shutdown = async (): Promise<void> => {
-  await close();
+  try {
+    await close();
+  } catch {
+    // Shutdown must not fail the process with an unhandled rejection.
+  }
   process.exit(0);
 };
 

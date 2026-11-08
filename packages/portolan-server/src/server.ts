@@ -1,13 +1,27 @@
+import { randomUUID } from "node:crypto";
+
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { ErrorCode, ResultEnvelope } from "@portolan/protocol";
 import { createSessionRequestSchema } from "@portolan/protocol";
-import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import Fastify, {
+  type FastifyError,
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
 import type { ZodError } from "zod";
 
+import { notReadyExecutor, type OpExecutor } from "./executor.js";
+import type { MapStore } from "./maps.js";
+import { createMcpServer } from "./mcp.js";
 import type { SessionStore } from "./store.js";
 
 export type ServerOptions = {
   store: SessionStore;
   logger?: boolean;
+  /** Enables the MCP surface at POST /mcp when present. */
+  maps?: MapStore;
+  executor?: OpExecutor;
 };
 
 /**
@@ -71,6 +85,58 @@ export function createServer(options: ServerOptions): FastifyInstance {
 
     return { ok: true, result: { sid, closed: true } };
   });
+
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+
+  const handleMcp = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    if (options.maps === undefined) {
+      reply.code(404).send(failure("invalid_request", "mcp is not configured"));
+      return;
+    }
+
+    const header = request.headers["mcp-session-id"];
+    const sessionId = typeof header === "string" ? header : undefined;
+    let transport = sessionId === undefined ? undefined : transports.get(sessionId);
+
+    if (transport === undefined) {
+      const created = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (id) => {
+          transports.set(id, created);
+        },
+      });
+
+      created.onclose = () => {
+        if (created.sessionId !== undefined) {
+          transports.delete(created.sessionId);
+        }
+      };
+
+      const mcp = createMcpServer({
+        maps: options.maps,
+        sessions: options.store,
+        executor: options.executor ?? notReadyExecutor,
+      });
+
+      await mcp.connect(created);
+      transport = created;
+    }
+
+    reply.hijack();
+
+    try {
+      await transport.handleRequest(request.raw, reply.raw, request.body);
+    } catch {
+      if (!reply.raw.headersSent) {
+        reply.raw.writeHead(500, { "content-type": "application/json" });
+      }
+      reply.raw.end();
+    }
+  };
+
+  app.post("/mcp", handleMcp);
+  app.get("/mcp", handleMcp);
+  app.delete("/mcp", handleMcp);
 
   return app;
 }

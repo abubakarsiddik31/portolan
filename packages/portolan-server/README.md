@@ -30,6 +30,24 @@ Every response, including errors, uses the protocol envelope:
 Malformed JSON and schema violations are `invalid_request` with
 `details.issues`. An unknown or already-closed session is `session_not_found`.
 
+## MCP
+
+```bash
+MAPS_DIR=maps DATABASE_PATH=portolan.db pnpm --filter @portolan/server mcp
+```
+
+The stdio server exposes the portable surface:
+
+| Tool | Result |
+|---|---|
+| `list_sites` | every site with a map, its latest version, and its ops |
+| `open_site(site)` | creates a session, pins the map version, returns the compact map |
+| `call(op, params, idempotency_key?, confirm?)` | validates the op and params, checks `confirm` for irreversible ops, then hands off to the executor |
+
+The HTTP server exposes the same surface at `POST /mcp` (Streamable HTTP) when it is created with a map store.
+
+The op executor is injected. Until T2.17–T2.21 it is `notReadyExecutor`, which returns `op_broken` with `details.stage = "executor"` — the call reached the runtime, but no op ran.
+
 ## Notes
 
 - The store is `better-sqlite3`; sessions survive a restart.

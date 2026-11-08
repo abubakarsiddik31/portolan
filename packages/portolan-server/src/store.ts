@@ -70,6 +70,14 @@ export class SessionStore {
     return row === undefined ? undefined : toRecord(row);
   }
 
+  /** Pin a session to a map version. Returns false when it is unknown or closed. */
+  pin(sid: string, mapVersion: number): boolean {
+    const result = this.db
+      .prepare("UPDATE sessions SET map_version = ? WHERE sid = ? AND closed_at IS NULL")
+      .run(mapVersion, sid);
+    return result.changes > 0;
+  }
+
   /** Mark a session as used. Returns false when it is unknown or closed. */
   touch(sid: string): boolean {
     const now = new Date().toISOString();

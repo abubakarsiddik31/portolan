@@ -13,12 +13,18 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:providers": "vitest run packages/model/src/providers.test.ts",
+    "fixtures:store": "pnpm --filter @portolan/bench run fixtures:store",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc -b --pretty false && tsc -p tsconfig.test.json --pretty false",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "commitlint": "commitlint --from origin/main --to HEAD --verbose"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",

@@ -1,4 +1,4 @@
 {
   "files": [],
-  "references": [{ "path": "packages/protocol" }, { "path": "packages/model" }]
+  "references": [{ "path": "packages/protocol" }, { "path": "packages/model" }, { "path": "bench" }]
 }

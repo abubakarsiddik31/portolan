@@ -40,18 +40,45 @@ runs `npm pack --dry-run` and asserts each tarball contains `dist/` and not
 `src/`. `pnpm package:check` runs the manifest half without a build. CI runs
 `pnpm package:check:tarballs` after `pnpm build`.
 
-### Publish
+### Release automation
 
-Until T5.09 adds Changesets, publish by hand:
+Changesets owns the version bump and the publish.
+
+- **`.changeset/config.json`**: `access: "public"`, `baseBranch: "main"`,
+  `updateInternalDependencies: "patch"`, `@portolan/bench` ignored.
+- **Every user-visible change adds a changeset** (`pnpm changeset`): the
+  packages and a `patch` / `minor` / `major` bump, plus a summary.
+- **`.github/workflows/release.yml`** runs on a push to `main`. It opens or
+  updates a **Version Packages** pull request. Merging that PR publishes the
+  changed packages and creates the GitHub release.
+- **`.changeset/initial-release.md`** bumps all eight packages from `0.0.0` to
+  `0.1.0`.
+
+The workflow needs `NPM_TOKEN` (an npm automation token for the `@portolan`
+scope) and `id-token: write`, which npm uses for provenance. `GITHUB_TOKEN`
+comes from the workflow.
+
+Semver: a bug fix is `patch`, a backward-compatible feature is `minor`, and a
+breaking change is `major`. Before `1.0.0`, a `minor` is the normal feature
+bump; changesets still requires an explicit `major` for a break.
+
+### Dry run
 
 ```bash
 pnpm build
-pnpm -r --filter "./packages/*" publish --access public --provenance
+pnpm release:dry-run --out /tmp/portolan-release
 ```
 
-Order matters only for the first publish: pnpm rewrites `workspace:*` to the
-package version, so the registry needs the dependency before the dependent.
-T5.09 automates the order, the version bump, and the GitHub release.
+The script reads `.changeset/*.md` and writes:
+
+- `RELEASE_NOTES.md` — the version table and every changeset summary.
+- `release-plan.json` — current version, bump, and next version per package.
+- one `.tgz` per package, via `npm pack`, at the version currently in the
+  tree. The next version is in the plan; `changeset version` applies it in the
+  Version Packages pull request.
+
+`--notes-only` skips the build and the tarballs. It does not modify the tree.
+CI runs the dry run after the build.
 
 ### Clean-machine check
 
@@ -109,4 +136,7 @@ resolve the workspace.
   the static checks are in place; CI does not build the image yet.
 - **The Docker build re-runs `pnpm install` from the lockfile**, so a private
   registry or an offline machine needs a mirror.
-- **Versions are still `0.0.0`.** T5.09 owns the first real version.
+- **Versions are still `0.0.0` in the tree.** The initial changeset bumps
+  them to `0.1.0` when the Version Packages PR merges.
+- **The release workflow has not run.** There is no `NPM_TOKEN` or published
+  scope in this environment.

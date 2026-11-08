@@ -21,7 +21,10 @@
     "format": "biome format --write .",
     "commitlint": "commitlint --from origin/main --to HEAD --verbose",
     "package:check": "node scripts/verify-packages.mjs",
-    "package:check:tarballs": "node scripts/verify-packages.mjs --tarballs"
+    "package:check:tarballs": "node scripts/verify-packages.mjs --tarballs",
+    "version-packages": "changeset version && pnpm install --lockfile-only",
+    "release": "pnpm build && changeset publish",
+    "release:dry-run": "node scripts/release-dry-run.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -32,6 +35,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
+    "@changesets/cli": "^3.0.3",
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-conventional": "21.2.4",
     "@commitlint/lint": "21.2.4",

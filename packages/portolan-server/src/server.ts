@@ -11,6 +11,7 @@ import Fastify, {
 } from "fastify";
 import type { ZodError } from "zod";
 
+import { BrowserRegistry } from "./browsers.js";
 import type { CanaryScheduler } from "./canary.js";
 import { notReadyExecutor, type OpExecutor } from "./executor.js";
 import { mergeHealth } from "./health.js";
@@ -26,6 +27,16 @@ export type ServerOptions = {
   executor?: OpExecutor;
   /** Started with the server and stopped when it closes. */
   canary?: CanaryScheduler;
+  /** Idle time after which a session is closed. Default 30 minutes. */
+  sessionTtlMs?: number;
+  /** Maximum open sessions. Default 100. */
+  maxOpenSessions?: number;
+  /** How often the expiry sweep runs. Default 60 seconds. */
+  cleanupIntervalMs?: number;
+  /** Close sessions left open by a previous process at startup. Default true. */
+  recoverSessions?: boolean;
+  /** Browser resources owned by sessions. */
+  browsers?: BrowserRegistry;
 };
 
 /**
@@ -37,6 +48,20 @@ export type ServerOptions = {
  */
 export function createServer(options: ServerOptions): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? false });
+  const ttl = options.sessionTtlMs ?? 30 * 60 * 1000;
+  const cap = options.maxOpenSessions ?? 100;
+  const browsers = options.browsers ?? new BrowserRegistry();
+
+  if (options.recoverSessions !== false) {
+    // A restart means the previous process's browsers are gone; no session
+    // from that process can be resumed safely.
+    options.store.closeAllOpen();
+  }
+
+  const sweep = setInterval(() => {
+    options.store.sweepExpired(ttl);
+  }, options.cleanupIntervalMs ?? 60_000);
+  sweep.unref();
 
   app.setErrorHandler<FastifyError>((error, _request, reply) => {
     const status = error.statusCode ?? 500;
@@ -59,6 +84,12 @@ export function createServer(options: ServerOptions): FastifyInstance {
     ok: true as const,
     result: { status: "ok" },
   }));
+
+  app.addHook("onClose", async () => {
+    clearInterval(sweep);
+    options.store.closeAllOpen();
+    await browsers.closeAll();
+  });
 
   options.canary?.start();
   app.addHook("onClose", async () => {
@@ -84,6 +115,20 @@ export function createServer(options: ServerOptions): FastifyInstance {
     const parsed = createSessionRequestSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
       reply.code(400).send(invalidBody(parsed.error));
+      return;
+    }
+
+    options.store.sweepExpired(ttl);
+
+    const open = options.store.countOpen();
+    if (open >= cap) {
+      reply.code(429).send(
+        failure("precondition_failed", "session limit reached", {
+          reason: "session_limit",
+          open,
+          cap,
+        }),
+      );
       return;
     }
 
@@ -117,6 +162,7 @@ export function createServer(options: ServerOptions): FastifyInstance {
       return;
     }
 
+    await browsers.close(sid);
     return { ok: true, result: { sid, closed: true } };
   });
 

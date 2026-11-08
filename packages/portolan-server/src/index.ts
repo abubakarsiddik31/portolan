@@ -1,3 +1,4 @@
+export * from "./browsers.js";
 export * from "./canary.js";
 export * from "./credentials.js";
 export * from "./executor.js";

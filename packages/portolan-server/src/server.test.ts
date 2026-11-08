@@ -5,6 +5,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { BrowserRegistry } from "./browsers.js";
 import { MapStore } from "./maps.js";
 import { createServer } from "./server.js";
 import { SessionStore } from "./store.js";
@@ -252,6 +253,97 @@ describe("server", () => {
       ok: false,
       error: { code: "session_not_found" },
     });
+  });
+
+  it("rejects a create at the session cap", async () => {
+    const http = createServer({ store, maxOpenSessions: 2 });
+
+    expect((await http.inject({ method: "POST", url: "/v1/sessions" })).statusCode).toBe(201);
+    expect((await http.inject({ method: "POST", url: "/v1/sessions" })).statusCode).toBe(201);
+
+    const third = await http.inject({ method: "POST", url: "/v1/sessions" });
+    expect(third.statusCode).toBe(429);
+    expect(third.json()).toMatchObject({
+      ok: false,
+      error: {
+        code: "precondition_failed",
+        details: { reason: "session_limit", open: 2, cap: 2 },
+      },
+    });
+
+    await http.close();
+  });
+
+  it("frees a cap slot when a session closes", async () => {
+    const http = createServer({ store, maxOpenSessions: 1 });
+    const created = await http.inject({ method: "POST", url: "/v1/sessions" });
+    const { sid } = created.json().result;
+
+    expect((await http.inject({ method: "POST", url: "/v1/sessions" })).statusCode).toBe(429);
+    await http.inject({ method: "DELETE", url: `/v1/sessions/${sid}` });
+    expect((await http.inject({ method: "POST", url: "/v1/sessions" })).statusCode).toBe(201);
+
+    await http.close();
+  });
+
+  it("closes sessions left open by a previous process", async () => {
+    const stale = new SessionStore();
+    const leftover = stale.create({ site: "store" });
+
+    const http = createServer({ store: stale, recoverSessions: true });
+    expect(stale.get(leftover.sid)?.closed_at).toBeTypeOf("string");
+    expect(stale.countOpen()).toBe(0);
+
+    await http.close();
+    stale.closeDatabase();
+  });
+
+  it("leaves sessions alone when recovery is disabled", async () => {
+    const kept = new SessionStore();
+    const leftover = kept.create({ site: "store" });
+
+    const http = createServer({ store: kept, recoverSessions: false });
+    expect(kept.get(leftover.sid)?.closed_at).toBeUndefined();
+    expect(kept.countOpen()).toBe(1);
+
+    await http.close();
+    kept.closeDatabase();
+  });
+
+  it("sweeps expired sessions on the cleanup interval", async () => {
+    const idle = new SessionStore();
+    const http = createServer({
+      store: idle,
+      sessionTtlMs: 1,
+      cleanupIntervalMs: 5,
+      recoverSessions: false,
+    });
+    const session = idle.create();
+
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(idle.get(session.sid)?.closed_at).toBeTypeOf("string");
+
+    await http.close();
+    idle.closeDatabase();
+  });
+
+  it("closes a session's browser on delete", async () => {
+    const browsers = new BrowserRegistry();
+    const closed: string[] = [];
+    browsers.register("sid-1", { close: () => void closed.push("sid-1") });
+    browsers.register("sid-2", { close: () => void closed.push("sid-2") });
+
+    const http = createServer({ store, browsers, recoverSessions: false });
+    const created = await http.inject({ method: "POST", url: "/v1/sessions" });
+    const { sid } = created.json().result;
+    browsers.register(sid, { close: () => void closed.push(sid) });
+
+    await http.inject({ method: "DELETE", url: `/v1/sessions/${sid}` });
+    expect(closed).toContain(sid);
+
+    await http.close();
+    expect(closed).toEqual(expect.arrayContaining(["sid-1", "sid-2"]));
+    expect(browsers.size()).toBe(0);
   });
 
   it("returns invalid_request for an unknown route", async () => {

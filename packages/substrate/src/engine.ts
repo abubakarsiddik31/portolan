@@ -4,13 +4,24 @@ export type NavigateResult = {
   status: number | null;
 };
 
-export type AxNode = {
+export type Bounds = {
+  /** CSS pixels, in document coordinates. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type SemanticNode = {
   nodeId: string;
   role: string;
   name: string;
   /** CDP backend node id, used to dispatch an action. */
   backendNodeId?: number;
   ignored: boolean;
+  /** False when ignored, unstyled, zero-sized, or hidden by CSS. */
+  visible: boolean;
+  bounds?: Bounds;
   properties: Record<string, string | number | boolean>;
   childIds: string[];
 };
@@ -18,7 +29,7 @@ export type AxNode = {
 export type Snapshot = {
   url: string;
   title: string;
-  nodes: AxNode[];
+  nodes: SemanticNode[];
 };
 
 export type Action =
@@ -55,8 +66,8 @@ export class EngineError extends Error {
  * the first implementation; Lightpanda or a remote CDP endpoint can implement
  * the same interface without changing the runtime.
  *
- * `snapshot` returns the raw accessibility tree. Turning it into ranked
- * affordances and refs is the semantic engine's job, not the adapter's.
+ * `snapshot` returns the accessibility tree merged with layout: role, name,
+ * document bounds, and visibility. Ranking and refs are the next layer.
  */
 export interface Engine {
   navigate(url: string): Promise<NavigateResult>;

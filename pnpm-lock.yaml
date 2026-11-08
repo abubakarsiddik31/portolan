@@ -66,6 +66,12 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@portolan/protocol':
+        specifier: workspace:*
+        version: link:../packages/protocol
+      '@portolan/runtime':
+        specifier: workspace:*
+        version: link:../packages/runtime
       '@portolan/substrate':
         specifier: workspace:*
         version: link:../packages/substrate

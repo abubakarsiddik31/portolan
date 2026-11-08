@@ -28,6 +28,7 @@ describe("fixture maps", () => {
       "get_product",
       "add_to_cart",
       "view_cart",
+      "open_checkout",
       "checkout",
     ]);
   });

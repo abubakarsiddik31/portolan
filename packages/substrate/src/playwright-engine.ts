@@ -322,7 +322,18 @@ export class PlaywrightEngine implements Engine {
     const objectId = await this.resolveObject(backendNodeId);
 
     try {
-      await this.cdp.send("DOM.scrollIntoViewIfNeeded", { backendNodeId });
+      // Centre the node, not just bring it into view: a button at the bottom
+      // edge has its centre outside the viewport, and the hit-test then lands
+      // on whatever is at the clamped point.
+      await this.callOn(
+        objectId,
+        `function () {
+          if (typeof this.scrollIntoView === "function") {
+            this.scrollIntoView({ block: "center", inline: "center" });
+          }
+        }`,
+        [],
+      );
     } catch {
       // A node without a layout box reports a zero rect below.
     }
@@ -345,15 +356,38 @@ export class PlaywrightEngine implements Engine {
       throw new EngineError("not_interactive", `node ${backendNodeId} has no layout box`);
     }
 
-    const x = Math.round(rect.x + rect.width / 2);
-    const y = Math.round(rect.y + rect.height / 2);
+    const viewport = await this.evaluate<{
+      width: number;
+      height: number;
+      scrollX: number;
+      scrollY: number;
+    }>(
+      "({ width: window.innerWidth, height: window.innerHeight, scrollX: window.scrollX, scrollY: window.scrollY })",
+    );
+
+    // A button at the bottom edge cannot be centred when the page is already
+    // scrolled to the end. Click the centre of the visible part instead.
+    const left = Math.max(0, rect.x);
+    const top = Math.max(0, rect.y);
+    const right = Math.min(viewport.width, rect.x + rect.width);
+    const bottom = Math.min(viewport.height, rect.y + rect.height);
+
+    if (right <= left || bottom <= top) {
+      throw new EngineError("not_interactive", `node ${backendNodeId} is outside the viewport`);
+    }
+
+    const x = Math.round((left + right) / 2);
+    const y = Math.round((top + bottom) / 2);
 
     let hit: { backendNodeId?: number };
 
     try {
+      // DOM.getNodeForLocation takes document coordinates; the mouse takes
+      // viewport coordinates. Without the scroll offset a scrolled page
+      // reports the node above the target as the blocker.
       hit = (await this.cdp.send("DOM.getNodeForLocation", {
-        x,
-        y,
+        x: x + viewport.scrollX,
+        y: y + viewport.scrollY,
         includeUserAgentShadowDOM: false,
       })) as unknown as { backendNodeId?: number };
     } catch (error) {
@@ -449,6 +483,22 @@ export class PlaywrightEngine implements Engine {
 
   private async fill(backendNodeId: number, value: string): Promise<void> {
     const objectId = await this.resolveObject(backendNodeId);
+
+    const isFile = await this.callOn<boolean>(
+      objectId,
+      `function () {
+        return this instanceof HTMLInputElement && this.type === "file";
+      }`,
+      [],
+    );
+
+    if (isFile) {
+      await this.cdp.send("DOM.setFileInputFiles", {
+        files: [value],
+        backendNodeId,
+      });
+      return;
+    }
 
     await this.callOn(
       objectId,

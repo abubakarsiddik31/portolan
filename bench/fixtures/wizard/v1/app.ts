@@ -117,7 +117,15 @@ export async function buildWizardApp(options: { logger?: boolean } = {}): Promis
     const state = stateFor(request.sid);
     const result = validateStep1(request.body);
     if (!result.data) {
-      return reply.code(400).type("text/html").send(step1Page(state, result.errors));
+      const draft: WizardState = {
+        ...state,
+        data: {
+          ...state.data,
+          name: text(request.body, "name"),
+          email: text(request.body, "email"),
+        },
+      };
+      return reply.code(400).type("text/html").send(step1Page(draft, result.errors));
     }
     state.data = { ...state.data, ...result.data };
     state.step = 2;
@@ -128,7 +136,17 @@ export async function buildWizardApp(options: { logger?: boolean } = {}): Promis
     const state = stateFor(request.sid);
     const result = validateStep2(request.body);
     if (!result.data) {
-      return reply.code(400).type("text/html").send(step2Page(state, result.errors));
+      const parsedTeamSize = Number.parseInt(text(request.body, "teamSize"), 10);
+      const draft: WizardState = {
+        ...state,
+        data: {
+          ...state.data,
+          company: text(request.body, "company"),
+          role: text(request.body, "role"),
+          ...(Number.isFinite(parsedTeamSize) ? { teamSize: parsedTeamSize } : {}),
+        },
+      };
+      return reply.code(400).type("text/html").send(step2Page(draft, result.errors));
     }
     state.data = { ...state.data, ...result.data };
     state.step = 3;

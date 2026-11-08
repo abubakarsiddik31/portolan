@@ -82,7 +82,7 @@ export function loginPage(error?: string): string {
        <h1>Sign in</h1>
        <p class="muted">Demo account: analyst@example.com / portolan</p>
        ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ""}
-       <form method="post" action="/login" data-testid="login-form">
+       <form method="post" action="/login" data-testid="login-form" novalidate>
          <label for="email">Email</label>
          <input id="email" name="email" type="email" autocomplete="username" required>
          <label for="password">Password</label>

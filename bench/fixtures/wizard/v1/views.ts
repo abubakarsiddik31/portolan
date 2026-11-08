@@ -86,7 +86,7 @@ export function step1Page(state: WizardState, errors: Record<string, string> = {
      <p class="muted">Step 1 of 3</p>
      ${stepIndicator(1)}
      ${errorsBlock(errors)}
-     <form method="post" action="/step/1">
+     <form method="post" action="/step/1" novalidate>
        <label for="name">Full name</label>
        <input id="name" name="name" value="${escapeHtml(state.data.name ?? "")}" required>
        <label for="email">Work email</label>
@@ -107,7 +107,7 @@ export function step2Page(state: WizardState, errors: Record<string, string> = {
      <p class="muted">Step 2 of 3</p>
      ${stepIndicator(2)}
      ${errorsBlock(errors)}
-     <form method="post" action="/step/2">
+     <form method="post" action="/step/2" novalidate>
        <label for="company">Company</label>
        <input id="company" name="company" value="${escapeHtml(state.data.company ?? "")}" required>
        <label for="role">Your role</label>
@@ -140,7 +140,7 @@ export function step3Page(state: WizardState, errors: Record<string, string> = {
          <dt>Team size</dt><dd>${escapeHtml(String(data.teamSize ?? ""))}</dd>
        </dl>
      </section>
-     <form method="post" action="/submit" enctype="multipart/form-data">
+     <form method="post" action="/submit" enctype="multipart/form-data" novalidate>
        <label for="attachment">Attachment (PDF, TXT or PNG, max 1 MB)</label>
        <input id="attachment" name="attachment" type="file" accept=".pdf,.txt,.png" required>
        <label>

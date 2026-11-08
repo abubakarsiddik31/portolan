@@ -225,7 +225,7 @@ export function checkoutPage(
     "Checkout",
     `<h1>Checkout</h1>
      <p>Subtotal: <strong>${formatPrice(cart.subtotalCents)}</strong></p>
-     <form method="post" action="/checkout" data-checkout-form>
+     <form method="post" action="/checkout" data-checkout-form novalidate>
        <label for="name">Full name</label>
        <input id="name" name="name" autocomplete="name" required>
        ${error("name")}

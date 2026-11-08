@@ -41,6 +41,24 @@ Broken ops are excluded; degraded ops are still routable.
 Supported extractors: `fields`, `rows`, `composite`, `none`. `download` and
 `press` are not supported yet.
 
+## Extraction and post-checks
+
+`extract(extractor, view)` is tier-agnostic: `url`, `http`, and `ui` impls all
+end with the same extractor.
+
+- `fields` reads a locator's text, `value`, `href`, or `name`, with an optional
+  capture pattern. Text falls back to a node's `StaticText` descendants.
+- `rows` scopes the row locator to the container's descendants and each column
+  to the row's descendants, in document order.
+- `composite` combines fields and one row list.
+- `none` returns `{}`.
+
+`validateReturns(op, value)` validates with Ajv and coerces numeric strings to
+the schema's integer types. A schema miss is an op failure, not a pass-through.
+
+`checkPost(check, map, view)` handles `state`, `url`, `exists`, `absent`, and
+`text`.
+
 ## Not here yet
 
 The `url` and `http` tiers are T2.20–T2.21; write safety is T2.22–T2.24.

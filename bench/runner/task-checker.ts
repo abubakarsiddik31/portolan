@@ -7,13 +7,13 @@ type EvaluateEnvelope = {
 };
 
 /**
- * Checks a task's success predicate against the live oracle page.
+ * Checks a task's success predicate against the live page of any backend.
  *
- * URL and DOM clauses use the oracle's `evaluate` tool. Download clauses are
+ * URL and DOM clauses use the backend's `evaluate` tool. Download clauses are
  * checked against the tool results the runner already recorded, because a
  * download does not navigate the page.
  */
-export class OracleSuccessChecker implements SuccessChecker {
+export class TaskSuccessChecker implements SuccessChecker {
   constructor(private readonly backend: ToolBackend) {}
 
   async check(

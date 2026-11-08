@@ -63,6 +63,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      agent-browser:
+        specifier: 0.41.2
+        version: 0.41.2
       playwright-core:
         specifier: 1.65.0
         version: 1.65.0
@@ -682,6 +685,11 @@ packages:
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
     engines: {node: '>= 0.6'}
+
+  agent-browser@0.41.2:
+    resolution: {integrity: sha512-/agCKB5rw1EEK8SKWo4zid7a5kOwlclqALC0P3c69buJvKdhrl/dJkKdfLqGGaiNIbWzRdqqT0PxZVkwVEf2fg==}
+    engines: {node: '>=24.0.0', pnpm: '>=11.0.0'}
+    hasBin: true
 
   ai@7.0.165:
     resolution: {integrity: sha512-cEeORsLF+9+fNzvo4nQo9hxgQoEfupjc9Xmq6OM2NGUwQQQdkHxByBdFoqnNfBE0H+qwhGQaZejvbCFFD84tBA==}
@@ -2091,6 +2099,8 @@ snapshots:
     dependencies:
       mime-types: 3.0.2
       negotiator: 1.1.0
+
+  agent-browser@0.41.2: {}
 
   ai@7.0.165(zod@4.6.7):
     dependencies:

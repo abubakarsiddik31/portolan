@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const armSchema = z.enum(["A", "B", "C", "D-oracle", "D"]);
-export const siteSchema = z.enum(["store", "wizard", "portal"]);
+export const siteSchema = z.enum(["store", "wizard", "portal", "library", "support"]);
 
 export const usageSchema = z.object({
   input_tokens: z.number().int().nonnegative(),

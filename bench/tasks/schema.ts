@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const siteSchema = z.enum(["store", "wizard", "portal"]);
+const siteSchema = z.enum(["store", "wizard", "portal", "library", "support"]);
 
 export const successSchema = z
   .object({

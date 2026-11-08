@@ -93,9 +93,28 @@ importers:
 
   packages/cli:
     dependencies:
+      '@portolan/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@portolan/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@portolan/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@portolan/server':
+        specifier: workspace:*
+        version: link:../portolan-server
+      '@portolan/skills':
+        specifier: workspace:*
+        version: link:../skills
       '@portolan/substrate':
         specifier: workspace:*
         version: link:../substrate
+    devDependencies:
+      fastify:
+        specifier: 5.12.8
+        version: 5.12.8
 
   packages/compiler:
     dependencies:

@@ -7,5 +7,24 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts"],
-  "references": [{ "path": "../substrate" }]
+  "references": [
+    {
+      "path": "../compiler"
+    },
+    {
+      "path": "../protocol"
+    },
+    {
+      "path": "../runtime"
+    },
+    {
+      "path": "../portolan-server"
+    },
+    {
+      "path": "../skills"
+    },
+    {
+      "path": "../substrate"
+    }
+  ]
 }

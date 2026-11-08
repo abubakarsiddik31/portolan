@@ -9,9 +9,9 @@ import { buildStoreApp } from "../fixtures/store/v1/app.js";
 import { buildOracleServer } from "../oracle/server.js";
 import { loadTasks } from "../tasks/load.js";
 import { McpBackend } from "./backend.js";
-import { OracleSuccessChecker } from "./oracle-checker.js";
 import { runTask } from "./runner.js";
 import { createScriptedModel } from "./scripted-model.js";
+import { TaskSuccessChecker } from "./task-checker.js";
 import type { Decision } from "./types.js";
 
 const chromePath =
@@ -117,7 +117,7 @@ describe.skipIf(!hasChrome)("common runner", () => {
       provider: "scripted",
       modelId: "scripted",
       maxSteps: 10,
-      checker: new OracleSuccessChecker(backend),
+      checker: new TaskSuccessChecker(backend),
     });
 
     expect(outcome.success).toBe(true);
@@ -154,7 +154,7 @@ describe.skipIf(!hasChrome)("common runner", () => {
       provider: "scripted",
       modelId: "scripted",
       maxSteps: 10,
-      checker: new OracleSuccessChecker(backend),
+      checker: new TaskSuccessChecker(backend),
     });
 
     expect(outcome.success).toBe(false);

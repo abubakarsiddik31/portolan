@@ -1,0 +1,120 @@
+site: library
+templates:
+  - id: library-search-open
+    goal: "Search the library for {query} and open {title}."
+    start: /
+    max_steps: 10
+    params:
+      - { query: "Analytical", title: "The Analytical Engine" }
+      - { query: "Compilers", title: "Compilers at Dawn" }
+      - { query: "Orbital", title: "Orbital Mechanics" }
+      - { query: "Bletchley", title: "The Bletchley Papers" }
+      - { query: "Apollo", title: "Apollo Guidance" }
+    success:
+      url_matches: '^/books/b_\d+$'
+      dom: >-
+        document.body.innerText.includes('{title}')
+
+  - id: library-borrow
+    goal: "Search the library for {query}, open {title}, and borrow it."
+    start: /
+    max_steps: 12
+    params:
+      - { query: "Analytical", title: "The Analytical Engine" }
+      - { query: "Compilers", title: "Compilers at Dawn" }
+      - { query: "Orbital", title: "Orbital Mechanics" }
+      - { query: "Bletchley", title: "The Bletchley Papers" }
+      - { query: "Apollo", title: "Apollo Guidance" }
+    success:
+      url_matches: "^/loans$"
+      dom: >-
+        document.body.innerText.includes('{title}')
+
+  - id: library-author
+    goal: "Find a book by {author} and open {title}."
+    start: /
+    max_steps: 10
+    params:
+      - { author: "Ada Lovelace", title: "The Analytical Engine" }
+      - { author: "Grace Hopper", title: "Compilers at Dawn" }
+      - { author: "Katherine Johnson", title: "Orbital Mechanics" }
+      - { author: "Alan Turing", title: "The Bletchley Papers" }
+      - { author: "Margaret Hamilton", title: "Apollo Guidance" }
+    success:
+      url_matches: '^/books/b_\d+$'
+      dom: >-
+        document.body.innerText.includes('{title}')
+
+  - id: library-genre
+    goal: "Browse {genre} books and open {title}."
+    start: /
+    max_steps: 10
+    params:
+      - { genre: "history", title: "The Analytical Engine" }
+      - { genre: "engineering", title: "Compilers at Dawn" }
+      - { genre: "science", title: "Orbital Mechanics" }
+      - { genre: "history", title: "The Bletchley Papers" }
+      - { genre: "engineering", title: "Apollo Guidance" }
+    success:
+      url_matches: '^/books/b_\d+$'
+      dom: >-
+        document.body.innerText.includes('{title}')
+
+  - id: library-loans-empty
+    goal: "Open the loans page and confirm it is empty."
+    start: /loans
+    max_steps: 4
+    params:
+      - {}
+      - {}
+      - {}
+      - {}
+      - {}
+    success:
+      url_matches: "^/loans$"
+      dom: >-
+        document.body.innerText.includes('No books on loan')
+
+  - id: library-availability
+    goal: "Open {title} and confirm it is available."
+    start: /
+    max_steps: 10
+    params:
+      - { query: "Analytical", title: "The Analytical Engine" }
+      - { query: "Compilers", title: "Compilers at Dawn" }
+      - { query: "Orbital", title: "Orbital Mechanics" }
+      - { query: "Bletchley", title: "The Bletchley Papers" }
+      - { query: "Apollo", title: "Apollo Guidance" }
+    success:
+      url_matches: '^/books/b_\d+$'
+      dom: >-
+        document.body.innerText.includes('Available')
+
+  - id: library-back
+    goal: "Open {title} and return to the catalog."
+    start: /
+    max_steps: 12
+    params:
+      - { query: "Analytical", title: "The Analytical Engine" }
+      - { query: "Compilers", title: "Compilers at Dawn" }
+      - { query: "Orbital", title: "Orbital Mechanics" }
+      - { query: "Bletchley", title: "The Bletchley Papers" }
+      - { query: "Apollo", title: "Apollo Guidance" }
+    success:
+      url_matches: "^/$"
+      dom: >-
+        document.body.innerText.includes('Catalog')
+
+  - id: library-search-miss
+    goal: "Search the library for {query} and confirm there are no matches."
+    start: /
+    max_steps: 8
+    params:
+      - { query: "zzzz" }
+      - { query: "nonexistent" }
+      - { query: "qwerty" }
+      - { query: "absent" }
+      - { query: "void" }
+    success:
+      dom: >-
+        document.body.innerText.includes('No books found')

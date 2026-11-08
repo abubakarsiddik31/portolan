@@ -1,0 +1,119 @@
+site: support
+templates:
+  - id: support-login
+    goal: "Sign in to the support queue and confirm the ticket list is open."
+    start: /login
+    max_steps: 8
+    params:
+      - {}
+      - {}
+      - {}
+      - {}
+      - {}
+    success:
+      url_matches: "^/$"
+      dom: >-
+        document.body.innerText.includes('Tickets')
+
+  - id: support-filter
+    goal: "Sign in and filter the ticket list to {status}."
+    start: /login
+    max_steps: 12
+    params:
+      - { status: "open" }
+      - { status: "pending" }
+      - { status: "closed" }
+      - { status: "open" }
+      - { status: "pending" }
+    success:
+      url_matches: '^/\?.*status={status}'
+      dom: >-
+        Array.from(document.querySelectorAll('[data-status]')).every((el) => el.dataset.status === '{status}')
+
+  - id: support-filter-search
+    goal: "Sign in, search for {query}, and filter to {status}."
+    start: /login
+    max_steps: 15
+    params:
+      - { status: "open", query: "printer", expected: "Issue 1001" }
+      - { status: "pending", query: "login", expected: "Issue 1002" }
+      - { status: "closed", query: "billing", expected: "Issue 1003" }
+      - { status: "open", query: "network", expected: "Issue 1004" }
+      - { status: "pending", query: "printer", expected: "Issue 1005" }
+    success:
+      url_matches: '^/\?.*status={status}'
+      dom: >-
+        document.body.innerText.includes('{expected}')
+
+  - id: support-search
+    goal: "Sign in and search the ticket list for {query}."
+    start: /login
+    max_steps: 12
+    params:
+      - { query: "printer" }
+      - { query: "login" }
+      - { query: "billing" }
+      - { query: "network" }
+      - { query: "printer" }
+    success:
+      dom: >-
+        document.body.innerText.toLowerCase().includes('{query}')
+
+  - id: support-search-miss
+    goal: "Sign in, search for {query}, and confirm there are no matches."
+    start: /login
+    max_steps: 12
+    params:
+      - { query: "zzzz" }
+      - { query: "nonexistent" }
+      - { query: "qwerty" }
+      - { query: "absent" }
+      - { query: "void" }
+    success:
+      dom: >-
+        document.body.innerText.includes('No tickets match')
+
+  - id: support-paginate
+    goal: "Sign in and open page {page} of the ticket list."
+    start: /login
+    max_steps: 12
+    params:
+      - { page: "2", expected: "Issue 1006" }
+      - { page: "2", expected: "Issue 1007" }
+      - { page: "2", expected: "Issue 1008" }
+      - { page: "2", expected: "Issue 1009" }
+      - { page: "2", expected: "Issue 1010" }
+    success:
+      url_matches: '^/\?.*page={page}'
+      dom: >-
+        document.body.innerText.includes('{expected}')
+
+  - id: support-open-ticket
+    goal: "Sign in and open the ticket {subject}."
+    start: /login
+    max_steps: 12
+    params:
+      - { subject: "Issue 1001: printer trouble", ticket: "t_1001" }
+      - { subject: "Issue 1002: login trouble", ticket: "t_1002" }
+      - { subject: "Issue 1003: billing trouble", ticket: "t_1003" }
+      - { subject: "Issue 1004: network trouble", ticket: "t_1004" }
+      - { subject: "Issue 1005: printer trouble", ticket: "t_1005" }
+    success:
+      url_matches: "^/tickets/{ticket}$"
+      dom: >-
+        document.body.innerText.includes('{subject}')
+
+  - id: support-create
+    goal: "Sign in and create a {priority}-priority ticket: {subject}."
+    start: /login
+    max_steps: 15
+    params:
+      - { subject: "Printer is down", priority: "high" }
+      - { subject: "Cannot log in", priority: "normal" }
+      - { subject: "Invoice mismatch", priority: "low" }
+      - { subject: "Network outage", priority: "high" }
+      - { subject: "Password reset", priority: "normal" }
+    success:
+      url_matches: '^/tickets/t_\d+$'
+      dom: >-
+        document.body.innerText.includes('{subject}')

@@ -25,5 +25,6 @@ export function modelConfigFromEnv(env: NodeJS.ProcessEnv = process.env): ModelC
     segment: { provider: "anthropic", model: anthropicModel, maxTokens: 2048 },
     name: { provider: "openai", model: openaiModel, maxTokens: 1024 },
     repair: { provider: "anthropic", model: anthropicModel, maxTokens: 4096 },
+    runner: { provider: "openai", model: openaiModel, maxTokens: 1024 },
   };
 }

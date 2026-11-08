@@ -1,8 +1,8 @@
 /** JSON Schema as the wire format for op params and returns. */
 export type JSONSchema = Record<string, unknown>;
 
-/** The three jobs the offline compiler asks a model to do. */
-export type ModelRole = "segment" | "name" | "repair";
+/** The jobs a model does for Portolan: compile, name, repair, or run a task. */
+export type ModelRole = "segment" | "name" | "repair" | "runner";
 
 /** Billed usage, normalized across providers. */
 export type Usage = {

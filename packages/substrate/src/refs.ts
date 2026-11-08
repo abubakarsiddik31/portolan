@@ -22,6 +22,7 @@ export type RefMap = {
   doc: number;
   byRef: Map<Ref, RefEntry>;
   byNode: Map<string, RefEntry>;
+  byBackend: Map<number, RefEntry>;
 };
 
 export type RefOptions = {
@@ -68,12 +69,18 @@ export function buildRefMap(nodes: SemanticNode[], doc: number, options: RefOpti
 
   const byRef = new Map<Ref, RefEntry>();
   const byNode = new Map<string, RefEntry>();
+  const byBackend = new Map<number, RefEntry>();
 
   for (const group of groupByPrefix(candidates)) {
     if (group.length === 1) {
       const candidate = group[0];
       if (candidate === undefined) continue;
-      remember(byRef, byNode, toEntry(candidate, `e${candidate.digest.slice(0, REF_LENGTH)}`, doc));
+      remember(
+        byRef,
+        byNode,
+        byBackend,
+        toEntry(candidate, `e${candidate.digest.slice(0, REF_LENGTH)}`, doc),
+      );
       continue;
     }
 
@@ -87,7 +94,7 @@ export function buildRefMap(nodes: SemanticNode[], doc: number, options: RefOpti
         group.forEach((candidate, index) => {
           const ref = refs[index];
           if (ref === undefined) return;
-          remember(byRef, byNode, toEntry(candidate, ref, doc));
+          remember(byRef, byNode, byBackend, toEntry(candidate, ref, doc));
         });
         resolved = true;
       } else {
@@ -98,12 +105,12 @@ export function buildRefMap(nodes: SemanticNode[], doc: number, options: RefOpti
     if (!resolved) {
       group.forEach((candidate, index) => {
         const ref = `e${candidate.digest.slice(0, 6)}${index.toString(36)}`;
-        remember(byRef, byNode, toEntry(candidate, ref, doc));
+        remember(byRef, byNode, byBackend, toEntry(candidate, ref, doc));
       });
     }
   }
 
-  return { doc, byRef, byNode };
+  return { doc, byRef, byNode, byBackend };
 }
 
 export function resolveRef(map: RefMap, ref: Ref): RefEntry | undefined {
@@ -218,9 +225,15 @@ function toEntry(candidate: Candidate, ref: Ref, doc: number): RefEntry {
   };
 }
 
-function remember(byRef: Map<Ref, RefEntry>, byNode: Map<string, RefEntry>, entry: RefEntry): void {
+function remember(
+  byRef: Map<Ref, RefEntry>,
+  byNode: Map<string, RefEntry>,
+  byBackend: Map<number, RefEntry>,
+  entry: RefEntry,
+): void {
   byRef.set(entry.ref, entry);
   byNode.set(entry.nodeId, entry);
+  byBackend.set(entry.backendNodeId, entry);
 }
 
 function normalizeName(name: string): string {

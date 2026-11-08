@@ -62,7 +62,27 @@ one character until unique.
 `new_ref`. A ref is only valid for the document that produced it;
 `snapshot.doc` increments on every committed main-frame navigation.
 
+## Act
+
+`Substrate` composes capture and refs into the two fallback verbs:
+
+```ts
+const { refs } = await substrate.view();
+await substrate.act({ ref, do: "fill", value: "tee" });
+await substrate.act({ ref, do: "click" });
+```
+
+`act` resolves the ref, dispatches through the engine, and returns a typed
+result: `ok`, `stale_ref` (with `new_ref` when the node moved), `not_interactive`
+(with `blocker_ref` when something covers the target), or `invalid_request`.
+
+The engine hit-tests the click point with `DOM.getNodeForLocation` before
+dispatching real mouse input, accepting the target, its descendants, and its
+ancestors. After a click, check, or press it waits up to 250ms for a main-frame
+navigation, then for load and a short network-idle window. A long poll or
+animation does not block the caller.
+
 ## Not here yet
 
-Hit-testing, overlays, quiescence and effects are T2.13–T2.14. This package is
-the transport, the capture, and the addressing layer, not the op runtime.
+Effects and deltas are T2.14. This package is the transport, the capture, the
+addressing layer, and the fallback verbs, not the op runtime.

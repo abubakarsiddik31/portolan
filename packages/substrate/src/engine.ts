@@ -41,6 +41,7 @@ export type Action =
 
 export type DispatchResult = {
   ok: true;
+  doc: number;
   url: string;
   title: string;
 };
@@ -53,11 +54,17 @@ export type EngineErrorCode =
 
 export class EngineError extends Error {
   readonly code: EngineErrorCode;
+  readonly details: Record<string, unknown>;
 
-  constructor(code: EngineErrorCode, message: string, options?: { cause?: unknown }) {
+  constructor(
+    code: EngineErrorCode,
+    message: string,
+    options?: { cause?: unknown; details?: Record<string, unknown> },
+  ) {
     super(message, options);
     this.name = "EngineError";
     this.code = code;
+    this.details = options?.details ?? {};
   }
 }
 

@@ -28,6 +28,19 @@ inserts an action the caller did not ask for.
 
 Broken ops are excluded; degraded ops are still routable.
 
+## UI tier
+
+`runUiOp({ map, op, params, substrate })` runs a `ui` impl:
+
+- checks the current state is in `op.from`
+- resolves each step's locator to a ref and acts through the substrate
+- waits for `await_state` steps
+- checks every `post` condition
+- extracts the return value and validates it with Ajv, coercing strings to the schema's numbers
+
+Supported extractors: `fields`, `rows`, `composite`, `none`. `download` and
+`press` are not supported yet.
+
 ## Not here yet
 
-Tiers, write safety, and extractors are T2.17–T2.24.
+The `url` and `http` tiers are T2.20–T2.21; write safety is T2.22–T2.24.

@@ -70,6 +70,12 @@ export class Substrate {
     return { snapshot, refs };
   }
 
+  /** The last captured document and refs, without taking a new snapshot. */
+  state(): SubstrateView | undefined {
+    if (this.last === undefined || this.current === undefined) return undefined;
+    return { snapshot: this.last, refs: this.current };
+  }
+
   async act(request: ActRequest): Promise<ActResult> {
     const before = this.last;
     const beforeRefs = this.current;

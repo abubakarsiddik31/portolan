@@ -57,8 +57,10 @@ describe("fixture routes", () => {
     expect(routeTo(map("store"), "cart", "cart")).toEqual([]);
   });
 
-  it("never routes to checkout, which needs a write", () => {
-    expect(routeTo(map("store"), "catalog", "checkout")).toBeUndefined();
+  it("routes from cart to checkout with a read op", () => {
+    expect(routeTo(map("store"), "cart", "checkout")).toEqual([
+      { op: "open_checkout", from: "cart", to: "checkout" },
+    ]);
   });
 
   it("never routes to an order, which needs an irreversible op", () => {

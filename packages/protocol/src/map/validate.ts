@@ -9,6 +9,13 @@ const ajv = new Ajv2020({
   allowUnionTypes: true,
 });
 
+const coercingAjv = new Ajv2020({
+  allErrors: true,
+  strict: true,
+  allowUnionTypes: true,
+  coerceTypes: true,
+});
+
 export type ValidationIssue = {
   /** JSON Pointer into the value, e.g. `/qty`. */
   path: string;
@@ -25,6 +32,19 @@ export type SchemaValidation = { ok: true } | { ok: false; issues: ValidationIss
  */
 export function validateJsonSchema(schema: JsonSchema, value: unknown): SchemaValidation {
   const validate = ajv.compile(schema);
+  if (validate(value)) return { ok: true };
+  return { ok: false, issues: formatAjvIssues(validate.errors) };
+}
+
+/**
+ * Validate and coerce in one pass.
+ *
+ * Extraction returns strings from the accessibility tree; a schema that says
+ * `integer` should get `1`, not `"1"`. Ajv mutates the value in place when it
+ * coerces, so callers see the typed result.
+ */
+export function coerceJsonSchema(schema: JsonSchema, value: unknown): SchemaValidation {
+  const validate = coercingAjv.compile(schema);
   if (validate(value)) return { ok: true };
   return { ok: false, issues: formatAjvIssues(validate.errors) };
 }

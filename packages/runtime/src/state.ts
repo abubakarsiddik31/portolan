@@ -8,6 +8,8 @@ export type StateMatch = {
 };
 
 const FORM_ROLES = new Set([
+  // A file input surfaces as a button whose accessible name is its label.
+  "button",
   "textbox",
   "searchbox",
   "combobox",

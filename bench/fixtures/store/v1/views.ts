@@ -80,7 +80,12 @@ function layout(title: string, body: string, cartCount: number): string {
 </html>`;
 }
 
-export function catalogPage(products: Product[], query: string, cartCount: number): string {
+export function catalogPage(
+  products: Product[],
+  query: string,
+  cartCount: number,
+  variant: "v1" | "v2" = "v1",
+): string {
   const cards = products
     .map(
       (product) => `<article class="card" data-testid="product-card">
@@ -96,10 +101,10 @@ export function catalogPage(products: Product[], query: string, cartCount: numbe
   return layout(
     query ? `Search: ${query}` : "Catalog",
     `<h1>${heading}</h1>
-     <form method="get" action="/search" role="search">
-       <label for="q">Search products</label>
+     <form method="get" action="${variant === "v2" ? "/catalog" : "/search"}" role="search">
+       <label for="q">${variant === "v2" ? "Find products" : "Search products"}</label>
        <input id="q" name="q" value="${escapeHtml(query)}" placeholder="tee, socks, mug">
-       <button type="submit">Search</button>
+       <button type="submit">${variant === "v2" ? "Find" : "Search"}</button>
      </form>
      <section class="grid" data-testid="product-grid">
        ${cards || "<p>No products found.</p>"}
@@ -108,7 +113,12 @@ export function catalogPage(products: Product[], query: string, cartCount: numbe
   );
 }
 
-export function productPage(product: Product, cartCount: number, error?: string): string {
+export function productPage(
+  product: Product,
+  cartCount: number,
+  error?: string,
+  variant: "v1" | "v2" = "v1",
+): string {
   const options = product.variants
     .map(
       (variant) =>
@@ -128,11 +138,11 @@ export function productPage(product: Product, cartCount: number, error?: string)
        ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ""}
        <form method="post" action="/cart/add" data-add-form>
          <input type="hidden" name="product_id" value="${product.id}">
-         <label for="variant">Size / color</label>
+         <label for="variant">${variant === "v2" ? "Size and color" : "Size / color"}</label>
          <select id="variant" name="variant_id" required>${options}</select>
          <label for="qty">Quantity</label>
          <input id="qty" name="qty" type="number" min="1" max="10" value="1">
-         <button type="submit" data-testid="add-to-cart">Add to cart</button>
+         <button type="submit" data-testid="add-to-cart">${variant === "v2" ? "Add to bag" : "Add to cart"}</button>
        </form>
      </article>
      <script>
@@ -217,6 +227,7 @@ export function checkoutPage(
   cart: CartView,
   cartCount: number,
   fields: Record<string, string> = {},
+  variant: "v1" | "v2" = "v1",
 ): string {
   const error = (name: string) =>
     fields[name] ? `<p class="error" role="alert">${escapeHtml(fields[name])}</p>` : "";
@@ -224,6 +235,13 @@ export function checkoutPage(
   return layout(
     "Checkout",
     `<h1>Checkout</h1>
+     ${
+       variant === "v2"
+         ? `<div role="dialog" aria-label="Before you continue" style="position:fixed;inset:0;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:10">
+              <button type="button" onclick="this.parentElement.remove()">Continue to payment</button>
+            </div>`
+         : ""
+     }
      <p>Subtotal: <strong>${formatPrice(cart.subtotalCents)}</strong></p>
      <form method="post" action="/checkout" data-checkout-form novalidate>
        <label for="name">Full name</label>

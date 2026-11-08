@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "fixtures": "tsx fixtures/server.ts",
-    "fixtures:store": "tsx fixtures/server.ts --fixture store --port 4100",
-    "fixtures:wizard": "tsx fixtures/server.ts --fixture wizard --port 4101",
     "fixtures:portal": "tsx fixtures/server.ts --fixture portal --port 4102",
-    "results:table": "tsx results/cli.ts",
+    "fixtures:portal:v2": "tsx fixtures/server.ts --fixture portal --variant v2 --port 4112",
+    "fixtures:store": "tsx fixtures/server.ts --fixture store --port 4100",
+    "fixtures:store:v2": "tsx fixtures/server.ts --fixture store --variant v2 --port 4110",
+    "fixtures:wizard": "tsx fixtures/server.ts --fixture wizard --port 4101",
+    "fixtures:wizard:v2": "tsx fixtures/server.ts --fixture wizard --variant v2 --port 4111",
     "oracle:mcp": "tsx oracle/main.ts",
-    "oracle:smoke": "tsx oracle/live-smoke.ts"
+    "oracle:smoke": "tsx oracle/live-smoke.ts",
+    "results:table": "tsx results/cli.ts"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.5",

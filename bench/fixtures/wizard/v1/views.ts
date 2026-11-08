@@ -79,24 +79,32 @@ function errorsBlock(errors: Record<string, string>): string {
     .join("")}</div>`;
 }
 
-export function step1Page(state: WizardState, errors: Record<string, string> = {}): string {
+export function step1Page(
+  state: WizardState,
+  errors: Record<string, string> = {},
+  variant: "v1" | "v2" = "v1",
+): string {
   return layout(
     "About you",
     `<h1>Tell us about you</h1>
      <p class="muted">Step 1 of 3</p>
      ${stepIndicator(1)}
      ${errorsBlock(errors)}
-     <form method="post" action="/step/1" novalidate>
-       <label for="name">Full name</label>
+     <form method="post" action="${variant === "v2" ? "/apply/1" : "/step/1"}" novalidate>
+       <label for="name">${variant === "v2" ? "Name" : "Full name"}</label>
        <input id="name" name="name" value="${escapeHtml(state.data.name ?? "")}" required>
-       <label for="email">Work email</label>
+       <label for="email">${variant === "v2" ? "Email" : "Work email"}</label>
        <input id="email" name="email" type="email" value="${escapeHtml(state.data.email ?? "")}" required>
        <button type="submit" data-testid="step1-next">Continue</button>
      </form>`,
   );
 }
 
-export function step2Page(state: WizardState, errors: Record<string, string> = {}): string {
+export function step2Page(
+  state: WizardState,
+  errors: Record<string, string> = {},
+  variant: "v1" | "v2" = "v1",
+): string {
   const options = ROLES.map(
     (role) =>
       `<option value="${escapeHtml(role)}" ${state.data.role === role ? "selected" : ""}>${escapeHtml(role)}</option>`,
@@ -107,10 +115,10 @@ export function step2Page(state: WizardState, errors: Record<string, string> = {
      <p class="muted">Step 2 of 3</p>
      ${stepIndicator(2)}
      ${errorsBlock(errors)}
-     <form method="post" action="/step/2" novalidate>
-       <label for="company">Company</label>
+     <form method="post" action="${variant === "v2" ? "/apply/2" : "/step/2"}" novalidate>
+       <label for="company">${variant === "v2" ? "Employer" : "Company"}</label>
        <input id="company" name="company" value="${escapeHtml(state.data.company ?? "")}" required>
-       <label for="role">Your role</label>
+       <label for="role">${variant === "v2" ? "Role" : "Your role"}</label>
        <select id="role" name="role" required>
          <option value="">Choose a role</option>
          ${options}
@@ -122,7 +130,11 @@ export function step2Page(state: WizardState, errors: Record<string, string> = {
   );
 }
 
-export function step3Page(state: WizardState, errors: Record<string, string> = {}): string {
+export function step3Page(
+  state: WizardState,
+  errors: Record<string, string> = {},
+  variant: "v1" | "v2" = "v1",
+): string {
   const data = state.data as Partial<WizardData>;
   return layout(
     "Review and upload",
@@ -140,8 +152,8 @@ export function step3Page(state: WizardState, errors: Record<string, string> = {
          <dt>Team size</dt><dd>${escapeHtml(String(data.teamSize ?? ""))}</dd>
        </dl>
      </section>
-     <form method="post" action="/submit" enctype="multipart/form-data" novalidate>
-       <label for="attachment">Attachment (PDF, TXT or PNG, max 1 MB)</label>
+     <form method="post" action="${variant === "v2" ? "/apply/submit" : "/submit"}" enctype="multipart/form-data" novalidate>
+       <label for="attachment">${variant === "v2" ? "Attach a file" : "Attachment (PDF, TXT or PNG, max 1 MB)"}</label>
        <input id="attachment" name="attachment" type="file" accept=".pdf,.txt,.png" required>
        <label>
          <input type="checkbox" name="terms" required>
@@ -152,13 +164,13 @@ export function step3Page(state: WizardState, errors: Record<string, string> = {
   );
 }
 
-export function donePage(submission: Submission): string {
+export function donePage(submission: Submission, variant: "v1" | "v2" = "v1"): string {
   return layout(
     "Application received",
     `<h1>Application received</h1>
      <p>Reference <strong data-testid="submission-id" data-submission-id="${submission.id}">${submission.id}</strong></p>
      <p class="muted">Attached: ${escapeHtml(submission.fileName)} (${submission.fileSize} bytes)</p>
-     <p><a class="button" href="/step/1">Start another application</a></p>`,
+     <p><a class="button" href="${variant === "v2" ? "/apply/1" : "/step/1"}">Start another application</a></p>`,
   );
 }
 

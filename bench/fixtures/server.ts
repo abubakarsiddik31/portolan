@@ -9,9 +9,9 @@ function readArg(name: string, fallback: string): string {
 }
 
 const fixtures = {
-  store: { build: buildStoreApp, label: "store v1", port: "4100" },
-  wizard: { build: buildWizardApp, label: "wizard v1", port: "4101" },
-  portal: { build: buildPortalApp, label: "portal v1", port: "4102" },
+  store: { build: buildStoreApp, label: "store", port: "4100" },
+  wizard: { build: buildWizardApp, label: "wizard", port: "4101" },
+  portal: { build: buildPortalApp, label: "portal", port: "4102" },
 } as const;
 
 type FixtureName = keyof typeof fixtures;
@@ -27,6 +27,7 @@ if (!entry) {
 }
 
 const port = Number(readArg("--port", entry.port));
-const app = await entry.build({ logger: true });
+const variant = readArg("--variant", "v1") as "v1" | "v2";
+const app = await entry.build({ logger: true, variant });
 await app.listen({ host: "127.0.0.1", port });
-console.log(`${entry.label} listening on http://127.0.0.1:${port}`);
+console.log(`${entry.label} ${variant} listening on http://127.0.0.1:${port}`);

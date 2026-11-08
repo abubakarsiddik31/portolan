@@ -21,15 +21,17 @@ type Session = { email: string };
 type FilterQuery = {
   q?: string;
   status?: string;
+  state?: string;
   category?: string;
   page?: string;
+  p?: string;
 };
 
-function parseFilters(query: FilterQuery): RowFilters {
-  const page = Number.parseInt(query.page ?? "1", 10);
+function parseFilters(query: FilterQuery, variant: "v1" | "v2"): RowFilters {
+  const page = Number.parseInt((variant === "v2" ? query.p : query.page) ?? "1", 10);
   return {
     q: query.q?.trim() ?? "",
-    status: query.status ?? "",
+    status: (variant === "v2" ? query.state : query.status) ?? "",
     category: query.category ?? "",
     page: Number.isFinite(page) ? page : 1,
   };
@@ -49,7 +51,10 @@ function toCsv(list: Row[]): string {
   return `${[header, ...lines].join("\n")}\n`;
 }
 
-export async function buildPortalApp(options: { logger?: boolean } = {}): Promise<FastifyInstance> {
+export async function buildPortalApp(
+  options: { logger?: boolean; variant?: "v1" | "v2" } = {},
+): Promise<FastifyInstance> {
+  const variant = options.variant ?? "v1";
   const app = Fastify({ logger: options.logger ?? false });
   await app.register(cookie);
   await app.register(formbody);
@@ -79,11 +84,11 @@ export async function buildPortalApp(options: { logger?: boolean } = {}): Promis
     request.sid = sid;
   });
 
-  app.get("/health", async () => ({ ok: true, fixture: "portal", version: "v1" }));
+  app.get("/health", async () => ({ ok: true, fixture: "portal", version: variant }));
 
   app.get("/login", async (request, reply) => {
     if (sessions.has(request.sid)) return reply.code(303).redirect("/");
-    return reply.type("text/html").send(loginPage());
+    return reply.type("text/html").send(loginPage(undefined, variant));
   });
 
   app.post<{ Body: Record<string, unknown> }>("/login", async (request, reply) => {
@@ -92,7 +97,10 @@ export async function buildPortalApp(options: { logger?: boolean } = {}): Promis
       typeof request.body.password === "string" ? (request.body.password as string) : "";
 
     if (email !== DEMO_EMAIL || password !== DEMO_PASSWORD) {
-      return reply.code(401).type("text/html").send(loginPage("Invalid email or password"));
+      return reply
+        .code(401)
+        .type("text/html")
+        .send(loginPage("Invalid email or password", variant));
     }
 
     sessions.set(request.sid, { email });
@@ -107,26 +115,29 @@ export async function buildPortalApp(options: { logger?: boolean } = {}): Promis
   app.get<{ Querystring: FilterQuery }>("/", async (request, reply) => {
     const session = requireSession(request, reply, false);
     if (!session) return reply;
-    const filters = parseFilters(request.query);
+    const filters = parseFilters(request.query, variant);
     const page = filterRows(rows, filters);
-    return reply.type("text/html").send(portalPage(page, filters, session.email));
+    return reply.type("text/html").send(portalPage(page, filters, session.email, variant));
   });
 
-  app.get<{ Querystring: FilterQuery }>("/export.csv", async (request, reply) => {
-    const session = requireSession(request, reply, true);
-    if (!session) return reply;
-    const filters = parseFilters(request.query);
-    const page = filterRows(rows, { ...filters, pageSize: 1000 });
-    return reply
-      .type("text/csv; charset=utf-8")
-      .header("content-disposition", 'attachment; filename="invoices.csv"')
-      .send(toCsv(page.rows));
-  });
+  app.get<{ Querystring: FilterQuery }>(
+    variant === "v2" ? "/invoices.csv" : "/export.csv",
+    async (request, reply) => {
+      const session = requireSession(request, reply, true);
+      if (!session) return reply;
+      const filters = parseFilters(request.query, variant);
+      const page = filterRows(rows, { ...filters, pageSize: 1000 });
+      return reply
+        .type("text/csv; charset=utf-8")
+        .header("content-disposition", 'attachment; filename="invoices.csv"')
+        .send(toCsv(page.rows));
+    },
+  );
 
   app.get<{ Querystring: FilterQuery }>("/api/rows", async (request, reply) => {
     const session = requireSession(request, reply, true);
     if (!session) return reply;
-    const page = filterRows(rows, parseFilters(request.query));
+    const page = filterRows(rows, parseFilters(request.query, variant));
     return { rows: page.rows, total: page.total, page: page.page, pages: page.pages };
   });
 

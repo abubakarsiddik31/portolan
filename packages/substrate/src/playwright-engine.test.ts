@@ -20,6 +20,7 @@ const PAGE = `<!doctype html>
     <option value="m">Medium</option>
   </select>
   <label><input id="terms" type="checkbox"> I agree</label>
+  <div style="display: none"><button>Hidden</button></div>
   <output id="out"></output>
 </body>
 </html>`;
@@ -114,6 +115,24 @@ describe.skipIf(!ENABLED)("playwright engine", () => {
     expect(roles).toContain("combobox");
     expect(roles).toContain("checkbox");
     expect(target(snapshot, "textbox", "Search")).toBeTypeOf("number");
+  });
+
+  it("merges layout and visibility into the snapshot", async () => {
+    await current().navigate(baseUrl);
+    const snapshot = await current().snapshot();
+
+    const heading = snapshot.nodes.find(
+      (node) => node.role === "heading" && node.name === "Engine test",
+    );
+
+    expect(heading?.visible).toBe(true);
+    expect(heading?.bounds?.width).toBeGreaterThan(0);
+    expect(heading?.bounds?.height).toBeGreaterThan(0);
+
+    const visibleHidden = snapshot.nodes.some(
+      (node) => node.role === "button" && node.name === "Hidden" && node.visible,
+    );
+    expect(visibleHidden).toBe(false);
   });
 
   it("fills an input and clicks a button", async () => {

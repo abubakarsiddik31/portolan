@@ -2,11 +2,11 @@ import { type Browser, type CDPSession, chromium, type Page } from "playwright-c
 
 import {
   type Action,
-  type AxNode,
   type DispatchResult,
   type Engine,
   EngineError,
   type NavigateResult,
+  type SemanticNode,
   type Snapshot,
 } from "./engine.js";
 
@@ -33,6 +33,21 @@ type RawAxNode = {
   backendDOMNodeId?: number;
   properties?: AxProperty[];
   childIds?: string[];
+};
+
+type DomSnapshotResult = {
+  strings: string[];
+  documents: Array<{
+    nodes: { backendNodeId: number[] };
+    layout: { nodeIndex: number[]; bounds: number[][]; styles?: number[][] };
+  }>;
+};
+
+type LayoutInfo = {
+  bounds: { x: number; y: number; width: number; height: number };
+  display: string;
+  visibility: string;
+  opacity: string;
 };
 
 type ResolvedNode = {
@@ -90,14 +105,22 @@ export class PlaywrightEngine implements Engine {
   }
 
   async snapshot(): Promise<Snapshot> {
-    const result = (await this.cdp.send("Accessibility.getFullAXTree")) as unknown as {
-      nodes: RawAxNode[];
-    };
+    const [ax, dom] = await Promise.all([
+      this.cdp.send("Accessibility.getFullAXTree") as unknown as Promise<{
+        nodes: RawAxNode[];
+      }>,
+      this.cdp.send("DOMSnapshot.captureSnapshot", {
+        computedStyles: ["display", "visibility", "opacity"],
+        includeDOMRects: true,
+      }) as unknown as Promise<DomSnapshotResult>,
+    ]);
+
+    const layout = indexLayout(dom);
 
     return {
       url: this.page.url(),
       title: await this.page.title(),
-      nodes: result.nodes.map(toAxNode),
+      nodes: ax.nodes.map((node) => toSemanticNode(node, layout)),
     };
   }
 
@@ -272,7 +295,42 @@ export class PlaywrightEngine implements Engine {
   }
 }
 
-function toAxNode(node: RawAxNode): AxNode {
+function indexLayout(snapshot: DomSnapshotResult): Map<number, LayoutInfo> {
+  const layout = new Map<number, LayoutInfo>();
+
+  for (const document of snapshot.documents) {
+    const nodes = document.nodes;
+    const boxes = document.layout;
+
+    boxes.nodeIndex.forEach((nodeIndex, position) => {
+      const backendNodeId = nodes.backendNodeId[nodeIndex];
+      const bounds = boxes.bounds[position];
+      if (backendNodeId === undefined || bounds === undefined) return;
+
+      const styles = boxes.styles?.[position];
+      layout.set(backendNodeId, {
+        bounds: {
+          x: bounds[0] ?? 0,
+          y: bounds[1] ?? 0,
+          width: bounds[2] ?? 0,
+          height: bounds[3] ?? 0,
+        },
+        display: styleValue(snapshot.strings, styles?.[0]),
+        visibility: styleValue(snapshot.strings, styles?.[1]),
+        opacity: styleValue(snapshot.strings, styles?.[2], "1"),
+      });
+    });
+  }
+
+  return layout;
+}
+
+function styleValue(strings: string[], index: number | undefined, fallback = ""): string {
+  if (index === undefined) return fallback;
+  return strings[index] ?? fallback;
+}
+
+function toSemanticNode(node: RawAxNode, layout: Map<number, LayoutInfo>): SemanticNode {
   const properties: Record<string, string | number | boolean> = {};
 
   for (const property of node.properties ?? []) {
@@ -282,18 +340,32 @@ function toAxNode(node: RawAxNode): AxNode {
     }
   }
 
-  const result: AxNode = {
+  const result: SemanticNode = {
     nodeId: node.nodeId,
     role: typeof node.role?.value === "string" ? node.role.value : "none",
     name: typeof node.name?.value === "string" ? node.name.value : String(node.name?.value ?? ""),
     ignored: node.ignored,
+    visible: false,
     properties,
     childIds: node.childIds ?? [],
   };
 
-  if (node.backendDOMNodeId !== undefined) {
-    result.backendNodeId = node.backendDOMNodeId;
-  }
+  if (node.backendDOMNodeId === undefined) return result;
+
+  result.backendNodeId = node.backendDOMNodeId;
+
+  const info = layout.get(node.backendDOMNodeId);
+  if (info === undefined) return result;
+
+  result.bounds = info.bounds;
+  result.visible =
+    !node.ignored &&
+    info.bounds.width > 0 &&
+    info.bounds.height > 0 &&
+    info.display !== "none" &&
+    info.visibility !== "hidden" &&
+    info.visibility !== "collapse" &&
+    Number(info.opacity) > 0;
 
   return result;
 }

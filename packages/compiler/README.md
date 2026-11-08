@@ -129,6 +129,23 @@ and records the check. The store add-to-cart lifts to
 sends the request, loses the response, reconciles with `view_cart`, and
 asserts the cart still has one item and the executor ran once.
 
+## Verifier
+
+`verifyOp({ map, op, paramSets, baseUrl })` runs every impl of an op on a
+fresh browser context per param set:
+
+- **At least three param sets.** Fewer is rejected before a browser starts.
+- **Params are validated** against the op's schema.
+- **The tier runs**: `url`, `http`, or `ui`. The `http` tier's post checks run
+  against the page after the fetch, because a fetch does not navigate.
+- **An `outcome_check`** runs after a write and must succeed.
+- **The report is per impl**: each run's params, result, state, URL, and
+  failure message. An op is verified when at least one impl passes every set.
+
+On the fixtures, store search verifies on three fresh sessions, a wrong post
+state is rejected with the run that broke, and a lifted `http` add-to-cart
+verifies on three fresh carts with `view_cart` as its outcome check.
+
 ## Local models
 
 The repair role is provider-agnostic. Any OpenAI-compatible endpoint works:

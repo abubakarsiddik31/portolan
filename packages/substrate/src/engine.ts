@@ -18,6 +18,8 @@ export type SemanticNode = {
   name: string;
   /** CDP backend node id, used to dispatch an action. */
   backendNodeId?: number;
+  /** The author's stable automation hook, when the node has one. */
+  test_id?: string;
   ignored: boolean;
   /** False when ignored, unstyled, zero-sized, or hidden by CSS. */
   visible: boolean;

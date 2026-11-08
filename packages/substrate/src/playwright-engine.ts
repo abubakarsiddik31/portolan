@@ -50,7 +50,7 @@ type ResponseEvent = {
 type DomSnapshotResult = {
   strings: string[];
   documents: Array<{
-    nodes: { backendNodeId: number[] };
+    nodes: { backendNodeId: number[]; attributes?: number[][] };
     layout: { nodeIndex: number[]; bounds: number[][]; styles?: number[][] };
   }>;
 };
@@ -60,6 +60,7 @@ type LayoutInfo = {
   display: string;
   visibility: string;
   opacity: string;
+  test_id?: string;
 };
 
 type DescribedNode = {
@@ -524,6 +525,7 @@ function indexLayout(snapshot: DomSnapshotResult): Map<number, LayoutInfo> {
         display: styleValue(snapshot.strings, styles?.[0]),
         visibility: styleValue(snapshot.strings, styles?.[1]),
         opacity: styleValue(snapshot.strings, styles?.[2], "1"),
+        test_id: testIdFor(nodes.attributes?.[nodeIndex], snapshot.strings),
       });
     });
   }
@@ -534,6 +536,21 @@ function indexLayout(snapshot: DomSnapshotResult): Map<number, LayoutInfo> {
 function styleValue(strings: string[], index: number | undefined, fallback = ""): string {
   if (index === undefined) return fallback;
   return strings[index] ?? fallback;
+}
+
+function testIdFor(attributes: number[] | undefined, strings: string[]): string | undefined {
+  if (attributes === undefined) return undefined;
+
+  for (let index = 0; index + 1 < attributes.length; index += 2) {
+    const nameIndex = attributes[index];
+    if (nameIndex === undefined) continue;
+    if (strings[nameIndex] !== "data-testid") continue;
+
+    const valueIndex = attributes[index + 1];
+    return valueIndex === undefined ? undefined : strings[valueIndex];
+  }
+
+  return undefined;
 }
 
 function toSemanticNode(node: RawAxNode, layout: Map<number, LayoutInfo>): SemanticNode {
@@ -562,6 +579,8 @@ function toSemanticNode(node: RawAxNode, layout: Map<number, LayoutInfo>): Seman
 
   const info = layout.get(node.backendDOMNodeId);
   if (info === undefined) return result;
+
+  if (info.test_id !== undefined) result.test_id = info.test_id;
 
   result.bounds = info.bounds;
   result.visible =

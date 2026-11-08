@@ -12,7 +12,7 @@ const PAGE = `<!doctype html>
 <body>
   <h1>Engine test</h1>
   <label for="q">Search</label>
-  <input id="q" name="q">
+  <input id="q" name="q" data-testid="search-input">
   <button id="go" onclick="document.getElementById('out').textContent = document.getElementById('q').value">Go</button>
   <label for="size">Size</label>
   <select id="size">
@@ -115,6 +115,9 @@ describe.skipIf(!ENABLED)("playwright engine", () => {
     expect(roles).toContain("combobox");
     expect(roles).toContain("checkbox");
     expect(target(snapshot, "textbox", "Search")).toBeTypeOf("number");
+
+    const search = snapshot.nodes.find((node) => node.role === "textbox" && node.name === "Search");
+    expect(search?.test_id).toBe("search-input");
   });
 
   it("merges layout and visibility into the snapshot", async () => {

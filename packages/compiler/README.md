@@ -172,6 +172,28 @@ The wizard's `submit_application` compiles this way and verifies on three fresh
 sessions with the attachment. The parameterizer maps the attachment label to
 `file_path`.
 
+## Repair loop
+
+`repairOp({ map, op, intent, params, paramSets, repair, capture, dir })` repairs
+one degraded op without a hand edit:
+
+1. **The repair run** finishes the op's intent with the substrate and returns
+   its trace.
+2. **The last segment** is labelled with the broken op; earlier segments are
+   labelled from their candidate, so a login setup stays a setup.
+3. **The compiler** turns the segment into a candidate, using the cheaper tier
+   the trace supports.
+4. **The verifier** runs it on fresh sessions with every param set.
+5. **The publisher** writes the next map version.
+
+`post` can override the op's post checks when the route moved with the drift;
+the v2 store search does that. An irreversible repair verifies but is held for
+review, not published.
+
+On the v2 store, the loop repairs `search` to `/catalog?q={query}` and
+`add_to_cart` to an `http` POST with `view_cart` as its outcome check, then
+publishes v2 and v3.
+
 ## Local models
 
 The repair role is provider-agnostic. Any OpenAI-compatible endpoint works:

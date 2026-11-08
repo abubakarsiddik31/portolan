@@ -1,0 +1,422 @@
+{
+  "site": "support",
+  "origins": ["http://127.0.0.1:4121"],
+  "version": 7,
+  "states": [
+    {
+      "id": "login",
+      "url": "/login",
+      "marks": [
+        {
+          "role": "button",
+          "name": "Sign in"
+        }
+      ]
+    },
+    {
+      "id": "tickets",
+      "url": "/",
+      "marks": [
+        {
+          "test_id": "ticket-table"
+        }
+      ]
+    },
+    {
+      "id": "ticket",
+      "url": "/tickets/:id",
+      "marks": [
+        {
+          "test_id": "ticket-detail"
+        }
+      ]
+    }
+  ],
+  "ops": [
+    {
+      "name": "login",
+      "version": 1,
+      "summary": "Sign in to the support queue.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 3
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["email", "password"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "string"
+            },
+            "requester": {
+              "type": "string"
+            }
+          },
+          "required": ["subject", "status", "priority", "requester"],
+          "additionalProperties": false
+        }
+      },
+      "from": ["login"],
+      "to": ["tickets"],
+      "post": [
+        {
+          "kind": "state",
+          "state": "tickets"
+        }
+      ],
+      "effect": "write",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "ui",
+          "steps": [
+            {
+              "do": "fill",
+              "target": {
+                "role": "textbox",
+                "name": "Work email",
+                "ordinal": 0
+              },
+              "value": "{email}"
+            },
+            {
+              "do": "fill",
+              "target": {
+                "role": "textbox",
+                "name": "Password",
+                "ordinal": 0
+              },
+              "value": "{password}"
+            },
+            {
+              "do": "click",
+              "target": {
+                "role": "button",
+                "name": "Sign in",
+                "ordinal": 0
+              }
+            }
+          ],
+          "extract": {
+            "kind": "rows",
+            "container": {
+              "test_id": "ticket-table"
+            },
+            "row": {
+              "test_id": "ticket-row"
+            },
+            "cols": {
+              "subject": {
+                "role": "cell",
+                "ordinal": 0
+              },
+              "status": {
+                "role": "cell",
+                "ordinal": 1,
+                "attribute": "data-status"
+              },
+              "priority": {
+                "role": "cell",
+                "ordinal": 2
+              },
+              "requester": {
+                "role": "cell",
+                "ordinal": 3
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "list_tickets",
+      "version": 1,
+      "summary": "Read the ticket list.",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "from": ["tickets"],
+      "to": ["tickets"],
+      "post": [
+        {
+          "kind": "state",
+          "state": "tickets"
+        }
+      ],
+      "effect": "read",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/",
+          "extract": {
+            "kind": "rows",
+            "container": {
+              "test_id": "ticket-table"
+            },
+            "row": {
+              "test_id": "ticket-row"
+            },
+            "cols": {
+              "subject": {
+                "role": "link"
+              },
+              "status": {
+                "role": "cell",
+                "ordinal": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "filter_tickets",
+      "version": 1,
+      "summary": "Filter the ticket list by status.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["status"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "string"
+            },
+            "requester": {
+              "type": "string"
+            }
+          },
+          "required": ["subject", "status", "priority", "requester"],
+          "additionalProperties": false
+        }
+      },
+      "from": ["tickets"],
+      "to": ["tickets"],
+      "post": [
+        {
+          "kind": "state",
+          "state": "tickets"
+        }
+      ],
+      "effect": "read",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/?status={status}",
+          "extract": {
+            "kind": "rows",
+            "container": {
+              "test_id": "ticket-table"
+            },
+            "row": {
+              "test_id": "ticket-row"
+            },
+            "cols": {
+              "subject": {
+                "role": "cell",
+                "ordinal": 0
+              },
+              "status": {
+                "role": "cell",
+                "ordinal": 1,
+                "attribute": "data-status"
+              },
+              "priority": {
+                "role": "cell",
+                "ordinal": 2
+              },
+              "requester": {
+                "role": "cell",
+                "ordinal": 3
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "paginate",
+      "version": 1,
+      "summary": "Open a page of the ticket list.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": ["page"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "string"
+            },
+            "requester": {
+              "type": "string"
+            }
+          },
+          "required": ["subject", "status", "priority", "requester"],
+          "additionalProperties": false
+        }
+      },
+      "from": ["tickets"],
+      "to": ["tickets"],
+      "post": [
+        {
+          "kind": "state",
+          "state": "tickets"
+        }
+      ],
+      "effect": "read",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/?page={page}",
+          "extract": {
+            "kind": "rows",
+            "container": {
+              "test_id": "ticket-table"
+            },
+            "row": {
+              "test_id": "ticket-row"
+            },
+            "cols": {
+              "subject": {
+                "role": "cell",
+                "ordinal": 0
+              },
+              "status": {
+                "role": "cell",
+                "ordinal": 1,
+                "attribute": "data-status"
+              },
+              "priority": {
+                "role": "cell",
+                "ordinal": 2
+              },
+              "requester": {
+                "role": "cell",
+                "ordinal": 3
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_ticket",
+      "version": 1,
+      "summary": "Open a ticket with a subject and priority.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "priority": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["subject", "priority"],
+        "additionalProperties": false
+      },
+      "returns": {},
+      "from": ["tickets"],
+      "to": ["ticket"],
+      "post": [],
+      "effect": "write",
+      "status": "verified",
+      "outcome_check": "list_tickets",
+      "impls": [
+        {
+          "tier": "http",
+          "steps": [
+            {
+              "method": "POST",
+              "url": "/api/tickets",
+              "body": {
+                "subject": "{subject}",
+                "urgency": "high"
+              },
+              "headers": {
+                "content-type": "application/json"
+              }
+            }
+          ],
+          "extract": {
+            "kind": "json",
+            "path": ""
+          }
+        }
+      ]
+    }
+  ],
+  "entities": {},
+  "compiled_from": [
+    "seed:support",
+    "trace:repair:login",
+    "trace:repair:filter_tickets",
+    "trace:repair:paginate",
+    "trace:repair:create_ticket"
+  ],
+  "verified_at": "2026-11-08T20:41:54.757Z"
+}

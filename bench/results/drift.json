@@ -1,0 +1,46 @@
+{
+  "frozen_commit": "98d8af4cd800f7720da76ab7ea6acf3b933fab03",
+  "model": "scripted",
+  "created_at": "2026-11-08T20:41:57.456Z",
+  "before": {
+    "library.search": true,
+    "support.login": true,
+    "support.create": true
+  },
+  "after_switch": {
+    "library.search": false,
+    "support.login": false,
+    "support.create": false
+  },
+  "after_repair": {
+    "library.search": true,
+    "support.login": true,
+    "support.create": true
+  },
+  "repairs": [
+    {
+      "op": "library.search",
+      "repaired": true,
+      "version": 5,
+      "verified": true,
+      "tier": "url"
+    },
+    {
+      "op": "support.login",
+      "repaired": true,
+      "version": 6,
+      "verified": true,
+      "tier": "ui"
+    },
+    {
+      "op": "support.create",
+      "repaired": true,
+      "version": 7,
+      "verified": true,
+      "tier": "http"
+    }
+  ],
+  "repair_rate": 1,
+  "duplicate_writes": 0,
+  "drift_day_success": 1
+}

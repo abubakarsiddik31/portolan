@@ -4,6 +4,7 @@ export * from "./map/lint.js";
 export * from "./map/load.js";
 export * from "./map/schema.js";
 export * from "./map/types.js";
+export * from "./map/validate.js";
 export * from "./meter.js";
 export * from "./session.js";
 

@@ -1,8 +1,8 @@
-import type { ErrorObject } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
 
 import { MAP_SCHEMA } from "./schema.js";
 import type { Extractor, Impl, JsonSchema, Locator, OpDef, SiteMap } from "./types.js";
+import { formatAjvIssues, type ValidationIssue } from "./validate.js";
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -12,11 +12,7 @@ const ajv = new Ajv2020({
 
 const validateMap = ajv.compile(MAP_SCHEMA);
 
-export type MapIssue = {
-  /** JSON Pointer into the map, e.g. `/ops/2/from/0`. */
-  path: string;
-  message: string;
-};
+export type MapIssue = ValidationIssue;
 
 export class MapValidationError extends Error {
   readonly issues: MapIssue[];
@@ -42,7 +38,7 @@ export class MapValidationError extends Error {
  */
 export function loadMap(data: unknown): SiteMap {
   if (!validateMap(data)) {
-    throw new MapValidationError(formatIssues(validateMap.errors));
+    throw new MapValidationError(formatAjvIssues(validateMap.errors));
   }
 
   const map = data as SiteMap;
@@ -68,17 +64,6 @@ export function parseMap(json: string): SiteMap {
     ]);
   }
   return loadMap(data);
-}
-
-function formatIssues(errors: ErrorObject[] | null | undefined): MapIssue[] {
-  return (errors ?? []).map((error) => {
-    const missing = (error.params as { missingProperty?: unknown }).missingProperty;
-    const path =
-      error.keyword === "required" && typeof missing === "string"
-        ? `${error.instancePath}/${missing}`
-        : error.instancePath || "/";
-    return { path, message: error.message ?? error.keyword };
-  });
 }
 
 function checkReferences(map: SiteMap): MapIssue[] {

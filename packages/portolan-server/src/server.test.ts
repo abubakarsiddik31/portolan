@@ -1,8 +1,15 @@
+import { join } from "node:path";
+
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { MapStore } from "./maps.js";
 import { createServer } from "./server.js";
 import { SessionStore } from "./store.js";
+
+const MAPS = join(import.meta.dirname, "../../../maps");
 
 describe("server", () => {
   let app: FastifyInstance;
@@ -123,6 +130,31 @@ describe("server", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().result.closed_at).toBeTypeOf("string");
+  });
+
+  it("serves the mcp surface over streamable http", async () => {
+    const http = createServer({ store, maps: new MapStore(MAPS) });
+    await http.listen({ port: 0, host: "127.0.0.1" });
+
+    const address = http.server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("the server did not get a port");
+    }
+
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://127.0.0.1:${address.port}/mcp`),
+    );
+    const client = new Client({ name: "http-test", version: "0.0.0" });
+
+    try {
+      await client.connect(transport);
+      const tools = await client.listTools();
+
+      expect(tools.tools.map((tool) => tool.name)).toEqual(["list_sites", "open_site", "call"]);
+    } finally {
+      await client.close();
+      await http.close();
+    }
   });
 
   it("returns invalid_request for an unknown route", async () => {

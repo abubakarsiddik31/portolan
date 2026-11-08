@@ -66,6 +66,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@portolan/compiler':
+        specifier: workspace:*
+        version: link:../packages/compiler
       '@portolan/protocol':
         specifier: workspace:*
         version: link:../packages/protocol
@@ -84,6 +87,24 @@ importers:
       tsx:
         specifier: 4.23.15
         version: 4.23.15
+
+  packages/compiler:
+    dependencies:
+      '@portolan/model':
+        specifier: workspace:*
+        version: link:../model
+      '@portolan/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@portolan/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@portolan/substrate':
+        specifier: workspace:*
+        version: link:../substrate
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/model:
     dependencies:

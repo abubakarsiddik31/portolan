@@ -29,10 +29,34 @@ export type SemanticNode = {
 export type Snapshot = {
   /** Document epoch. Increments on every committed main-frame navigation. */
   doc: number;
+  /** Mutation counter. Increments on every dispatched action. */
+  v: number;
   url: string;
   title: string;
   nodes: SemanticNode[];
 };
+
+export type NetworkEffect = {
+  kind: "network";
+  method: string;
+  url: string;
+  status?: number;
+};
+
+export type NavigationEffect = {
+  kind: "navigation";
+  from: string;
+  to: string;
+  doc: number;
+};
+
+export type ValueEffect = {
+  kind: "value";
+  backendNodeId: number;
+  value: string;
+};
+
+export type Effect = NetworkEffect | NavigationEffect | ValueEffect;
 
 export type Action =
   | { do: "click" | "check" | "uncheck"; backendNodeId: number }
@@ -42,8 +66,10 @@ export type Action =
 export type DispatchResult = {
   ok: true;
   doc: number;
+  v: number;
   url: string;
   title: string;
+  effects: Effect[];
 };
 
 export type EngineErrorCode =

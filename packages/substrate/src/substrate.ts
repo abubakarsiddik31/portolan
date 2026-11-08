@@ -1,4 +1,4 @@
-import type { Action, Engine, Snapshot } from "./engine.js";
+import type { Action, Effect, Engine, Snapshot } from "./engine.js";
 import { EngineError } from "./engine.js";
 import { type RefMap, RefRegistry } from "./refs.js";
 
@@ -14,8 +14,29 @@ export type ActRequest = {
   key?: string;
 };
 
+export type DeltaEntry = {
+  kind: "added" | "removed" | "changed";
+  ref?: string;
+  role: string;
+  name: string;
+};
+
+export type Delta = {
+  /** True when the document changed; the caller should re-read. */
+  navigation: boolean;
+  entries: DeltaEntry[];
+};
+
 export type ActResult =
-  | { ok: true; doc: number; url: string; title: string }
+  | {
+      ok: true;
+      doc: number;
+      v: number;
+      url: string;
+      title: string;
+      effects: Effect[];
+      delta: Delta;
+    }
   | { ok: false; code: "stale_ref"; current_doc: number; new_ref?: string }
   | {
       ok: false;
@@ -29,13 +50,14 @@ export type ActResult =
  * The stateful substrate verbs an agent uses when no op fits: view and act.
  *
  * `view` captures the document, builds refs, and remembers the map. `act`
- * resolves a ref, dispatches through the engine (which hit-tests and waits
- * for quiescence), and maps engine failures back to the substrate's typed
- * errors.
+ * resolves a ref, dispatches through the engine, then re-captures the
+ * document so the caller gets effects and a small delta instead of a full
+ * re-read.
  */
 export class Substrate {
   private readonly registry = new RefRegistry();
   private current: RefMap | undefined;
+  private last: Snapshot | undefined;
 
   constructor(private readonly engine: Engine) {}
 
@@ -43,11 +65,15 @@ export class Substrate {
     const snapshot = await this.engine.snapshot();
     const refs = this.registry.build(snapshot.nodes, snapshot.doc);
     this.current = refs;
+    this.last = snapshot;
 
     return { snapshot, refs };
   }
 
   async act(request: ActRequest): Promise<ActResult> {
+    const before = this.last;
+    const beforeRefs = this.current;
+
     const resolution = this.registry.resolve(request.ref);
 
     if (!resolution.ok) {
@@ -68,7 +94,26 @@ export class Substrate {
 
     try {
       const result = await this.engine.dispatch(action);
-      return { ok: true, doc: result.doc, url: result.url, title: result.title };
+
+      const snapshot = await this.engine.snapshot();
+      const refs = this.registry.build(snapshot.nodes, snapshot.doc);
+      this.current = refs;
+      this.last = snapshot;
+
+      const delta =
+        before !== undefined && beforeRefs !== undefined
+          ? diff(before, beforeRefs, snapshot, refs)
+          : { navigation: false, entries: [] };
+
+      return {
+        ok: true,
+        doc: result.doc,
+        v: result.v,
+        url: result.url,
+        title: result.title,
+        effects: result.effects,
+        delta,
+      };
     } catch (error) {
       if (error instanceof EngineError && error.code === "not_interactive") {
         const blocker = error.details.blockerBackendNodeId;
@@ -112,4 +157,51 @@ function toAction(request: ActRequest, backendNodeId: number): Action | string {
       }
       return { do: "press", key: request.key };
   }
+}
+
+function diff(before: Snapshot, beforeRefs: RefMap, after: Snapshot, afterRefs: RefMap): Delta {
+  if (before.doc !== after.doc || before.url !== after.url) {
+    return { navigation: true, entries: [] };
+  }
+
+  const beforeNodes = new Map(before.nodes.map((node) => [node.nodeId, node]));
+  const afterNodes = new Map(after.nodes.map((node) => [node.nodeId, node]));
+  const entries: DeltaEntry[] = [];
+
+  for (const [ref, entry] of afterRefs.byRef) {
+    const previous = beforeRefs.byRef.get(ref);
+
+    if (previous === undefined) {
+      entries.push({ kind: "added", ref, role: entry.role, name: entry.name });
+      continue;
+    }
+
+    const beforeNode = beforeNodes.get(previous.nodeId);
+    const afterNode = afterNodes.get(entry.nodeId);
+
+    if (
+      beforeNode !== undefined &&
+      afterNode !== undefined &&
+      stable(beforeNode.properties) !== stable(afterNode.properties)
+    ) {
+      entries.push({ kind: "changed", ref, role: entry.role, name: entry.name });
+    }
+  }
+
+  for (const [ref, entry] of beforeRefs.byRef) {
+    if (!afterRefs.byRef.has(ref)) {
+      entries.push({ kind: "removed", ref, role: entry.role, name: entry.name });
+    }
+  }
+
+  return { navigation: false, entries };
+}
+
+/** Property order is not meaningful; compare a sorted projection. */
+function stable(properties: Record<string, unknown>): string {
+  return JSON.stringify(
+    Object.keys(properties)
+      .sort()
+      .map((key) => [key, properties[key]]),
+  );
 }

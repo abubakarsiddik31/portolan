@@ -25,7 +25,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm coverage
       - run: pnpm build
       - run: pnpm package:check:tarballs
       - run: pnpm release:dry-run --out /tmp/portolan-release

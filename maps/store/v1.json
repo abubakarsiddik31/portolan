@@ -584,6 +584,126 @@
         }
       ],
       "status": "verified"
+    },
+    {
+      "name": "list_products_api",
+      "version": 1,
+      "summary": "List products from the JSON API.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "price_cents": {
+              "type": "integer"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": ["id", "name", "price_cents", "url"],
+          "additionalProperties": false
+        }
+      },
+      "from": ["catalog", "results"],
+      "to": ["catalog", "results"],
+      "post": [],
+      "effect": "read",
+      "impls": [
+        {
+          "tier": "http",
+          "steps": [
+            {
+              "method": "GET",
+              "url": "/api/products?q={query}"
+            }
+          ],
+          "extract": {
+            "kind": "json",
+            "path": "products"
+          }
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "name": "get_product_api",
+      "version": 1,
+      "summary": "Read a product through the JSON API, binding its name.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["product_id"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price_cents": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name", "price_cents", "url"],
+        "additionalProperties": false
+      },
+      "from": ["catalog", "results", "product"],
+      "to": ["catalog", "results", "product"],
+      "post": [],
+      "effect": "read",
+      "impls": [
+        {
+          "tier": "http",
+          "steps": [
+            {
+              "method": "GET",
+              "url": "/api/products/{product_id}",
+              "bind": {
+                "product_name": "name"
+              }
+            },
+            {
+              "method": "GET",
+              "url": "/api/products?q={product_name}"
+            }
+          ],
+          "extract": {
+            "kind": "json",
+            "path": "products.0"
+          }
+        }
+      ],
+      "status": "verified"
     }
   ],
   "entities": {

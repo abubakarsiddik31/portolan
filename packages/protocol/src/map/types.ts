@@ -72,6 +72,13 @@ export type CompositeExtractor = {
   };
 };
 
+/** Pull a value out of the last HTTP response body. */
+export type JsonExtractor = {
+  kind: "json";
+  /** Dot path into the body; empty means the whole body. */
+  path?: string;
+};
+
 /** The op's result is the file the browser downloaded. */
 export type DownloadExtractor = {
   kind: "download";
@@ -86,6 +93,7 @@ export type Extractor =
   | FieldExtractor
   | RowsExtractor
   | CompositeExtractor
+  | JsonExtractor
   | DownloadExtractor
   | NoneExtractor;
 

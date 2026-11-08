@@ -145,6 +145,15 @@ export const MAP_SCHEMA = {
           type: "object",
           additionalProperties: false,
           required: ["kind"],
+          properties: {
+            kind: { const: "json" },
+            path: { type: "string" },
+          },
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind"],
           properties: { kind: { const: "download" } },
         },
         {

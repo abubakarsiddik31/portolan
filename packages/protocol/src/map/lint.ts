@@ -64,7 +64,9 @@ export function lintMap(map: SiteMap): LintIssue[] {
     lintReturns(op.returns, `${base}/returns`, issues);
     lintSummary(op.summary, `${base}/summary`, issues);
 
-    if (op.post.length === 0) {
+    // An http op is verified by its response status and returns schema; a
+    // missing DOM post-check is not a gap for it.
+    if (op.post.length === 0 && !op.impls.some((impl) => impl.tier === "http")) {
       issues.push({
         path: `${base}/post`,
         rule: "op/no-post",

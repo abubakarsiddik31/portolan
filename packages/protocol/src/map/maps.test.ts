@@ -30,6 +30,8 @@ describe("fixture maps", () => {
       "view_cart",
       "open_checkout",
       "checkout",
+      "list_products_api",
+      "get_product_api",
     ]);
   });
 

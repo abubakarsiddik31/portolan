@@ -18,6 +18,11 @@ export type PlaywrightEngineOptions = {
   timeoutMs?: number;
   /** Extra Chromium flags, e.g. --no-sandbox in a container. */
   launchArgs?: string[];
+  /**
+   * Tags the browser's command line so `reapOrphans` can find it after this
+   * process dies without a graceful close.
+   */
+  instanceId?: string;
 };
 
 type AxValue = { value?: string | number | boolean };
@@ -119,10 +124,15 @@ export class PlaywrightEngine implements Engine {
   }
 
   static async launch(options: PlaywrightEngineOptions): Promise<PlaywrightEngine> {
+    const args = [...(options.launchArgs ?? [])];
+    if (options.instanceId !== undefined) {
+      args.push(`--portolan-instance=${options.instanceId}`);
+    }
+
     const browser = await chromium.launch({
       executablePath: options.executablePath,
       headless: options.headless ?? true,
-      args: options.launchArgs ?? [],
+      args,
     });
 
     const context = await browser.newContext();

@@ -117,6 +117,47 @@ export class SessionStore {
     return result.changes > 0;
   }
 
+  /** Close sessions whose last use is older than the TTL. Returns their sids. */
+  sweepExpired(ttlMs: number, now = Date.now()): string[] {
+    const cutoff = new Date(now - ttlMs).toISOString();
+    const rows = this.db
+      .prepare("SELECT sid FROM sessions WHERE closed_at IS NULL AND last_used_at <= ?")
+      .all(cutoff) as Array<{ sid: string }>;
+
+    if (rows.length === 0) return [];
+
+    const closedAt = new Date(now).toISOString();
+    const close = this.db.prepare(
+      "UPDATE sessions SET closed_at = ? WHERE sid = ? AND closed_at IS NULL",
+    );
+    const sweep = this.db.transaction((sids: string[]) => {
+      for (const sid of sids) close.run(closedAt, sid);
+    });
+    sweep(rows.map((row) => row.sid));
+
+    return rows.map((row) => row.sid);
+  }
+
+  /** Close every open session, e.g. on a graceful shutdown. */
+  closeAllOpen(now = Date.now()): number {
+    const result = this.db
+      .prepare("UPDATE sessions SET closed_at = ? WHERE closed_at IS NULL")
+      .run(new Date(now).toISOString());
+    return result.changes;
+  }
+
+  /** Open-session count, optionally for one site. */
+  countOpen(site?: string): number {
+    const row = this.db
+      .prepare(
+        site === undefined
+          ? "SELECT COUNT(*) AS count FROM sessions WHERE closed_at IS NULL"
+          : "SELECT COUNT(*) AS count FROM sessions WHERE closed_at IS NULL AND site = ?",
+      )
+      .get(...(site === undefined ? [] : [site])) as { count: number };
+    return row.count;
+  }
+
   /** Close a session. Returns false when it is unknown or already closed. */
   close(sid: string): boolean {
     const now = new Date().toISOString();

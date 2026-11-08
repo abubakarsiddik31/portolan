@@ -12,6 +12,10 @@ DATABASE_PATH=portolan.db PORT=4200 pnpm --filter @portolan/server start
 
 `DATABASE_PATH=:memory:` gives an ephemeral store.
 
+Set `PORTOLAN_INSTANCE_ID` to a stable id (one per runtime instance) to reap
+Chromium processes left behind by a hard-killed predecessor at startup. Pass
+the same id to `PlaywrightEngine.launch({ instanceId })`.
+
 ## Routes
 
 | Method | Path | Result |
@@ -31,6 +35,34 @@ Every response, including errors, uses the protocol envelope:
 
 Malformed JSON and schema violations are `invalid_request` with
 `details.issues`. An unknown or already-closed session is `session_not_found`.
+
+## Session lifecycle
+
+`createServer` owns four session controls:
+
+| Option | Default | Effect |
+|---|---|---|
+| `sessionTtlMs` | 30 minutes | A session idle longer than this is closed |
+| `maxOpenSessions` | 100 | A create at the cap returns `429` |
+| `cleanupIntervalMs` | 60 seconds | How often the expiry sweep runs |
+| `recoverSessions` | `true` | Close sessions left open by a previous process |
+
+A create at the cap returns `precondition_failed` with
+`details.reason = "session_limit"`, plus `details.open` and `details.cap`. The
+sweep runs before the cap check, so an expired session frees its slot.
+
+`recoverSessions` is on by default: a restart means the previous process's
+browsers are gone, so no session from that process can be resumed safely.
+Pass `false` only when the process shares its browser state deliberately.
+
+On `DELETE` the session's browser is closed through `BrowserRegistry`. On
+`app.close()` the sweep stops, every open session is closed, and every
+registered browser is closed. Register an engine with
+`browsers.register(sid, engine)` from the substrate factory.
+
+Recovery closes rows, not OS processes. A runtime killed with `SIGKILL` leaves
+its Chromium children behind; call `reapOrphans(instanceId)` from
+`@portolan/substrate` at startup to kill them before opening new browsers.
 
 ## Credentials
 
@@ -110,7 +142,8 @@ Every write is also recorded in SQLite: params, effect, outcome, idempotency key
 
 ## Notes
 
-- The store is `better-sqlite3`; sessions survive a restart.
+- The store is `better-sqlite3`; sessions survive a restart. An open session
+  from a dead process is closed on the next startup.
 - `createServer` takes a store, so tests use an in-memory database and
   `app.inject()` without binding a port.
 - A closed session stays readable for audit. `touch` and `close` both refuse

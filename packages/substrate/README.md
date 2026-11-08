@@ -130,6 +130,35 @@ request throws `EgressBlockedError`, is kept in `blockedRequests()`, and is
 passed to `onBlocked`. A page's own navigation is not intercepted by this
 layer.
 
+## Crash recovery
+
+Pass `instanceId` when launching an engine:
+
+```ts
+const engine = await PlaywrightEngine.launch({
+  executablePath,
+  instanceId: "portolan-local",
+});
+```
+
+The engine adds `--portolan-instance=<id>` to Chromium's command line. If the
+runtime dies without closing (SIGKILL, a crashed container), the browser is
+reparented and keeps running. The next process with the same id can kill it:
+
+```ts
+import { reapOrphans } from "@portolan/substrate";
+
+const pids = reapOrphans("portolan-local");
+```
+
+`reapOrphans` reads `ps`, matches only processes carrying the marker, skips
+itself, and sends `SIGKILL`. It returns the pids it killed. It is POSIX only
+and returns `[]` on Windows. An empty id throws, so a missing configuration
+cannot kill every Chromium on the machine.
+
+Use one id per runtime instance file, and reuse it across restarts so the new
+process can find the old process's browsers.
+
 ## Not here yet
 
 This package is the transport, the capture, the addressing layer, and the

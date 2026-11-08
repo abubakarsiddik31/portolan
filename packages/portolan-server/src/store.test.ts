@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionStore } from "./store.js";
 
@@ -112,6 +112,61 @@ describe("session store", () => {
         created_at: "2026-11-08T00:00:00Z",
       },
     ]);
+  });
+
+  it("sweeps only sessions past the ttl", () => {
+    vi.useFakeTimers();
+    try {
+      const store = open();
+      vi.setSystemTime(new Date("2026-11-09T10:00:00Z"));
+      const old = store.create({ site: "store" });
+
+      vi.setSystemTime(new Date("2026-11-09T12:00:00Z"));
+      const fresh = store.create({ site: "store" });
+
+      expect(store.sweepExpired(60 * 60 * 1000)).toEqual([old.sid]);
+      expect(store.get(old.sid)?.closed_at).toBe("2026-11-09T12:00:00.000Z");
+      expect(store.get(fresh.sid)?.closed_at).toBeUndefined();
+      expect(store.countOpen()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sweeps nothing when every session is fresh", () => {
+    const store = open();
+    store.create();
+    store.create();
+
+    expect(store.sweepExpired(60 * 60 * 1000)).toEqual([]);
+    expect(store.countOpen()).toBe(2);
+  });
+
+  it("counts open sessions, optionally per site", () => {
+    const store = open();
+    store.create({ site: "store" });
+    store.create({ site: "store" });
+    store.create({ site: "portal" });
+    const closed = store.create({ site: "portal" });
+    store.close(closed.sid);
+
+    expect(store.countOpen()).toBe(3);
+    expect(store.countOpen("store")).toBe(2);
+    expect(store.countOpen("portal")).toBe(1);
+    expect(store.countOpen("missing")).toBe(0);
+  });
+
+  it("closes every open session", () => {
+    const store = open();
+    const first = store.create();
+    const second = store.create();
+    const already = store.create();
+    store.close(already.sid);
+
+    expect(store.closeAllOpen()).toBe(2);
+    expect(store.get(first.sid)?.closed_at).toBeTypeOf("string");
+    expect(store.get(second.sid)?.closed_at).toBeTypeOf("string");
+    expect(store.countOpen()).toBe(0);
   });
 
   it("survives a reopen", () => {

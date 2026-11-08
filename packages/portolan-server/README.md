@@ -46,6 +46,8 @@ The stdio server exposes the portable surface:
 
 The HTTP server exposes the same surface at `POST /mcp` (Streamable HTTP) when it is created with a map store.
 
+After `open_site`, the site's ops also appear as native tools (`store__search`, `store__checkout`) and the server sends `notifications/tools/list_changed`. The list is capped by `toolBudget` (default 30); every op stays reachable through `call`. Native names are sanitized to `^[a-zA-Z0-9_-]{1,64}$`.
+
 The op executor is injected. Until T2.17–T2.21 it is `notReadyExecutor`, which returns `op_broken` with `details.stage = "executor"` — the call reached the runtime, but no op ran.
 
 ## Notes

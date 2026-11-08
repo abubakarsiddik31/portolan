@@ -309,6 +309,10 @@ function labelParam(label: string, op: OpDef): string | undefined {
   const alias = ALIASES[normalized];
   if (alias !== undefined && properties[alias] !== undefined) return alias;
 
+  if (normalized.startsWith("attachment") && properties.file_path !== undefined) {
+    return "file_path";
+  }
+
   for (const name of Object.keys(properties)) {
     if (normalized.split(" ").includes(name)) return name;
   }

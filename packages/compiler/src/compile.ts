@@ -7,6 +7,7 @@ import { liftUrl } from "./lift.js";
 import { type ParameterizedSegment, parameterizeTrace } from "./parameterize.js";
 import { type InferredReturns, inferJsonReturns, inferReturns } from "./returns.js";
 import type { SegmentLabel } from "./segment.js";
+import { liftUi } from "./ui.js";
 
 export type CompileTrace = {
   trace: Trace;
@@ -26,7 +27,7 @@ export type CompileOptions = {
 export type CompiledCandidate = {
   op: OpDef;
   segment: ParameterizedSegment;
-  tier: "url" | "http";
+  tier: "url" | "http" | "ui";
   source?: string;
 };
 
@@ -58,7 +59,7 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
 
       const write = segment.segment.actions.flatMap((action) => action.effects).find(isWriteEffect);
 
-      let tier: "url" | "http";
+      let tier: "url" | "http" | "ui";
       let returns: InferredReturns;
       let impl: Impl;
 
@@ -77,14 +78,24 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
 
         impl = { tier: "http", steps: lift.steps, extract: lift.extract };
       } else {
-        if (segment.segment.url === undefined) continue;
-        tier = "url";
-        returns = await captureReturns(options.capture, segment.segment.url);
+        returns =
+          segment.segment.url === undefined
+            ? noneReturns()
+            : await captureReturns(options.capture, segment.segment.url);
 
-        const lift = liftUrl({ segment, returns });
-        if (lift === undefined) continue;
+        const urlLift =
+          segment.segment.url === undefined ? undefined : liftUrl({ segment, returns });
 
-        impl = { tier: "url", route: lift.route, extract: lift.extract };
+        if (urlLift !== undefined) {
+          tier = "url";
+          impl = { tier: "url", route: urlLift.route, extract: urlLift.extract };
+        } else {
+          const uiLift = liftUi({ segment, returns });
+          if (uiLift === undefined) continue;
+
+          tier = "ui";
+          impl = { tier: "ui", steps: uiLift.steps, extract: uiLift.extract };
+        }
       }
 
       const oracle = options.map.ops.find((op) => op.name === name);

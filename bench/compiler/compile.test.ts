@@ -441,7 +441,9 @@ function renderReport(input: {
   lines.push(
     "- portal: `export_csv` needs download capture; `login` is inherited because the auth block names it.",
   );
-  lines.push("- wizard: no trace; file upload is still unsupported.");
+  lines.push(
+    "- wizard: covered separately by `wizard-compile.test.ts`; this report does not include it.",
+  );
   lines.push("");
 
   return lines.join("\n");

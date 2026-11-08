@@ -184,7 +184,7 @@ function inferFields(view: SubstrateView): InferredReturns | undefined {
       continue;
     }
 
-    const value = fieldValue(node);
+    const value = fieldValue(node, view.snapshot);
     if (value === undefined || value.length === 0) continue;
 
     const key = normalizeKey(node.test_id);
@@ -320,12 +320,32 @@ function isContainer(node: SemanticNode): boolean {
   );
 }
 
-function fieldValue(node: SemanticNode): string | undefined {
+function fieldValue(node: SemanticNode, snapshot: Snapshot): string | undefined {
   if (node.name.length > 0) return node.name;
   if (node.attributes?.value !== undefined && node.attributes.value.length > 0) {
     return node.attributes.value;
   }
-  return undefined;
+
+  const text = textOf(snapshot, node);
+  return text.length > 0 ? text : undefined;
+}
+
+function textOf(snapshot: Snapshot, node: SemanticNode): string {
+  const byId = new Map(snapshot.nodes.map((candidate) => [candidate.nodeId, candidate]));
+  const parts: string[] = [];
+  const stack = [...node.childIds];
+
+  while (stack.length > 0) {
+    const id = stack.shift();
+    if (id === undefined) continue;
+
+    const child = byId.get(id);
+    if (child === undefined) continue;
+    if (child.name.length > 0) parts.push(child.name);
+    stack.push(...child.childIds);
+  }
+
+  return parts.join(" ").trim();
 }
 
 function descendants(snapshot: Snapshot, root: SemanticNode, includeRoot = false): SemanticNode[] {

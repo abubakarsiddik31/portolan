@@ -8,4 +8,4 @@
 Missing ops are the ones no trace exercised or no lift supported:
 - store: `checkout` is irreversible and held for review; `list_products_api` and `get_product_api` were never exercised; `open_checkout` is static and does not lift; `view_cart` is inherited as the write's outcome check.
 - portal: `export_csv` needs download capture; `login` is inherited because the auth block names it.
-- wizard: no trace; file upload is still unsupported.
+- wizard: covered separately by `wizard-compile.test.ts`; this report does not include it.

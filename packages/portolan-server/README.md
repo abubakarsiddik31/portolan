@@ -44,6 +44,13 @@ The stdio server exposes the portable surface:
 | `list_sites` | every site with a map, its latest version, and its ops |
 | `open_site(site)` | creates a session, pins the map version, returns the compact map |
 | `call(op, params, idempotency_key?, confirm?)` | validates the op and params, checks `confirm` for irreversible ops, then hands off to the executor |
+| `fallback_begin(intent, effect?)` | opens a scope for `view`/`act`/`read` |
+| `view()` | ranked affordances with refs |
+| `act(ref, do, value?, key?)` | one substrate action |
+| `read(ref?)` | the page or one node's text |
+| `fallback_done(scope_id, result?)` | closes the scope |
+
+`view`, `act`, and `read` need a `substrateFactory` in `McpDeps`. While a write scope is open, `call` refuses other write ops with `precondition_failed`; reads still work.
 
 The HTTP server exposes the same surface at `POST /mcp` (Streamable HTTP) when it is created with a map store.
 

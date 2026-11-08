@@ -107,6 +107,18 @@ The bench test forces a mid-write failure on the store: the request reaches
 the server, the response is lost, `runWrite` returns `unknown_outcome`, and a
 retry with the same key creates no second order.
 
+## Fallback scopes
+
+`FallbackScopes` opens a permission slip for the caller's agent to finish an
+intent with `view`, `act`, and `read`:
+
+- `begin({ sid, intent, effect })` returns `{ scope_id, allowed, expires }`.
+- While a write or irreversible scope is open, `blocksWrite(sid)` returns it,
+  and the runtime refuses other write ops.
+- `close(scope_id, result?)` closes it and keeps the result for the trace.
+
+Scopes expire after 10 minutes by default.
+
 ## Not here yet
 
 A durable write ledger and the audit log are T2.23–T2.24; download capture is

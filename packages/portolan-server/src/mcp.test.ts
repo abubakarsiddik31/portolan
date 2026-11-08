@@ -3,14 +3,54 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { SemanticNode } from "@portolan/substrate";
+import { buildRefMap } from "@portolan/substrate";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { OpExecutor, OpExecutorInput } from "./executor.js";
 import { MapStore } from "./maps.js";
-import { createMcpServer, type McpDeps, sanitizeToolName } from "./mcp.js";
+import { createMcpServer, type FallbackSubstrate, type McpDeps, sanitizeToolName } from "./mcp.js";
 import { SessionStore } from "./store.js";
 
 const MAPS = join(import.meta.dirname, "../../../maps");
+
+const BUTTON: SemanticNode = {
+  nodeId: "b",
+  role: "button",
+  name: "Continue",
+  backendNodeId: 10,
+  ignored: false,
+  visible: true,
+  bounds: { x: 0, y: 0, width: 10, height: 10 },
+  properties: {},
+  childIds: [],
+};
+
+function fakeSubstrate(): FallbackSubstrate {
+  const snapshot = {
+    doc: 1,
+    v: 0,
+    url: "http://x/",
+    title: "",
+    nodes: [BUTTON],
+  };
+  const refs = buildRefMap([BUTTON], 1);
+
+  return {
+    view: async () => ({ snapshot, refs }),
+    state: () => ({ snapshot, refs }),
+    act: async () => ({
+      ok: true,
+      doc: 1,
+      v: 1,
+      url: "http://x/",
+      title: "",
+      effects: [],
+      delta: { navigation: false, entries: [] },
+    }),
+    read: async (ref?: string) => ({ text: ref === undefined ? "page text" : "Continue" }),
+  };
+}
 
 type ToolResult = {
   ok?: boolean;
@@ -61,7 +101,7 @@ describe("mcp surface", () => {
     sessions = new SessionStore();
     calls = [];
 
-    const connected = await connect();
+    const connected = await connect({ substrateFactory: async () => fakeSubstrate() });
     server = connected.server;
     client = connected.client;
   });
@@ -77,10 +117,19 @@ describe("mcp surface", () => {
     return JSON.parse(textOf(result));
   }
 
-  it("lists the three portable tools", async () => {
+  it("lists the portable tools", async () => {
     const tools = await currentClient().listTools();
 
-    expect(tools.tools.map((tool) => tool.name)).toEqual(["list_sites", "open_site", "call"]);
+    expect(tools.tools.map((tool) => tool.name)).toEqual([
+      "list_sites",
+      "open_site",
+      "call",
+      "fallback_begin",
+      "view",
+      "act",
+      "read",
+      "fallback_done",
+    ]);
   });
 
   it("lists the fixture sites", async () => {
@@ -309,6 +358,95 @@ describe("mcp surface", () => {
       params: checkoutParams(),
       requests: [{ method: "POST", url: "/api/checkout", status: 200 }],
     });
+  });
+
+  it("opens a scope and exposes view, act, read, and done", async () => {
+    await call("open_site", { site: "store" });
+
+    const scope = (await call("fallback_begin", { intent: "finish checkout" })) as {
+      scope_id: string;
+      allowed: string[];
+      effect: string;
+    };
+    expect(scope.allowed).toEqual(["view", "act", "read"]);
+    expect(scope.effect).toBe("write");
+
+    const view = (await call("view")) as {
+      text: string;
+      affordances: Array<{ ref?: string; name: string }>;
+    };
+    expect(view.text).toContain('button "Continue"');
+    expect(view.affordances[0]?.ref).toBeDefined();
+
+    const acted = (await call("act", {
+      ref: view.affordances[0]?.ref,
+      do: "click",
+    })) as { ok: boolean };
+    expect(acted.ok).toBe(true);
+
+    const read = (await call("read", { ref: view.affordances[0]?.ref })) as {
+      text: string;
+    };
+    expect(read.text).toBe("Continue");
+
+    const done = (await call("fallback_done", { scope_id: scope.scope_id })) as {
+      closed: boolean;
+    };
+    expect(done.closed).toBe(true);
+  });
+
+  it("refuses another write while a write scope is open", async () => {
+    await call("open_site", { site: "store" });
+    await call("fallback_begin", { intent: "finish checkout", effect: "write" });
+
+    const blocked = (await call("call", {
+      op: "checkout",
+      confirm: true,
+      params: checkoutParams(),
+    })) as ToolResult;
+
+    expect(blocked).toMatchObject({
+      ok: false,
+      error: { code: "precondition_failed" },
+    });
+    expect(calls).toHaveLength(0);
+
+    const read = (await call("call", {
+      op: "search",
+      params: { query: "tee" },
+    })) as ToolResult;
+
+    expect(read).toMatchObject({ ok: true });
+  });
+
+  it("opens a scope when a read op is broken", async () => {
+    const failing: OpExecutor = async () => ({
+      ok: false,
+      error: { code: "op_broken", message: "boom" },
+    });
+    const extra = await connect({ executor: failing });
+
+    try {
+      await extra.client.callTool({
+        name: "open_site",
+        arguments: { site: "store" },
+      });
+
+      const result = await extra.client.callTool({
+        name: "call",
+        arguments: { op: "search", params: { query: "tee" } },
+      });
+
+      const body = JSON.parse(textOf(result)) as {
+        error: { code: string; details: { scope_id?: string } };
+      };
+
+      expect(body.error.code).toBe("op_broken");
+      expect(body.error.details.scope_id).toBeTypeOf("string");
+    } finally {
+      await extra.client.close();
+      await extra.server.close();
+    }
   });
 
   it("caps native tools at the budget and keeps call working", async () => {

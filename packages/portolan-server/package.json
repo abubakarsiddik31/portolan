@@ -23,6 +23,7 @@
     "@modelcontextprotocol/sdk": "1.32.2",
     "@portolan/protocol": "workspace:*",
     "@portolan/runtime": "workspace:*",
+    "@portolan/substrate": "workspace:*",
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.8",
     "zod": "4.6.7"

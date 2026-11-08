@@ -16,7 +16,8 @@ Portolan turns a website into a **map an agent can call**: the site's states, an
 |---|---|
 | Stage | Pre-build / validated on paper, unvalidated in code |
 | Date of analysis | 2026-11-08 |
-| Current plan | [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) (v2, site-map runtime, 15 days, 3 gates) |
+| Current plan | [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) (what and how) · [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) (when and who) |
+| First release | v0.1.0 public alpha, target **Tue 2027-03-02** |
 | First gate | Day 2: hand-written ops must beat the best free tool by ≥3x on steps and ≥5x on cost, or we stop |
 | Key decisions | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic; MCP + Skills), ADR-004 (name) in [docs/DECISIONS.md](./docs/DECISIONS.md) |
 
@@ -49,6 +50,7 @@ open_site("acme-store")
 | File | What's in it |
 |---|---|
 | [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) | **Start here.** Map model, op runtime, write safety, compiler, agent surface, stack, benchmark, gates, 15-day build order, landscape |
+| [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) | Schedule to v0.1.0 (Mar 2, 2027): release criteria, milestones, ~95 tasks with estimates and dependencies, gates, risks, commit and PR conventions |
 | [docs/DECISIONS.md](./docs/DECISIONS.md) | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic; MCP + Skills), ADR-004 (name), one-line rationale for other choices |
 | [docs/SUBSTRATE.md](./docs/SUBSTRATE.md) | The stateful browser layer underneath: engine adapter, semantic engine, refs, effects, hibernation, meter |
 | [docs/ANALYSIS.md](./docs/ANALYSIS.md) | Market evidence, cost model, competitive landscape, reasoning trail (v1 → v4), falsification criteria |

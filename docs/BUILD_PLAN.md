@@ -419,6 +419,8 @@ Bootstrap CIs resample **templates**, not runs (carried from v1 review F12).
 
 ## 11. Build order (15 working days)
 
+> "Day N" below is the ideal build order. The realistic schedule, task breakdown and dates to v0.1.0 are in [`PROJECT_PLAN.md`](./PROJECT_PLAN.md), which wins on dates.
+
 | Day | Deliverable | Acceptance |
 |---|---|---|
 | **1** | Workspace; `ModelPort` with two provider adapters; fixture server; 3 dev fixtures (v1 only); arms A and B on dev templates with billed usage | Per-step token/step counts for A and B on both providers. |

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { OpExecutor, OpExecutorInput } from "./executor.js";
 import { MapStore } from "./maps.js";
-import { createMcpServer } from "./mcp.js";
+import { createMcpServer, type McpDeps, sanitizeToolName } from "./mcp.js";
 import { SessionStore } from "./store.js";
 
 const MAPS = join(import.meta.dirname, "../../../maps");
@@ -28,16 +28,36 @@ describe("mcp surface", () => {
     return { ok: true, result: { op: input.op.name, params: input.params } };
   };
 
+  async function connect(
+    overrides: Partial<McpDeps> = {},
+  ): Promise<{ server: McpServer; client: Client }> {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const nextServer = createMcpServer({
+      maps: new MapStore(MAPS),
+      sessions,
+      executor,
+      ...overrides,
+    });
+    await nextServer.connect(serverTransport);
+
+    const nextClient = new Client({ name: "test", version: "0.0.0" });
+    await nextClient.connect(clientTransport);
+
+    return { server: nextServer, client: nextClient };
+  }
+
+  function currentClient(): Client {
+    if (client === undefined) throw new Error("the client is not connected");
+    return client;
+  }
+
   beforeEach(async () => {
     sessions = new SessionStore();
     calls = [];
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    server = createMcpServer({ maps: new MapStore(MAPS), sessions, executor });
-    await server.connect(serverTransport);
-
-    client = new Client({ name: "test", version: "0.0.0" });
-    await client.connect(clientTransport);
+    const connected = await connect();
+    server = connected.server;
+    client = connected.client;
   });
 
   afterEach(async () => {
@@ -47,14 +67,12 @@ describe("mcp surface", () => {
   });
 
   async function call(name: string, args: Record<string, unknown> = {}): Promise<unknown> {
-    if (client === undefined) throw new Error("the client is not connected");
-    const result = await client.callTool({ name, arguments: args });
+    const result = await currentClient().callTool({ name, arguments: args });
     return JSON.parse(textOf(result));
   }
 
-  it("lists the three tools", async () => {
-    if (client === undefined) throw new Error("the client is not connected");
-    const tools = await client.listTools();
+  it("lists the three portable tools", async () => {
+    const tools = await currentClient().listTools();
 
     expect(tools.tools.map((tool) => tool.name)).toEqual(["list_sites", "open_site", "call"]);
   });
@@ -137,14 +155,7 @@ describe("mcp surface", () => {
 
     const result = (await call("call", {
       op: "checkout",
-      params: {
-        name: "Ada",
-        email: "ada@example.com",
-        address: "1 Way",
-        city: "London",
-        postal: "N1",
-        card: "4242424242424242",
-      },
+      params: checkoutParams(),
     })) as ToolResult;
 
     expect(result).toMatchObject({
@@ -160,21 +171,119 @@ describe("mcp surface", () => {
     const result = (await call("call", {
       op: "checkout",
       confirm: true,
-      params: {
-        name: "Ada",
-        email: "ada@example.com",
-        address: "1 Way",
-        city: "London",
-        postal: "N1",
-        card: "4242424242424242",
-      },
+      params: checkoutParams(),
     })) as ToolResult;
 
     expect(result).toMatchObject({ ok: true, result: { op: "checkout" } });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.confirm).toBe(true);
   });
+
+  it("lists native tools after open_site", async () => {
+    await call("open_site", { site: "store" });
+
+    const names = (await currentClient().listTools()).tools.map((tool) => tool.name);
+
+    expect(names).toContain("store__search");
+    expect(names).toContain("store__checkout");
+  });
+
+  it("calls a native tool", async () => {
+    await call("open_site", { site: "store" });
+
+    const result = await call("store__search", { query: "tee" });
+
+    expect(result).toEqual({
+      ok: true,
+      result: { op: "search", params: { query: "tee" } },
+    });
+    expect(calls[0]?.op.name).toBe("search");
+  });
+
+  it("requires confirmation on a native irreversible tool", async () => {
+    await call("open_site", { site: "store" });
+
+    const refused = (await call("store__checkout", checkoutParams())) as ToolResult;
+    expect(refused).toMatchObject({
+      ok: false,
+      error: { code: "needs_confirmation" },
+    });
+
+    const accepted = (await call("store__checkout", {
+      ...checkoutParams(),
+      confirm: true,
+    })) as ToolResult;
+    expect(accepted).toMatchObject({ ok: true, result: { op: "checkout" } });
+  });
+
+  it("replaces native tools when the site changes", async () => {
+    await call("open_site", { site: "store" });
+    await call("open_site", { site: "portal" });
+
+    const names = (await currentClient().listTools()).tools.map((tool) => tool.name);
+
+    expect(names).toContain("portal__login");
+    expect(names).not.toContain("store__search");
+  });
+
+  it("caps native tools at the budget and keeps call working", async () => {
+    const extra = await connect({ toolBudget: 2 });
+
+    try {
+      await extra.client.callTool({
+        name: "open_site",
+        arguments: { site: "store" },
+      });
+
+      const names = (await extra.client.listTools()).tools.map((tool) => tool.name);
+      const native = names.filter((name) => name.startsWith("store__"));
+
+      expect(native).toHaveLength(2);
+
+      const result = await extra.client.callTool({
+        name: "call",
+        arguments: {
+          op: "checkout",
+          confirm: true,
+          params: checkoutParams(),
+        },
+      });
+
+      expect(JSON.parse(textOf(result))).toMatchObject({
+        ok: true,
+        result: { op: "checkout" },
+      });
+    } finally {
+      await extra.client.close();
+      await extra.server.close();
+    }
+  });
 });
+
+describe("sanitizeToolName", () => {
+  it("replaces characters outside the portable set", () => {
+    expect(sanitizeToolName("store.search")).toBe("store_search");
+  });
+
+  it("truncates to 64 characters", () => {
+    expect(sanitizeToolName("a".repeat(80))).toHaveLength(64);
+  });
+
+  it("never returns an empty name", () => {
+    expect(sanitizeToolName("")).toBe("tool");
+  });
+});
+
+function checkoutParams(): Record<string, unknown> {
+  return {
+    name: "Ada",
+    email: "ada@example.com",
+    address: "1 Way",
+    city: "London",
+    postal: "N1",
+    card: "4242424242424242",
+  };
+}
 
 function textOf(result: unknown): string {
   if (typeof result !== "object" || result === null || !("content" in result)) {

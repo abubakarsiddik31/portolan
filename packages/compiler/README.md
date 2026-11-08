@@ -54,6 +54,26 @@ model.
 segment: `reuse` an existing op, `extend` one, or `propose` a new one. The
 deterministic candidate is a hint, not an answer.
 
+## Parameterizer
+
+`parameterizeTrace({ trace, params?, labels? }, map)` turns a segment into
+params and constants:
+
+- **A segment that matches an op** is parameterized against that op's
+  signature. A typed value that fills a named param becomes a param; so does a
+  URL path or query piece. Everything else stays a constant.
+- **A segment with no op** is parameterized by its label and the task values.
+- **`parameterizeTraces(inputs, map)`** diffs several traces of the same op. A
+  value that changes between runs becomes a param, even when the first pass
+  called it a constant.
+
+The result carries `params`, `constants`, `missing` (required op params no
+binding covered), and an inferred JSON Schema.
+
+On the dev fixtures, the store's five ops and the portal's two ops match their
+oracle signatures exactly. The wizard reports `file_path` as missing, because
+the substrate cannot upload yet.
+
 ## Local models
 
 The repair role is provider-agnostic. Any OpenAI-compatible endpoint works:

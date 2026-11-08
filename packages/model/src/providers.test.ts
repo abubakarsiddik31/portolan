@@ -26,6 +26,7 @@ describe.skipIf(!anthropicReady)("anthropic structured output", () => {
         segment: { provider: "anthropic", model: env.ANTHROPIC_MODEL as string },
         name: { provider: "anthropic", model: env.ANTHROPIC_MODEL as string },
         repair: { provider: "anthropic", model: env.ANTHROPIC_MODEL as string },
+        runner: { provider: "anthropic", model: env.ANTHROPIC_MODEL as string },
       }),
     );
 
@@ -51,6 +52,7 @@ describe.skipIf(!openaiReady)("openai structured output", () => {
         segment: { provider: "openai", model: env.OPENAI_MODEL as string },
         name: { provider: "openai", model: env.OPENAI_MODEL as string },
         repair: { provider: "openai", model: env.OPENAI_MODEL as string },
+        runner: { provider: "openai", model: env.OPENAI_MODEL as string },
       }),
     );
 

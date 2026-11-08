@@ -16,6 +16,7 @@ const config = defineModelConfig({
   segment: { provider: "anthropic", model: "segment-model" },
   name: { provider: "openai", model: "name-model" },
   repair: { provider: "anthropic", model: "repair-model" },
+  runner: { provider: "openai", model: "runner-model" },
 });
 
 function fakeAdapter(provider: string, model: string): ProviderAdapter {
@@ -138,5 +139,6 @@ describe("modelConfigFromEnv", () => {
     expect(fromEnv.segment.provider).toBe("anthropic");
     expect(fromEnv.name.provider).toBe("openai");
     expect(fromEnv.repair.provider).toBe("anthropic");
+    expect(fromEnv.runner.provider).toBe("openai");
   });
 });

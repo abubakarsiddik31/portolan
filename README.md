@@ -62,6 +62,7 @@ open_site("acme-store")
 | [docs/INSTALL.md](./docs/INSTALL.md) | MCP install snippets for Claude Code, Claude Desktop, Codex CLI, Cursor, Gemini CLI, and VS Code |
 | [docs/SECURITY.md](./docs/SECURITY.md) | Threat model, write-path review, and the open security findings |
 | [docs/spec/map-v0.md](./docs/spec/map-v0.md) | The site-map format: every field, the write rules, and validating examples |
+| [docs/QUICKSTART.md](./docs/QUICKSTART.md) | From a clone to a working MCP call; the site also covers concepts, MCP, skills, and write safety (`pnpm docs:build`) |
 | [docs/ANALYSIS.md](./docs/ANALYSIS.md) | Market evidence, cost model, competitive landscape, reasoning trail (v1 → v4), falsification criteria |
 | [PRD.md](./PRD.md) | v0.1 requirements. Partly superseded by ADR-002; its verbs and architecture now describe the substrate. Rewrite pending. |
 | [docs/archive/BUILD_PLAN_v1.md](./docs/archive/BUILD_PLAN_v1.md) | The v1 plan (affordance browser) and its adversarial review, written under the old name Facet, kept for the record |

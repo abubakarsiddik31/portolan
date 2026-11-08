@@ -1,9 +1,11 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { SessionRecord } from "@portolan/protocol";
 
+import type { BrowserRegistry } from "./browsers.js";
 import type { OpExecutor } from "./executor.js";
 import { MapStore } from "./maps.js";
-import { createMcpServer } from "./mcp.js";
+import { createMcpServer, type FallbackSubstrate } from "./mcp.js";
 import { SessionStore } from "./store.js";
 
 export type StdioServerOptions = {
@@ -14,6 +16,10 @@ export type StdioServerOptions = {
   /** Defaults to a stdio transport; tests pass an in-memory one. */
   transport?: Transport;
   executor?: OpExecutor;
+  /** Creates the browser substrate used by view, act, and read. */
+  substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
+  /** Browsers owned by sessions; closed with the server. */
+  browsers?: BrowserRegistry;
 };
 
 export type StdioServerHandle = {
@@ -40,6 +46,9 @@ export async function startStdioServer(
     maps,
     sessions,
     ...(options.executor !== undefined ? { executor: options.executor } : {}),
+    ...(options.substrateFactory !== undefined
+      ? { substrateFactory: options.substrateFactory }
+      : {}),
   });
 
   await server.connect(options.transport ?? new StdioServerTransport());
@@ -49,6 +58,7 @@ export async function startStdioServer(
     sessions,
     close: async () => {
       await server.close();
+      await options.browsers?.closeAll();
       sessions.closeDatabase();
     },
   };

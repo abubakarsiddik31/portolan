@@ -146,6 +146,21 @@ On the fixtures, store search verifies on three fresh sessions, a wrong post
 state is rejected with the run that broke, and a lifted `http` add-to-cart
 verifies on three fresh carts with `view_cart` as its outcome check.
 
+## Publisher
+
+`publishMap({ dir, map, candidates })` writes the next `v<n>.json`:
+
+- **A verified candidate** replaces an op of the same name or adds a new one.
+- **An unverified candidate** is rejected and never written.
+- **An irreversible op without `reviewed: true`** is held: it goes to
+  `review/v<n>.json` and does not enter the map.
+- **`compiled_from`** records only the traces that reached the map;
+  `verified_at` is the publish time.
+
+The new map is parsed with the same loader the runtime uses before it is
+written, so the publisher cannot create a map the server will reject. The
+result carries the version, path, map, diff, and review path.
+
 ## Local models
 
 The repair role is provider-agnostic. Any OpenAI-compatible endpoint works:

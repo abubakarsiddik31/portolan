@@ -2,7 +2,13 @@ import type { RepairDecision } from "@portolan/compiler";
 import type { ModelPort, ObjectRequest, Usage } from "@portolan/model";
 
 export type ScriptStep =
-  | { kind: "act"; role: string; name: string; do: "click" | "fill" | "select"; value?: string }
+  | {
+      kind: "act";
+      role: string;
+      name: string;
+      do: "click" | "fill" | "select" | "check";
+      value?: string;
+    }
   | { kind: "done"; answer: string };
 
 const USAGE: Usage = {

@@ -161,6 +161,17 @@ The new map is parsed with the same loader the runtime uses before it is
 written, so the publisher cannot create a map the server will reject. The
 result carries the version, path, map, diff, and review path.
 
+## UI lift
+
+A segment with no cheaper tier lifts to a `ui` program. The trace already
+carries the semantic locator of every action, so the steps are those actions
+with bound values replaced by `{name}` placeholders. A file input is a `fill`
+with a path; the engine turns that into `DOM.setFileInputFiles`.
+
+The wizard's `submit_application` compiles this way and verifies on three fresh
+sessions with the attachment. The parameterizer maps the attachment label to
+`file_path`.
+
 ## Local models
 
 The repair role is provider-agnostic. Any OpenAI-compatible endpoint works:

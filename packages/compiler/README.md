@@ -98,6 +98,20 @@ a held-back run with different data.
 must be unique snake_case and must exist in the inference; anything else is
 rejected.
 
+## URL lift
+
+`liftUrl({ segment, returns })` builds a route from the post-state URL:
+
+- A query value or path segment that equals a bound param becomes `{name}`.
+- Empty query params are dropped, so a filter form's `q=` and `category=` do
+  not end up in the route.
+- A segment whose params never appear in the URL does not lift.
+
+`withUrlLift(op, lift, returns)` replaces the op's `url` impl with the lifted
+route and extractor. The store search lifts to `/search?q={query}` and the
+portal filter to `/?status={status}`; both are run with a new param in the
+bench test, not just compared as strings.
+
 ## Local models
 
 The repair role is provider-agnostic. Any OpenAI-compatible endpoint works:

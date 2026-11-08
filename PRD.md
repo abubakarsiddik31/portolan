@@ -1,8 +1,10 @@
-# Facet — Product Requirements Document
+# Portolan — Product Requirements Document
+
+> **Superseded in part by ADR-002 (2026-11-08).** The product is now a **site-map runtime**: agents call typed operations from a verified map of each site, instead of reading affordances step by step. This PRD's one-liner still holds. Its verbs (§6), architecture (§7), requirements (§8), metrics (§9) and gates (§10) describe what is now the **substrate** (`docs/SUBSTRATE.md`). The current plan, gates and metrics are in `docs/BUILD_PLAN.md`. A PRD v0.2 rewrite is pending.
 
 | | |
 |---|---|
-| **Product** | Facet |
+| **Product** | Portolan |
 | **Version** | 0.1 (draft for validation) |
 | **Date** | 2026-11-08 |
 | **Owner** | Abubakar Siddik |
@@ -34,14 +36,14 @@ Hosted browsers sell for **$0.02–$0.10 per browser-hour** (Browser Use, Steel,
 
 > Move state out of the conversation and into the browser.
 
-Today the browser is a function: `observe() → dump`. Facet makes the browser a **stateful actor**: the agent holds a session handle and a set of element references; the browser holds the page, history, DOM, and network. Steps become stateless. O(n²) collapses to O(n).
+Today the browser is a function: `observe() → dump`. Portolan makes the browser a **stateful actor**: the agent holds a session handle and a set of element references; the browser holds the page, history, DOM, and network. Steps become stateless. O(n²) collapses to O(n).
 
 Two primitives follow from that:
 
 - **Affordances over observables.** The agent asks "what can I do here?" and receives a ranked, typed, budgeted action list — not a document.
 - **Effects over pixels.** After an action, report structural consequences — *modal opened*, *navigated*, *3 requests pending* — so the agent decides correctly in one turn. Fewer steps beats smaller steps, because steps multiply everything.
 
-**Framing:** Facet is a browser that **synthesizes a temporary API for any website at runtime, without the site's cooperation.** Chrome-in-a-trench-coat gives the agent a document. WebMCP gives it a real API that the site must build. Facet occupies the space between.
+**Framing:** Portolan is a browser that **synthesizes a temporary API for any website at runtime, without the site's cooperation.** Chrome-in-a-trench-coat gives the agent a document. WebMCP gives it a real API that the site must build. Portolan occupies the space between.
 
 ---
 
@@ -95,9 +97,9 @@ Two primitives follow from that:
 | Lightpanda | 10x cheaper engine | Engine only; no interaction model |
 | Firecrawl / Exa / Jina | Excellent read/scrape | Read-only; no interaction, no session state |
 | WebMCP | Sites expose typed tools | Requires site cooperation; years from coverage |
-| Facet | Typed affordances + effects + deltas + hibernation + engine-agnostic | New session model to adopt; JS fidelity bounded by engine |
+| Portolan | Typed affordances + effects + deltas + hibernation + engine-agnostic | New session model to adopt; JS fidelity bounded by engine |
 
-**Positioning statement:** For teams whose agents must *act* on the open web, Facet is a stateful browser that exposes each site as a temporary, typed API, costing 5x less per completed task than document-based browsing — because it holds the page state so the agent doesn't have to.
+**Positioning statement:** For teams whose agents must *act* on the open web, Portolan is a stateful browser that exposes each site as a temporary, typed API, costing 5x less per completed task than document-based browsing — because it holds the page state so the agent doesn't have to.
 
 **Moat (honest):** thin at launch. The durable assets are (a) the protocol as a de facto interface, (b) an eval suite that proves cost-per-task, and (c) the affordance/effect model's quality bar. Not compute.
 
@@ -152,7 +154,7 @@ POST /v1/sessions/wake { snapshot:"sn_9f2" } → { sid:"s_7f3", v:2, ready:true,
 ## 7. Architecture
 
 ```
-agent ──JSON-RPC/HTTP──▶ facetd
+agent ──JSON-RPC/HTTP──▶ portolan-server
                           ├── session manager      create/fork/sleep/wake, snapshot store
                           ├── semantic engine      affordance extraction, ref graph, ranking
                           ├── delta engine         structural diff, effect classification
@@ -162,7 +164,7 @@ agent ──JSON-RPC/HTTP──▶ facetd
                           └── engine adapter       CDP: chromium | lightpanda | webkit
 ```
 
-**Engine adapter is four methods:** `navigate`, `snapshot`, `dispatch_input`, `evaluate`. Anything that implements it is a Facet engine. This is what keeps us from marrying Chromium and what lets us ride Lightpanda's cost curve down without a rewrite.
+**Engine adapter is four methods:** `navigate`, `snapshot`, `dispatch_input`, `evaluate`. Anything that implements it is a Portolan engine. This is what keeps us from marrying Chromium and what lets us ride Lightpanda's cost curve down without a rewrite.
 
 **Escalation ladder:**
 
@@ -201,7 +203,7 @@ Escalate on: empty semantic model after quiescence, challenge detected, or expli
 | R12 | Fork from warm base — per-session marginal cost near zero |
 | R13 | Multi-document (tabs), back/forward without reload |
 | R14 | Typed error taxonomy with recovery hints |
-| R15 | MCP server wrapper (`facet mcp`) |
+| R15 | MCP server wrapper (`portolan mcp`) |
 | R16 | Lightpanda adapter behind the same protocol |
 | R17 | Replayable audit log of every action and every byte observed |
 | R18 | Capability scoping: per-session egress allowlist, scoped credentials |
@@ -240,7 +242,7 @@ Escalate on: empty semantic model after quiescence, challenge detected, or expli
 
 Ship the demo only if all four hold:
 
-1. **20 real tasks** (not benchmarks): checkout, form fill, dashboard read, multi-page research, auth-gated flow. Each run against baseline (`browser-use` + Playwright) and Facet.
+1. **20 real tasks** (not benchmarks): checkout, form fill, dashboard read, multi-page research, auth-gated flow. Each run against baseline (`browser-use` + Playwright) and Portolan.
 2. **≥5x reduction in $/completed task**, with the meter's arithmetic reproducible by hand.
 3. **Success rate ≥ baseline − 2pts.**
 4. **Three design partners** have run their own tasks through it and asked when they can have access.
@@ -265,7 +267,7 @@ If the result is 1.5x, we have a feature incumbents ship in a quarter — and we
 
 ## 12. Business Model (sketch)
 
-- **Free:** OSS protocol + local `facetd`, unlimited, no support.
+- **Free:** OSS protocol + local `portolan-server`, unlimited, no support.
 - **Usage:** per completed task, with a published cost-per-task guarantee ("or we refund the delta").
 - **Platform:** concurrency tiers, profiles, audit log, capability scoping.
 - **Never** price per browser-hour. That is the commodity we are escaping.
@@ -289,9 +291,9 @@ If the result is 1.5x, we have a feature incumbents ship in a quarter — and we
 1. **Stateful vs stateless default.** Stateful wins the cost argument; stateless wins adoption. Do we default to stateful and offer ephemeral, or the reverse?
 2. **Protocol carrier.** HTTP/JSON, JSON-RPC over stdio, or MCP-first? MCP maximizes reach; HTTP maximizes performance.
 3. **Ref stability contract.** How much re-render churn can a ref survive before we require re-observation?
-4. **Do we open-source `facetd`?** Adoption vs. defensibility. Leaning open protocol, hosted runtime.
+4. **Do we open-source `portolan-server`?** Adoption vs. defensibility. Leaning open protocol, hosted runtime.
 5. **Vertical #1.** Which workflow do we use to prove outcomes — support ops, procurement, or insurance eligibility?
-6. **Name clearance.** "Facet" conflicts with a wealth-management brand; verify trademark in class 9/42.
+6. **Name clearance.** "Portolan" conflicts with a wealth-management brand; verify trademark in class 9/42.
 
 ---
 
@@ -321,6 +323,8 @@ If the result is 1.5x, we have a feature incumbents ship in a quarter — and we
 
 ## Appendix B — Naming
 
-**Facet** — a facet is both "an aspect of a thing" and an addressable dimension in a query. That is precisely what an affordance surface is: a small, addressable view of a large object. Short, pronounceable, no collision in developer tooling.
+**Portolan** (renamed from Facet on 2026-11-08, ADR-004) — portolan charts were medieval sea charts drawn from the logbooks of sailors who had already made the voyage, used to navigate by chart instead of by sight. That is the product: site maps compiled from the runs of agents that came before, so the next agent calls known routes instead of looking at screens.
+
+Facet was dropped because of Facets Cloud (an AI-agents + MCP platform for the same buyer), an existing FACET MCP server, a wealth-management brand, and crowded developer search results.
 
 Rejected: Quay (Red Hat's registry), Tether (USDT), Pith (reads as "pithy"), Gantry (existing ML brand), Mullion (unspellable).

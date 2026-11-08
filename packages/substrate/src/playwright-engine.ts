@@ -1,4 +1,4 @@
-import { type Browser, type CDPSession, chromium, type Page } from "playwright-core";
+import { type Browser, type CDPSession, chromium, type Frame, type Page } from "playwright-core";
 
 import {
   type Action,
@@ -48,6 +48,11 @@ type LayoutInfo = {
   display: string;
   visibility: string;
   opacity: string;
+};
+
+type DescribedNode = {
+  backendNodeId?: number;
+  children?: DescribedNode[];
 };
 
 type ResolvedNode = {
@@ -136,6 +141,7 @@ export class PlaywrightEngine implements Engine {
     switch (action.do) {
       case "click":
         await this.click(action.backendNodeId);
+        await this.settle();
         break;
       case "fill":
         await this.fill(action.backendNodeId, action.value);
@@ -145,16 +151,24 @@ export class PlaywrightEngine implements Engine {
         break;
       case "check":
         await this.setChecked(action.backendNodeId, true);
+        await this.settle();
         break;
       case "uncheck":
         await this.setChecked(action.backendNodeId, false);
+        await this.settle();
         break;
       case "press":
         await this.page.keyboard.press(action.key);
+        await this.settle();
         break;
     }
 
-    return { ok: true, url: this.page.url(), title: await this.page.title() };
+    return {
+      ok: true,
+      doc: this.doc,
+      url: this.page.url(),
+      title: await this.page.title(),
+    };
   }
 
   async evaluate<T>(expression: string): Promise<T> {
@@ -245,7 +259,106 @@ export class PlaywrightEngine implements Engine {
       throw new EngineError("not_interactive", `node ${backendNodeId} has no layout box`);
     }
 
-    await this.page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    const x = Math.round(rect.x + rect.width / 2);
+    const y = Math.round(rect.y + rect.height / 2);
+
+    let hit: { backendNodeId?: number };
+
+    try {
+      hit = (await this.cdp.send("DOM.getNodeForLocation", {
+        x,
+        y,
+        includeUserAgentShadowDOM: false,
+      })) as unknown as { backendNodeId?: number };
+    } catch (error) {
+      throw new EngineError(
+        "not_interactive",
+        `hit-test failed at ${x},${y}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error, details: { x, y } },
+      );
+    }
+
+    const blocker = hit.backendNodeId;
+
+    if (blocker !== undefined && blocker !== backendNodeId) {
+      const related =
+        (await this.contains(backendNodeId, blocker)) ||
+        (await this.ancestorsOf(backendNodeId)).has(blocker);
+
+      if (!related) {
+        throw new EngineError("not_interactive", `node ${backendNodeId} is covered by ${blocker}`, {
+          details: { blockerBackendNodeId: blocker },
+        });
+      }
+    }
+
+    await this.page.mouse.click(x, y);
+  }
+
+  /**
+   * Wait for the page to settle after an action.
+   *
+   * A click that submits a form starts a navigation asynchronously, so this
+   * first waits up to 250ms for a main-frame navigation, then for load and a
+   * short network-idle window. A long poll or animation must not block the
+   * caller; the timeouts are the contract.
+   */
+  private async settle(): Promise<void> {
+    const navigated = new Promise<void>((resolve) => {
+      const onNavigated = (frame: Frame): void => {
+        if (frame === this.page.mainFrame()) {
+          this.page.off("framenavigated", onNavigated);
+          resolve();
+        }
+      };
+
+      this.page.on("framenavigated", onNavigated);
+      setTimeout(() => {
+        this.page.off("framenavigated", onNavigated);
+        resolve();
+      }, 250);
+    });
+
+    await navigated;
+    await this.page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => {});
+    await this.page.waitForLoadState("networkidle", { timeout: 1_000 }).catch(() => {});
+  }
+
+  private async contains(target: number, candidate: number): Promise<boolean> {
+    const described = (await this.cdp.send("DOM.describeNode", {
+      backendNodeId: target,
+      depth: -1,
+    })) as unknown as { node: DescribedNode };
+
+    return collectBackendIds(described.node).has(candidate);
+  }
+
+  private async ancestorsOf(backendNodeId: number): Promise<Set<number>> {
+    const ids = new Set<number>([backendNodeId]);
+    let current = backendNodeId;
+
+    for (let depth = 0; depth < 8; depth += 1) {
+      const described = (await this.cdp.send("DOM.describeNode", {
+        backendNodeId: current,
+        depth: 0,
+      })) as unknown as { node: { parentId?: number } };
+
+      const parentId = described.node.parentId;
+      if (parentId === undefined) break;
+
+      const parent = (await this.cdp.send("DOM.describeNode", {
+        nodeId: parentId,
+        depth: 0,
+      })) as unknown as { node: { backendNodeId?: number } };
+
+      const parentBackend = parent.node.backendNodeId;
+      if (parentBackend === undefined) break;
+
+      ids.add(parentBackend);
+      current = parentBackend;
+    }
+
+    return ids;
   }
 
   private async fill(backendNodeId: number, value: string): Promise<void> {
@@ -376,4 +489,14 @@ function toSemanticNode(node: RawAxNode, layout: Map<number, LayoutInfo>): Seman
     Number(info.opacity) > 0;
 
   return result;
+}
+
+function collectBackendIds(node: DescribedNode, into = new Set<number>()): Set<number> {
+  if (node.backendNodeId !== undefined) into.add(node.backendNodeId);
+
+  for (const child of node.children ?? []) {
+    collectBackendIds(child, into);
+  }
+
+  return into;
 }

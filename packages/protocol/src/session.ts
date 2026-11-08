@@ -31,3 +31,25 @@ export const sessionSchema = z.object({
 });
 
 export type Session = z.infer<typeof sessionSchema>;
+
+/** `POST /v1/sessions` — open a session, optionally pinned to a site and profile. */
+export const createSessionRequestSchema = z.object({
+  site: z.string().min(1).max(64).optional(),
+  profile: z.string().min(1).max(64).optional(),
+});
+
+export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
+
+/** The durable record of a session, as stored and returned by the server. */
+export const sessionRecordSchema = z.object({
+  sid: z.string().min(1),
+  site: z.string().min(1).optional(),
+  profile: z.string().min(1).optional(),
+  map_version: z.number().int().positive().optional(),
+  state: z.string().min(1).optional(),
+  created_at: z.string().min(1),
+  last_used_at: z.string().min(1),
+  closed_at: z.string().min(1).nullable().optional(),
+});
+
+export type SessionRecord = z.infer<typeof sessionRecordSchema>;

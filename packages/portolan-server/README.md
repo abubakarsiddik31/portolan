@@ -163,6 +163,13 @@ Writes go through `@portolan/runtime`'s `runWrite`: irreversible ops need `confi
 
 Every write is also recorded in SQLite: params, effect, outcome, idempotency key, and — when the executor reports them — tier, before/after state, and the network requests. `GET /v1/sessions/:sid/audit` returns them.
 
+## stdio
+
+`startStdioServer()` runs the same tools over stdin/stdout, which is the
+transport every MCP client supports. `dist/mcp-stdio.js` is the standalone
+entry point; `portolan mcp` calls the same function. It reads `MAPS_DIR` and
+`DATABASE_PATH`. Nothing but protocol frames may go to stdout.
+
 ## Notes
 
 - The store is `better-sqlite3`; sessions survive a restart. An open session

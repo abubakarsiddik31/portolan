@@ -26,6 +26,12 @@ Starts the HTTP and MCP server from the config.
 Options: `--config <path>`, `--host`, `--port`, `--database`, `--maps`.
 `SIGINT` and `SIGTERM` close the server and the database.
 
+### `portolan mcp`
+
+Serves MCP over stdio for a client that spawns the process. It prints nothing
+on stdout except protocol frames. Reads `MAPS_DIR` and `DATABASE_PATH`, then
+the config file. This is the command every install snippet uses.
+
 ### `portolan compile <trace...>`
 
 Compiles trace JSON files into candidate ops and publishes a new map version.

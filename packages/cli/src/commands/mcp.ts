@@ -1,0 +1,28 @@
+import {
+  type StdioServerHandle,
+  type StdioServerOptions,
+  startStdioServer,
+} from "@portolan/server";
+
+import type { CliConfig } from "../config.js";
+
+export type McpInput = {
+  config: CliConfig;
+};
+
+export type McpDeps = {
+  start?: (options: StdioServerOptions) => Promise<StdioServerHandle>;
+};
+
+/**
+ * Start the MCP server over stdio for a client that spawns this process.
+ *
+ * stdout belongs to the protocol, so this command prints nothing.
+ */
+export async function runMcp(input: McpInput, deps: McpDeps = {}): Promise<StdioServerHandle> {
+  const start = deps.start ?? startStdioServer;
+  return start({
+    mapsDir: process.env.MAPS_DIR ?? input.config.maps,
+    databasePath: process.env.DATABASE_PATH ?? input.config.database,
+  });
+}

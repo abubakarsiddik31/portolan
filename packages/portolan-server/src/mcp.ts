@@ -16,6 +16,8 @@ import {
   MemoryWriteLedger,
   recognizeState,
   runWrite,
+  type Trace,
+  type TraceStore,
   type WriteExecution,
   type WriteFailureCode,
   type WriteLedger,
@@ -43,6 +45,8 @@ export type McpDeps = {
   ledger?: WriteLedger;
   /** Fallback scopes. Defaults to a per-server registry. */
   scopes?: FallbackScopes;
+  /** Persists a closed scope's trace as JSONL and HAR. */
+  traceStore?: TraceStore;
   /** Creates the substrate used by view, act, and read. */
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
 };
@@ -574,17 +578,22 @@ export function createMcpServer(deps: McpDeps): McpServer {
         return failure("op_broken", `no open scope "${scope_id}"`);
       }
 
-      return text(
-        JSON.stringify({
-          scope_id,
-          closed: true,
-          intent: closed.intent,
-          effect: closed.effect,
-          started_at: closed.started_at,
-          ...(closed.ended_at !== undefined ? { ended_at: closed.ended_at } : {}),
-          entries: closed.trace,
-        }),
-      );
+      const trace: Trace = {
+        scope_id,
+        sid: closed.sid,
+        intent: closed.intent,
+        effect: closed.effect,
+        started_at: closed.started_at,
+        ...(closed.ended_at !== undefined ? { ended_at: closed.ended_at } : {}),
+        entries: closed.trace,
+      };
+
+      if (deps.traceStore !== undefined) {
+        await deps.traceStore.append(trace);
+        await deps.traceStore.writeHar(trace);
+      }
+
+      return text(JSON.stringify({ ...trace, closed: true }));
     },
   );
 

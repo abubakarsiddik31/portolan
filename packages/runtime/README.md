@@ -121,8 +121,10 @@ intent with `view`, `act`, and `read`:
 
 Each entry carries what the compiler needs: the locator (`role`, `name`,
 `ordinal`), the value or key, the document and mutation counters, the URL,
-the map state before and after, the effects, and the delta. The trace is the
-raw material for segmenting a fallback run into ops.
+the map state before and after, the effects, and the delta. Network effects
+carry parsed JSON request and response bodies, attributed to the action that
+caused them. The trace is the raw material for segmenting a fallback run into
+ops.
 
 Scopes expire after 10 minutes by default.
 

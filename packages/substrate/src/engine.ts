@@ -45,6 +45,12 @@ export type NetworkEffect = {
   method: string;
   url: string;
   status?: number;
+  resource_type?: string;
+  mime_type?: string;
+  /** Parsed JSON request body, when the request had one. */
+  request_body?: unknown;
+  /** Parsed JSON response body, when the response had one. */
+  response_body?: unknown;
 };
 
 export type NavigationEffect = {

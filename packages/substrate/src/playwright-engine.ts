@@ -39,13 +39,30 @@ type RawAxNode = {
 
 type RequestEvent = {
   requestId: string;
-  request: { method: string; url: string };
+  request: { method: string; url: string; postData?: string; hasPostData?: boolean };
+  type?: string;
+};
+
+type RequestBodyResult = {
+  postData: string;
 };
 
 type ResponseEvent = {
   requestId: string;
-  response: { status: number };
+  response: { status: number; mimeType?: string };
 };
+
+type LoadingFinishedEvent = {
+  requestId: string;
+};
+
+type ResponseBodyResult = {
+  body: string;
+  base64Encoded: boolean;
+};
+
+/** A body larger than this is not worth carrying into a trace. */
+const MAX_BODY_CHARS = 256 * 1024;
 
 type DomSnapshotResult = {
   strings: string[];
@@ -87,6 +104,10 @@ export class PlaywrightEngine implements Engine {
   private v = 0;
   private readonly network = new Map<string, NetworkEffect>();
   private networkOrder: string[] = [];
+  private readonly networkSeqOf = new Map<string, number>();
+  private networkSeq = 0;
+  private readonly requestCaptures = new Map<string, Promise<void>>();
+  private readonly responseCaptures = new Map<string, Promise<void>>();
 
   private constructor(
     private readonly browser: Browser,
@@ -120,6 +141,9 @@ export class PlaywrightEngine implements Engine {
     });
     cdp.on("Network.responseReceived", (event) => {
       engine.recordResponse(event as unknown as ResponseEvent);
+    });
+    cdp.on("Network.loadingFinished", (event) => {
+      engine.captureBody(event as unknown as LoadingFinishedEvent);
     });
 
     return engine;
@@ -169,7 +193,7 @@ export class PlaywrightEngine implements Engine {
   async dispatch(action: Action): Promise<DispatchResult> {
     const beforeUrl = this.page.url();
     const beforeDoc = this.doc;
-    const networkMark = this.networkOrder.length;
+    const networkMark = this.networkSeq;
 
     switch (action.do) {
       case "click":
@@ -195,6 +219,8 @@ export class PlaywrightEngine implements Engine {
         await this.settle();
         break;
     }
+
+    await this.finishNetwork(networkMark);
 
     this.v += 1;
     const effects = this.effectsSince(networkMark, action, beforeUrl, beforeDoc);
@@ -287,7 +313,10 @@ export class PlaywrightEngine implements Engine {
       });
     }
 
-    for (const requestId of this.networkOrder.slice(mark)) {
+    for (const requestId of this.networkOrder) {
+      const seq = this.networkSeqOf.get(requestId);
+      if (seq === undefined || seq < mark) continue;
+
       const effect = this.network.get(requestId);
       if (effect !== undefined) effects.push(effect);
     }
@@ -304,22 +333,117 @@ export class PlaywrightEngine implements Engine {
   }
 
   private recordRequest(event: RequestEvent): void {
-    this.network.set(event.requestId, {
+    const effect: NetworkEffect = {
       kind: "network",
       method: event.request.method,
       url: event.request.url,
-    });
+    };
+
+    if (event.type !== undefined) effect.resource_type = event.type;
+
+    if (event.request.postData !== undefined) {
+      const body = parseJsonBody(event.request.postData);
+      if (body !== undefined) effect.request_body = body;
+    } else if (event.request.hasPostData === true) {
+      this.captureRequestBody(event.requestId, effect);
+    }
+
+    this.network.set(event.requestId, effect);
     this.networkOrder.push(event.requestId);
+    this.networkSeqOf.set(event.requestId, this.networkSeq);
+    this.networkSeq += 1;
 
     if (this.networkOrder.length > 500) {
       const oldest = this.networkOrder.shift();
-      if (oldest !== undefined) this.network.delete(oldest);
+      if (oldest !== undefined) {
+        this.network.delete(oldest);
+        this.networkSeqOf.delete(oldest);
+      }
     }
   }
 
   private recordResponse(event: ResponseEvent): void {
     const effect = this.network.get(event.requestId);
-    if (effect !== undefined) effect.status = event.response.status;
+    if (effect === undefined) return;
+
+    effect.status = event.response.status;
+    if (event.response.mimeType !== undefined) effect.mime_type = event.response.mimeType;
+  }
+
+  /**
+   * CDP only inlines a small request body in `requestWillBeSent`; a larger one
+   * has to be asked for by id. This is the body a lifted write needs to replay.
+   */
+  private captureRequestBody(requestId: string, effect: NetworkEffect): void {
+    const capture = (async () => {
+      try {
+        const result = (await this.cdp.send("Network.getRequestPostData", {
+          requestId,
+        })) as unknown as RequestBodyResult;
+
+        const body = parseJsonBody(result.postData);
+        if (body !== undefined) effect.request_body = body;
+      } catch {
+        // The body was already evicted; the effect is still attributed.
+      }
+    })();
+
+    this.requestCaptures.set(requestId, capture);
+    void capture.finally(() => {
+      this.requestCaptures.delete(requestId);
+    });
+  }
+
+  /**
+   * Fetch a JSON response body while CDP still holds it.
+   *
+   * `loadingFinished` is the last moment the body is guaranteed to be
+   * available, so the capture starts there and the action awaits it before
+   * returning effects.
+   */
+  private captureBody(event: LoadingFinishedEvent): void {
+    const effect = this.network.get(event.requestId);
+    if (effect === undefined || !isJsonMime(effect.mime_type)) return;
+
+    const capture = (async () => {
+      try {
+        const result = (await this.cdp.send("Network.getResponseBody", {
+          requestId: event.requestId,
+        })) as unknown as ResponseBodyResult;
+
+        const text = result.base64Encoded
+          ? Buffer.from(result.body, "base64").toString("utf8")
+          : result.body;
+
+        const body = parseJsonBody(text);
+        if (body !== undefined) effect.response_body = body;
+      } catch {
+        // Redirects and evicted bodies have no readable body; status remains.
+      }
+    })();
+
+    this.responseCaptures.set(event.requestId, capture);
+    void capture.finally(() => {
+      this.responseCaptures.delete(event.requestId);
+    });
+  }
+
+  /** Wait for the body captures that belong to the action starting at `mark`. */
+  private async finishNetwork(mark: number): Promise<void> {
+    const pending: Promise<void>[] = [];
+
+    for (const requestId of this.networkOrder) {
+      const seq = this.networkSeqOf.get(requestId);
+      if (seq === undefined || seq < mark) continue;
+
+      const request = this.requestCaptures.get(requestId);
+      if (request !== undefined) pending.push(request);
+
+      const response = this.responseCaptures.get(requestId);
+      if (response !== undefined) pending.push(response);
+    }
+
+    await Promise.all(pending);
   }
 
   private async click(backendNodeId: number): Promise<void> {
@@ -554,6 +678,20 @@ export class PlaywrightEngine implements Engine {
       [{ value: checked }],
     );
   }
+}
+
+function parseJsonBody(text: string): unknown {
+  if (text.length === 0 || text.length > MAX_BODY_CHARS) return undefined;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function isJsonMime(mime: string | undefined): boolean {
+  return mime?.includes("json") === true;
 }
 
 function indexSnapshot(snapshot: DomSnapshotResult): SnapshotIndex {

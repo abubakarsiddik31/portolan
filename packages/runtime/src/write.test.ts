@@ -104,6 +104,48 @@ describe("idempotency", () => {
     expect(execute).toHaveBeenCalledOnce();
   });
 
+  it("refuses a key reused for another op", async () => {
+    const ledger = new MemoryWriteLedger();
+    const execute = vi.fn(async (): Promise<WriteExecution> => ({ ok: true, result: {} }));
+
+    await runWrite({ map: MAP, op: WRITE, idempotencyKey: "k", execute, ledger });
+
+    const other = opDef({ name: "other", effect: "write" });
+    const reused = await runWrite({
+      map: MAP,
+      op: other,
+      idempotencyKey: "k",
+      execute,
+      ledger,
+    });
+
+    expect(reused).toMatchObject({
+      ok: false,
+      code: "invalid_params",
+      details: { idempotency_key_reused: true, site: "test", op: "place" },
+    });
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it("refuses a key reused for another site", async () => {
+    const ledger = new MemoryWriteLedger();
+    const execute = vi.fn(async (): Promise<WriteExecution> => ({ ok: true, result: {} }));
+
+    await runWrite({ map: MAP, op: WRITE, idempotencyKey: "k", execute, ledger });
+
+    const otherSite = { ...MAP, site: "other" };
+    const reused = await runWrite({
+      map: otherSite,
+      op: WRITE,
+      idempotencyKey: "k",
+      execute,
+      ledger,
+    });
+
+    expect(reused).toMatchObject({ ok: false, code: "invalid_params" });
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
   it("reconciles a pending key that is already done", async () => {
     const ledger = new MemoryWriteLedger();
     ledger.put({

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "conformance": "tsx conformance/run.ts",
     "drift": "tsx drift/run.ts",
     "fixtures": "tsx fixtures/server.ts",
     "fixtures:library": "tsx fixtures/server.ts --fixture library --port 4120",

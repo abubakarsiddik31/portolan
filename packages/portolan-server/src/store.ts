@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { AuditRecord, CreateSessionRequest, SessionRecord } from "@portolan/protocol";
 import Database from "better-sqlite3";
+import type { OpHealthRecord } from "./health.js";
 
 type SessionRow = {
   sid: string;
@@ -60,6 +61,17 @@ export class SessionStore {
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS audit_sid ON audit_log (sid, created_at);
+
+      CREATE TABLE IF NOT EXISTS op_health (
+        site TEXT NOT NULL,
+        op TEXT NOT NULL,
+        map_version INTEGER,
+        status TEXT NOT NULL,
+        checked_at TEXT NOT NULL,
+        message TEXT,
+        ms INTEGER,
+        PRIMARY KEY (site, op)
+      );
     `);
   }
 
@@ -146,6 +158,37 @@ export class SessionStore {
     return rows.map(toAuditRecord);
   }
 
+  recordOpHealth(record: OpHealthRecord): void {
+    this.db
+      .prepare(
+        `INSERT INTO op_health (site, op, map_version, status, checked_at, message, ms)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(site, op) DO UPDATE SET
+           map_version = excluded.map_version,
+           status = excluded.status,
+           checked_at = excluded.checked_at,
+           message = excluded.message,
+           ms = excluded.ms`,
+      )
+      .run(
+        record.site,
+        record.op,
+        record.map_version ?? null,
+        record.status,
+        record.checked_at,
+        record.message ?? null,
+        record.ms ?? null,
+      );
+  }
+
+  listOpHealth(site: string): OpHealthRecord[] {
+    const rows = this.db
+      .prepare("SELECT * FROM op_health WHERE site = ? ORDER BY op")
+      .all(site) as OpHealthRow[];
+
+    return rows.map(toOpHealth);
+  }
+
   listOpen(): SessionRecord[] {
     const rows = this.db
       .prepare("SELECT * FROM sessions WHERE closed_at IS NULL ORDER BY created_at")
@@ -189,6 +232,31 @@ type AuditRow = {
   requests: string | null;
   created_at: string;
 };
+
+type OpHealthRow = {
+  site: string;
+  op: string;
+  map_version: number | null;
+  status: string;
+  checked_at: string;
+  message: string | null;
+  ms: number | null;
+};
+
+function toOpHealth(row: OpHealthRow): OpHealthRecord {
+  const record: OpHealthRecord = {
+    site: row.site,
+    op: row.op,
+    status: row.status as OpHealthRecord["status"],
+    checked_at: row.checked_at,
+  };
+
+  if (row.map_version !== null) record.map_version = row.map_version;
+  if (row.message !== null) record.message = row.message;
+  if (row.ms !== null) record.ms = row.ms;
+
+  return record;
+}
 
 function toAuditRecord(row: AuditRow): AuditRecord {
   const record: AuditRecord = {

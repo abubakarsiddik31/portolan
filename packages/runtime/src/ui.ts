@@ -3,6 +3,7 @@ import type { ActResult, Effect, Substrate, SubstrateView } from "@portolan/subs
 
 import { checkPost, extract, validateReturns } from "./extract.js";
 import { matchingNodes, recognizeState } from "./state.js";
+import { fillTemplate } from "./template.js";
 
 export type UiRunInput = {
   map: SiteMap;
@@ -163,21 +164,6 @@ function resolveRef(view: SubstrateView, locator: Locator): string | undefined {
   }
 
   return undefined;
-}
-
-function fillTemplate(template: string, params: Record<string, unknown>): string | undefined {
-  let missing = false;
-
-  const value = template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key: string) => {
-    const param = params[key];
-    if (param === undefined) {
-      missing = true;
-      return "";
-    }
-    return String(param);
-  });
-
-  return missing ? undefined : value;
 }
 
 function fromAct(result: Extract<ActResult, { ok: false }>, index: number): UiRunResult {

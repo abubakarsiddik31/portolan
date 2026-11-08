@@ -46,8 +46,11 @@ Supported extractors: `fields`, `rows`, `composite`, `none`. `download` and
 `extract(extractor, view)` is tier-agnostic: `url`, `http`, and `ui` impls all
 end with the same extractor.
 
-- `fields` reads a locator's text, `value`, `href`, or `name`, with an optional
-  capture pattern. Text falls back to a node's `StaticText` descendants.
+- `fields` reads a locator's text, `value`, `href`, `name`, or any DOM
+  attribute via `attribute`, with an optional capture pattern. Text falls back
+  to a node's `StaticText` descendants.
+- Extraction includes hidden nodes, so a closed `<select>`'s options are still
+  readable.
 - `rows` scopes the row locator to the container's descendants and each column
   to the row's descendants, in document order.
 - `composite` combines fields and one row list.
@@ -59,6 +62,17 @@ the schema's integer types. A schema miss is an op failure, not a pass-through.
 `checkPost(check, map, view)` handles `state`, `url`, `exists`, `absent`, and
 `text`.
 
+## URL tier
+
+`runUrlOp({ map, op, params, substrate, baseUrl? })` fills a route template,
+navigates, checks the postconditions, extracts, and validates.
+
+- `fillRoute` URL-encodes each parameter.
+- The base is `baseUrl` or `map.origins[0]`. The override exists for tests and
+  proxies where the map's origin is not the address to hit.
+- The tier is read-only. A write must use `ui` or `http`, because a navigation
+  has no outcome check and no confirmation step.
+
 ## Not here yet
 
-The `url` and `http` tiers are T2.20–T2.21; write safety is T2.22–T2.24.
+The `http` tier is T2.21; write safety is T2.22–T2.24.

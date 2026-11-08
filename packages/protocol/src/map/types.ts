@@ -37,6 +37,8 @@ export type Locator = {
   test_id?: string;
   /** Which value to read. Only meaningful inside an extractor. */
   attr?: "name" | "value" | "text" | "href";
+  /** Read an arbitrary DOM attribute by name, e.g. `data-status`. */
+  attribute?: string;
   /**
    * Applied to the extracted string; the first capture group, or the whole
    * match when there is none, becomes the value. Used to pull an id out of a

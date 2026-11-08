@@ -56,6 +56,11 @@ export function matchesLocator(nodes: SemanticNode[], locator: Locator): boolean
   return matchingNodes(nodes, locator).length > 0;
 }
 
+export type MatchOptions = {
+  /** Default true. Extraction sets false so hidden options and cells are readable. */
+  visibleOnly?: boolean;
+};
+
 /**
  * Resolve a map locator against a semantic snapshot.
  *
@@ -63,9 +68,15 @@ export function matchesLocator(nodes: SemanticNode[], locator: Locator): boolean
  * accessible name, and `role` matches with optional `name` / `name_re`.
  * `ctx` and `attr` are extraction hints, not identity, so they are ignored.
  */
-export function matchingNodes(nodes: SemanticNode[], locator: Locator): SemanticNode[] {
+export function matchingNodes(
+  nodes: SemanticNode[],
+  locator: Locator,
+  options: MatchOptions = {},
+): SemanticNode[] {
+  const visibleOnly = options.visibleOnly ?? true;
+
   const matches = nodes.filter((node) => {
-    if (!node.visible) return false;
+    if (visibleOnly && !node.visible) return false;
 
     if (locator.test_id !== undefined) {
       return node.test_id === locator.test_id;

@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import type { Site } from "../oracle/sites.js";
 import type { ToolBackend, ToolDef, ToolResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -104,7 +103,7 @@ const TOOLS: ToolDef[] = [
 ];
 
 export type AgentBrowserBackendOptions = {
-  baseURLs: Record<Site, string>;
+  baseURLs: Record<string, string>;
   session?: string;
   executablePath?: string;
   binary?: string;
@@ -178,7 +177,7 @@ function normalizeTarget(target: string): string {
  * The session is unique per backend so parallel tasks do not share cookies.
  */
 export class AgentBrowserBackend implements ToolBackend {
-  private readonly baseURLs: Record<Site, string>;
+  private readonly baseURLs: Record<string, string>;
   private readonly session: string;
   private readonly binary: string;
   private readonly executablePath: string | undefined;
@@ -199,8 +198,9 @@ export class AgentBrowserBackend implements ToolBackend {
     return TOOLS;
   }
 
-  async openSite(site: Site): Promise<ToolResult> {
+  async openSite(site: string): Promise<ToolResult> {
     const baseURL = this.baseURLs[site];
+    if (baseURL === undefined) return { ok: false, text: `no base URL for "${site}"` };
     this.currentBaseURL = baseURL;
 
     const opened = await this.callTool("open", { url: baseURL });

@@ -1,6 +1,8 @@
 import type { RepairDecision } from "@portolan/compiler";
 import type { ModelPort, ObjectRequest, Usage } from "@portolan/model";
 
+import type { Decision } from "../runner/types.js";
+
 export type ScriptStep =
   | {
       kind: "act";
@@ -9,6 +11,7 @@ export type ScriptStep =
       do: "click" | "fill" | "select" | "check";
       value?: string;
     }
+  | { kind: "view" }
   | { kind: "done"; answer: string };
 
 const USAGE: Usage = {
@@ -29,11 +32,74 @@ export function refFromPrompt(prompt: string, role: string, name: string): strin
   const line = prompt.split("\n").find((candidate) => candidate.includes(needle));
   const ref = line?.trim().split(" ")[0];
 
-  if (ref === undefined || ref.length === 0) {
-    throw new Error(`no ${role} named "${name}" in the observation`);
+  if (ref !== undefined && ref.length > 0) return ref;
+
+  const matches = [...prompt.matchAll(/"affordances":(\[[\s\S]*?\])/g)];
+
+  for (const match of matches.reverse()) {
+    try {
+      const list = JSON.parse(match[1] ?? "") as Array<{
+        ref?: string;
+        role?: string;
+        name?: string;
+      }>;
+      const found = list.find((item) => item.role === role && item.name === name);
+      if (found?.ref !== undefined) return found.ref;
+    } catch {
+      // A truncated JSON block is not the latest complete view.
+    }
   }
 
-  return ref;
+  throw new Error(`no ${role} named "${name}" in the observation`);
+}
+
+/** A deterministic runner model: the same script, shaped as a Decision. */
+export function createRunnerScript(steps: ScriptStep[]): ModelPort {
+  let index = 0;
+
+  return {
+    async object<T>(req: ObjectRequest): Promise<{ value: T; usage: Usage }> {
+      const step = steps[index];
+      index += 1;
+      if (step === undefined) throw new Error("runner script ran out of steps");
+
+      if (step.kind === "view") {
+        const decision: Decision = {
+          thought: "Look.",
+          tool: "view",
+          arguments: {},
+          answer: "",
+        };
+        return { value: decision as T, usage: USAGE };
+      }
+
+      if (step.kind === "done") {
+        const decision: Decision = {
+          thought: "Done.",
+          tool: "",
+          arguments: {},
+          answer: step.answer,
+        };
+        return { value: decision as T, usage: USAGE };
+      }
+
+      const decision: Decision = {
+        thought: `${step.do} ${step.role} "${step.name}".`,
+        tool: "act",
+        arguments: {
+          ref: refFromPrompt(req.prompt, step.role, step.name),
+          do: step.do,
+          ...(step.value !== undefined ? { value: step.value } : {}),
+        },
+        answer: "",
+      };
+
+      return { value: decision as T, usage: USAGE };
+    },
+    async agent() {
+      throw new Error("the runner script does not implement agent()");
+    },
+  };
 }
 
 /** A deterministic repair model that names affordances by role and name. */
@@ -45,6 +111,13 @@ export function createRepairScript(steps: ScriptStep[]): ModelPort {
       const step = steps[index];
       index += 1;
       if (step === undefined) throw new Error("repair script ran out of steps");
+
+      if (step.kind === "view") {
+        return {
+          value: { thought: "Look.", tool: "view", arguments: {}, answer: "" } as T,
+          usage: USAGE,
+        };
+      }
 
       const decision: RepairDecision =
         step.kind === "done"

@@ -170,6 +170,21 @@ importers:
         specifier: workspace:*
         version: link:../substrate
 
+  packages/skills:
+    dependencies:
+      '@portolan/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@portolan/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@portolan/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
+
   packages/substrate:
     dependencies:
       playwright-core:

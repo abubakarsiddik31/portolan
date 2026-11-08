@@ -1,8 +1,11 @@
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { TraceStore } from "@portolan/runtime";
 import type { SemanticNode } from "@portolan/substrate";
 import { buildRefMap } from "@portolan/substrate";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -466,6 +469,57 @@ describe("mcp surface", () => {
     } finally {
       await extra.client.close();
       await extra.server.close();
+    }
+  });
+
+  it("persists a closed scope as jsonl and har", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "portolan-trace-"));
+    const store = new TraceStore(dir);
+    const extra = await connect({
+      substrateFactory: async () => fakeSubstrate(),
+      traceStore: store,
+    });
+
+    try {
+      await extra.client.callTool({
+        name: "open_site",
+        arguments: { site: "store" },
+      });
+
+      const scope = JSON.parse(
+        textOf(
+          await extra.client.callTool({
+            name: "fallback_begin",
+            arguments: { intent: "finish checkout" },
+          }),
+        ),
+      ) as { scope_id: string };
+
+      const view = JSON.parse(
+        textOf(await extra.client.callTool({ name: "view", arguments: {} })),
+      ) as { affordances: Array<{ ref: string }> };
+
+      await extra.client.callTool({
+        name: "act",
+        arguments: { ref: view.affordances[0]?.ref, do: "click" },
+      });
+      await extra.client.callTool({ name: "read", arguments: {} });
+      await extra.client.callTool({
+        name: "fallback_done",
+        arguments: { scope_id: scope.scope_id },
+      });
+
+      const trace = await store.get(scope.scope_id);
+      expect(trace?.entries.map((entry) => entry.kind)).toEqual(["view", "act", "read"]);
+
+      const har = JSON.parse(await readFile(join(dir, `${scope.scope_id}.har`), "utf8")) as {
+        log: { version: string };
+      };
+      expect(har.log.version).toBe("1.2");
+    } finally {
+      await extra.client.close();
+      await extra.server.close();
+      await rm(dir, { recursive: true, force: true });
     }
   });
 

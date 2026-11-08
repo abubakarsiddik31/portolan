@@ -128,6 +128,21 @@ ops.
 
 Scopes expire after 10 minutes by default.
 
+## Trace storage
+
+`TraceStore` writes each finished trace as one JSON line to
+`<dir>/traces.jsonl` and exports its network effects as HAR 1.2 to
+`<dir>/<scope_id>.har`.
+
+- `append(trace)` adds a line; nothing is ever rewritten.
+- `all()` reads every trace back in append order.
+- `get(scope_id)` returns the last trace for that scope.
+- `writeHar(trace)` derives HAR from the same trace.
+
+JSONL is the source of truth and reloads losslessly. HAR is a projection:
+view and read entries do not appear, and request timings are zero because the
+engine settles on network idle rather than timing each request.
+
 ## Not here yet
 
 A durable write ledger and the audit log are T2.23–T2.24; download capture is

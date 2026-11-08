@@ -56,6 +56,10 @@ When a scope is active, `view`, `act`, and `read` record a trace entry: locator,
 value, document and mutation counters, URL, map state before and after, effects,
 and delta. `fallback_done` returns the entries with `started_at` and `ended_at`.
 
+Pass a `TraceStore` in `McpDeps` to persist each closed scope: one JSON line in
+`traces.jsonl` plus a HAR 1.2 export. Without one, the trace is returned but not
+written.
+
 The HTTP server exposes the same surface at `POST /mcp` (Streamable HTTP) when it is created with a map store.
 
 After `open_site`, the site's ops also appear as native tools (`store__search`, `store__checkout`) and the server sends `notifications/tools/list_changed`. The list is capped by `toolBudget` (default 30); every op stays reachable through `call`. Native names are sanitized to `^[a-zA-Z0-9_-]{1,64}$`.

@@ -90,6 +90,20 @@ TLS fingerprint.
 The fixtures have no CSRF endpoint; the parity test exercises `bind` with a
 product name returned by the first request. A CSRF token is the same mechanism.
 
+## Write safety
+
+`runWrite` wraps a write:
+
+- `irreversible` requires `confirm: true`.
+- A completed idempotency key returns the stored result without executing.
+- A pending key is reconciled with the op's `outcome_check`; without a check,
+  a pending key returns `unknown_outcome` instead of risking a duplicate.
+- A failure after input was dispatched is never retried blindly: the check
+  decides `done`, `not_done`, or `unknown_outcome`.
+
+`MemoryWriteLedger` is the default; a durable ledger is the audit work.
+
 ## Not here yet
 
-Write safety is T2.22–T2.24; download capture is still open.
+A durable write ledger and the audit log are T2.23–T2.24; download capture is
+still open.

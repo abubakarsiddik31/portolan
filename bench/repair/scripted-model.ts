@@ -12,6 +12,7 @@ export type ScriptStep =
       value?: string;
     }
   | { kind: "view" }
+  | { kind: "read"; ref?: string }
   | { kind: "done"; answer: string };
 
 const USAGE: Usage = {
@@ -73,6 +74,16 @@ export function createRunnerScript(steps: ScriptStep[]): ModelPort {
         return { value: decision as T, usage: USAGE };
       }
 
+      if (step.kind === "read") {
+        const decision: Decision = {
+          thought: "Read.",
+          tool: "read",
+          arguments: step.ref === undefined ? {} : { ref: step.ref },
+          answer: "",
+        };
+        return { value: decision as T, usage: USAGE };
+      }
+
       if (step.kind === "done") {
         const decision: Decision = {
           thought: "Done.",
@@ -115,6 +126,18 @@ export function createRepairScript(steps: ScriptStep[]): ModelPort {
       if (step.kind === "view") {
         return {
           value: { thought: "Look.", tool: "view", arguments: {}, answer: "" } as T,
+          usage: USAGE,
+        };
+      }
+
+      if (step.kind === "read") {
+        return {
+          value: {
+            thought: "Read.",
+            tool: "read",
+            ...(step.ref !== undefined ? { ref: step.ref } : {}),
+            answer: "",
+          } as T,
           usage: USAGE,
         };
       }

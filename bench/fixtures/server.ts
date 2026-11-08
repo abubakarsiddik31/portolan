@@ -1,3 +1,4 @@
+import { buildInjectionApp } from "./injection/v1/app.js";
 import { buildLibraryApp } from "./library/v1/app.js";
 import { buildPortalApp } from "./portal/v1/app.js";
 import { buildStoreApp } from "./store/v1/app.js";
@@ -16,6 +17,7 @@ const fixtures = {
   portal: { build: buildPortalApp, label: "portal", port: "4102" },
   library: { build: buildLibraryApp, label: "library", port: "4120" },
   support: { build: buildSupportApp, label: "support", port: "4121" },
+  injection: { build: buildInjectionApp, label: "injection", port: "4130" },
 } as const;
 
 type FixtureName = keyof typeof fixtures;

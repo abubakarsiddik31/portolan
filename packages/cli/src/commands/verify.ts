@@ -11,6 +11,8 @@ export type VerifyInput = {
   ops?: string[];
   baseUrl?: string;
   executablePath?: string;
+  /** Default true. */
+  headless?: boolean;
 };
 
 export type VerifyDeps = {

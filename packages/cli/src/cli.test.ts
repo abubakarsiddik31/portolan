@@ -15,7 +15,7 @@ import { runExportSkills } from "./commands/export-skills.js";
 import { runInit } from "./commands/init.js";
 import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
-import { loadConfig } from "./config.js";
+import { DEFAULT_CONFIG, loadConfig } from "./config.js";
 
 const STORE_MAP = join(import.meta.dirname, "../../../maps/store/v1.json");
 const dirs: string[] = [];
@@ -245,15 +245,7 @@ describe("serve", () => {
 
     const handle = await runServe(
       {
-        config: {
-          site: "store",
-          maps: "maps",
-          skills: "skills",
-          policies: "policies",
-          database: ":memory:",
-          host: "127.0.0.1",
-          port: 0,
-        },
+        config: { ...DEFAULT_CONFIG, site: "store", database: ":memory:", port: 0 },
       },
       { createApp: () => fake },
     );

@@ -19,6 +19,10 @@ export type CompileOptionsInput = {
   baseUrl?: string;
   /** JSON object: op name to the read op that proves the write. */
   outcomeChecksPath?: string;
+  /** Chrome binary; defaults to CHROME_PATH or auto-detection. */
+  chrome?: string;
+  /** Default true. */
+  headless?: boolean;
 };
 
 export type CompileDeps = {
@@ -58,7 +62,7 @@ export async function runCompile(
 
   const live =
     deps.capture === undefined && input.baseUrl !== undefined
-      ? await liveCapture(input.baseUrl)
+      ? await liveCapture(input.baseUrl, input.chrome, input.headless ?? true)
       : undefined;
   const capture = deps.capture ?? live?.capture ?? (async () => undefined);
 
@@ -94,16 +98,20 @@ export async function runCompile(
   }
 }
 
-async function liveCapture(baseUrl: string): Promise<{
+async function liveCapture(
+  baseUrl: string,
+  chrome: string | undefined,
+  headless: boolean,
+): Promise<{
   capture: (url: string) => Promise<SubstrateView | undefined>;
   close: () => Promise<void>;
 }> {
-  const executablePath = findChrome();
+  const executablePath = chrome ?? findChrome();
   if (executablePath === undefined) {
     throw new Error("compile --base-url needs Chrome; install it or set CHROME_PATH");
   }
 
-  const engine = await PlaywrightEngine.launch({ executablePath });
+  const engine = await PlaywrightEngine.launch({ executablePath, headless });
   const substrate = new Substrate(engine);
 
   return {

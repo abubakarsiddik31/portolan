@@ -226,6 +226,57 @@ describe("mcp surface", () => {
     expect(names).not.toContain("store__search");
   });
 
+  it("replays a confirmed write with the same idempotency key", async () => {
+    await call("open_site", { site: "store" });
+
+    const first = (await call("call", {
+      op: "checkout",
+      confirm: true,
+      idempotency_key: "order-1",
+      params: checkoutParams(),
+    })) as ToolResult;
+
+    const second = (await call("call", {
+      op: "checkout",
+      confirm: true,
+      idempotency_key: "order-1",
+      params: checkoutParams(),
+    })) as ToolResult;
+
+    expect(first).toMatchObject({ ok: true, result: { op: "checkout" } });
+    expect(second).toMatchObject({ ok: true, result: { op: "checkout" } });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("reports unknown_outcome when a write fails after dispatch", async () => {
+    const failing: OpExecutor = async () => ({
+      ok: false,
+      error: { code: "op_broken", message: "connection reset" },
+    });
+
+    const extra = await connect({ executor: failing });
+
+    try {
+      await extra.client.callTool({
+        name: "open_site",
+        arguments: { site: "store" },
+      });
+
+      const result = await extra.client.callTool({
+        name: "call",
+        arguments: { op: "checkout", confirm: true, params: checkoutParams() },
+      });
+
+      expect(JSON.parse(textOf(result))).toMatchObject({
+        ok: false,
+        error: { code: "unknown_outcome" },
+      });
+    } finally {
+      await extra.client.close();
+      await extra.server.close();
+    }
+  });
+
   it("caps native tools at the budget and keeps call working", async () => {
     const extra = await connect({ toolBudget: 2 });
 

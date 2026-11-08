@@ -50,6 +50,8 @@ After `open_site`, the site's ops also appear as native tools (`store__search`, 
 
 The op executor is injected. Until T2.17–T2.21 it is `notReadyExecutor`, which returns `op_broken` with `details.stage = "executor"` — the call reached the runtime, but no op ran.
 
+Writes go through `@portolan/runtime`'s `runWrite`: irreversible ops need `confirm: true`, an idempotency key replays a completed result, and a write that fails after dispatch returns `unknown_outcome` instead of retrying. The ledger is in memory per server for now; the audit work makes it durable.
+
 ## Notes
 
 - The store is `better-sqlite3`; sessions survive a restart.

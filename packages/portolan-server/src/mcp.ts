@@ -2,10 +2,18 @@ import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server
 import {
   type ErrorCode,
   type OpDef,
+  type ProtocolError,
   type SiteMap,
   toolName,
   validateJsonSchema,
 } from "@portolan/protocol";
+import {
+  MemoryWriteLedger,
+  runWrite,
+  type WriteExecution,
+  type WriteFailureCode,
+  type WriteLedger,
+} from "@portolan/runtime";
 import { z } from "zod";
 
 import { notReadyExecutor, type OpExecutor } from "./executor.js";
@@ -19,6 +27,8 @@ export type McpDeps = {
   executor?: OpExecutor;
   /** Maximum number of native tools listed for the open site. Default 30. */
   toolBudget?: number;
+  /** Idempotency ledger. Defaults to an in-memory ledger per server. */
+  ledger?: WriteLedger;
 };
 
 export type CallInput = {
@@ -38,6 +48,7 @@ export type CallInput = {
 export function createMcpServer(deps: McpDeps): McpServer {
   const server = new McpServer({ name: "portolan", version: "0.0.1" });
   const executor = deps.executor ?? notReadyExecutor;
+  const ledger = deps.ledger ?? new MemoryWriteLedger();
   const budget = deps.toolBudget ?? 30;
   let currentSid: string | undefined;
   let nativeTools: RegisteredTool[] = [];
@@ -77,22 +88,68 @@ export function createMcpServer(deps: McpDeps): McpServer {
       });
     }
 
-    if (opDef.effect === "irreversible" && input.confirm !== true) {
-      return failure("needs_confirmation", `"${input.op}" is irreversible; pass confirm: true`);
-    }
-
     deps.sessions.touch(session.sid);
 
-    const envelope = await executor({
-      session,
+    const runExecutor = (
+      target: OpDef,
+      targetParams: Record<string, unknown>,
+      confirm: boolean | undefined,
+      idempotencyKey: string | undefined,
+    ) =>
+      executor({
+        session,
+        map,
+        op: target,
+        params: targetParams,
+        confirm,
+        idempotencyKey,
+      });
+
+    if (opDef.effect === "read") {
+      return text(
+        JSON.stringify(await runExecutor(opDef, params, input.confirm, input.idempotency_key)),
+      );
+    }
+
+    const safety = await runWrite({
       map,
       op: opDef,
-      params,
       confirm: input.confirm,
       idempotencyKey: input.idempotency_key,
+      ledger,
+      execute: async (): Promise<WriteExecution> => {
+        const envelope = await runExecutor(opDef, params, input.confirm, input.idempotency_key);
+
+        return envelope.ok ? { ok: true, result: envelope.result } : toWriteFailure(envelope.error);
+      },
+      check:
+        opDef.outcome_check === undefined
+          ? undefined
+          : async () => {
+              const checkOp = map.ops.find((candidate) => candidate.name === opDef.outcome_check);
+              if (checkOp === undefined) return { outcome: "unknown" };
+
+              const envelope = await runExecutor(checkOp, {}, false, undefined);
+              return envelope.ok
+                ? { outcome: "done", result: envelope.result }
+                : { outcome: "unknown" };
+            },
     });
 
-    return text(JSON.stringify(envelope));
+    return text(
+      JSON.stringify(
+        safety.ok
+          ? { ok: true, result: safety.result }
+          : {
+              ok: false,
+              error: {
+                code: safety.code,
+                message: safety.message,
+                ...(safety.details !== undefined ? { details: safety.details } : {}),
+              },
+            },
+      ),
+    );
   }
 
   function clearNativeTools(): void {
@@ -264,6 +321,26 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 
 function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
+}
+
+function toWriteFailure(error: ProtocolError): Extract<WriteExecution, { ok: false }> {
+  const allowed: WriteFailureCode[] = [
+    "invalid_params",
+    "precondition_failed",
+    "needs_confirmation",
+    "op_broken",
+    "unknown_outcome",
+  ];
+  const code = allowed.includes(error.code as WriteFailureCode)
+    ? (error.code as WriteFailureCode)
+    : "op_broken";
+
+  return {
+    ok: false,
+    code,
+    message: error.message,
+    ...(error.details !== undefined ? { details: error.details } : {}),
+  };
 }
 
 function failure(code: ErrorCode, message: string, details?: Record<string, unknown>) {

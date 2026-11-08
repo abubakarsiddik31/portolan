@@ -97,7 +97,7 @@ function extractFields(fields: Record<string, Locator>, view: SubstrateView): Ex
   const result: Record<string, unknown> = {};
 
   for (const [key, locator] of Object.entries(fields)) {
-    const node = matchingNodes(view.snapshot.nodes, locator)[0];
+    const node = matchingNodes(view.snapshot.nodes, locator, { visibleOnly: false })[0];
     if (node === undefined) {
       return {
         ok: false,
@@ -112,7 +112,9 @@ function extractFields(fields: Record<string, Locator>, view: SubstrateView): Ex
 }
 
 function extractRows(extractor: RowsExtractor, view: SubstrateView): ExtractResult {
-  const container = matchingNodes(view.snapshot.nodes, extractor.container)[0];
+  const container = matchingNodes(view.snapshot.nodes, extractor.container, {
+    visibleOnly: false,
+  })[0];
   if (container === undefined) {
     return {
       ok: false,
@@ -122,7 +124,7 @@ function extractRows(extractor: RowsExtractor, view: SubstrateView): ExtractResu
   }
 
   const scope = descendants(view.snapshot, container);
-  const rows = matchingNodes(scope, extractor.row);
+  const rows = matchingNodes(scope, extractor.row, { visibleOnly: false });
   const values: Array<Record<string, unknown>> = [];
 
   for (const row of rows) {
@@ -130,7 +132,7 @@ function extractRows(extractor: RowsExtractor, view: SubstrateView): ExtractResu
     const cols: Record<string, unknown> = {};
 
     for (const [key, locator] of Object.entries(extractor.cols)) {
-      const node = matchingNodes(rowScope, locator)[0];
+      const node = matchingNodes(rowScope, locator, { visibleOnly: false })[0];
       if (node === undefined) {
         return {
           ok: false,
@@ -195,19 +197,23 @@ function descendants(snapshot: Snapshot, root: SemanticNode, includeRoot = false
 function readValue(node: SemanticNode, locator: Locator, snapshot: Snapshot): unknown {
   let value: unknown;
 
-  switch (locator.attr) {
-    case "value":
-      value = node.properties.value ?? node.properties.valuetext ?? "";
-      break;
-    case "href":
-      value = node.properties.url ?? "";
-      break;
-    case "name":
-      value = node.name;
-      break;
-    default:
-      value = node.name.length > 0 ? node.name : textOf(snapshot, node);
-      break;
+  if (locator.attribute !== undefined) {
+    value = attributeValue(snapshot, node, locator.attribute);
+  } else {
+    switch (locator.attr) {
+      case "value":
+        value = node.attributes?.value ?? node.properties.value ?? node.properties.valuetext ?? "";
+        break;
+      case "href":
+        value = node.attributes?.href ?? node.properties.url ?? "";
+        break;
+      case "name":
+        value = node.attributes?.name ?? node.name;
+        break;
+      default:
+        value = node.name.length > 0 ? node.name : textOf(snapshot, node);
+        break;
+    }
   }
 
   if (locator.pattern !== undefined && typeof value === "string") {
@@ -216,6 +222,29 @@ function readValue(node: SemanticNode, locator: Locator, snapshot: Snapshot): un
   }
 
   return value;
+}
+
+function attributeValue(snapshot: Snapshot, node: SemanticNode, name: string): string {
+  const own = node.attributes?.[name];
+  if (own !== undefined) return own;
+
+  const byId = new Map(snapshot.nodes.map((candidate) => [candidate.nodeId, candidate]));
+  const stack = [...node.childIds];
+
+  while (stack.length > 0) {
+    const id = stack.shift();
+    if (id === undefined) continue;
+
+    const child = byId.get(id);
+    if (child === undefined) continue;
+
+    const value = child.attributes?.[name];
+    if (value !== undefined) return value;
+
+    stack.push(...child.childIds);
+  }
+
+  return "";
 }
 
 function textOf(snapshot: Snapshot, node: SemanticNode): string {

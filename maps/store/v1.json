@@ -119,7 +119,7 @@
             "cols": {
               "id": {
                 "role": "link",
-                "attr": "href",
+                "attribute": "href",
                 "pattern": "/p/([^/]+)$"
               },
               "name": {

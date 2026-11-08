@@ -71,6 +71,7 @@ export const MAP_SCHEMA = {
         ordinal: { type: "integer", minimum: 0 },
         test_id: { type: "string", minLength: 1 },
         attr: { enum: ["name", "value", "text", "href"] },
+        attribute: { type: "string", minLength: 1 },
         pattern: { type: "string", minLength: 1 },
       },
     },

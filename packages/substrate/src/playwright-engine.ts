@@ -60,7 +60,11 @@ type LayoutInfo = {
   display: string;
   visibility: string;
   opacity: string;
-  test_id?: string;
+};
+
+type SnapshotIndex = {
+  layout: Map<number, LayoutInfo>;
+  attributes: Map<number, Record<string, string>>;
 };
 
 type DescribedNode = {
@@ -151,14 +155,14 @@ export class PlaywrightEngine implements Engine {
       }) as unknown as Promise<DomSnapshotResult>,
     ]);
 
-    const layout = indexLayout(dom);
+    const index = indexSnapshot(dom);
 
     return {
       doc: this.doc,
       v: this.v,
       url: this.page.url(),
       title: await this.page.title(),
-      nodes: ax.nodes.map((node) => toSemanticNode(node, layout)),
+      nodes: ax.nodes.map((node) => toSemanticNode(node, index.layout, index.attributes)),
     };
   }
 
@@ -552,12 +556,19 @@ export class PlaywrightEngine implements Engine {
   }
 }
 
-function indexLayout(snapshot: DomSnapshotResult): Map<number, LayoutInfo> {
+function indexSnapshot(snapshot: DomSnapshotResult): SnapshotIndex {
   const layout = new Map<number, LayoutInfo>();
+  const attributes = new Map<number, Record<string, string>>();
 
   for (const document of snapshot.documents) {
     const nodes = document.nodes;
     const boxes = document.layout;
+
+    // Attributes exist for hidden nodes too, including closed-select options.
+    nodes.backendNodeId.forEach((backendNodeId, index) => {
+      const parsed = attributesFor(nodes.attributes?.[index], snapshot.strings);
+      if (Object.keys(parsed).length > 0) attributes.set(backendNodeId, parsed);
+    });
 
     boxes.nodeIndex.forEach((nodeIndex, position) => {
       const backendNodeId = nodes.backendNodeId[nodeIndex];
@@ -565,6 +576,7 @@ function indexLayout(snapshot: DomSnapshotResult): Map<number, LayoutInfo> {
       if (backendNodeId === undefined || bounds === undefined) return;
 
       const styles = boxes.styles?.[position];
+
       layout.set(backendNodeId, {
         bounds: {
           x: bounds[0] ?? 0,
@@ -575,12 +587,11 @@ function indexLayout(snapshot: DomSnapshotResult): Map<number, LayoutInfo> {
         display: styleValue(snapshot.strings, styles?.[0]),
         visibility: styleValue(snapshot.strings, styles?.[1]),
         opacity: styleValue(snapshot.strings, styles?.[2], "1"),
-        test_id: testIdFor(nodes.attributes?.[nodeIndex], snapshot.strings),
       });
     });
   }
 
-  return layout;
+  return { layout, attributes };
 }
 
 function styleValue(strings: string[], index: number | undefined, fallback = ""): string {
@@ -588,22 +599,28 @@ function styleValue(strings: string[], index: number | undefined, fallback = "")
   return strings[index] ?? fallback;
 }
 
-function testIdFor(attributes: number[] | undefined, strings: string[]): string | undefined {
-  if (attributes === undefined) return undefined;
+function attributesFor(indices: number[] | undefined, strings: string[]): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  if (indices === undefined) return attributes;
 
-  for (let index = 0; index + 1 < attributes.length; index += 2) {
-    const nameIndex = attributes[index];
-    if (nameIndex === undefined) continue;
-    if (strings[nameIndex] !== "data-testid") continue;
+  for (let index = 0; index + 1 < indices.length; index += 2) {
+    const nameIndex = indices[index];
+    const valueIndex = indices[index + 1];
+    if (nameIndex === undefined || valueIndex === undefined) continue;
 
-    const valueIndex = attributes[index + 1];
-    return valueIndex === undefined ? undefined : strings[valueIndex];
+    const name = strings[nameIndex];
+    const value = strings[valueIndex];
+    if (name !== undefined && value !== undefined) attributes[name] = value;
   }
 
-  return undefined;
+  return attributes;
 }
 
-function toSemanticNode(node: RawAxNode, layout: Map<number, LayoutInfo>): SemanticNode {
+function toSemanticNode(
+  node: RawAxNode,
+  layout: Map<number, LayoutInfo>,
+  attributes: Map<number, Record<string, string>>,
+): SemanticNode {
   const properties: Record<string, string | number | boolean> = {};
 
   for (const property of node.properties ?? []) {
@@ -627,10 +644,14 @@ function toSemanticNode(node: RawAxNode, layout: Map<number, LayoutInfo>): Seman
 
   result.backendNodeId = node.backendDOMNodeId;
 
+  const attrs = attributes.get(node.backendDOMNodeId);
+  if (attrs !== undefined) {
+    result.attributes = attrs;
+    if (attrs["data-testid"] !== undefined) result.test_id = attrs["data-testid"];
+  }
+
   const info = layout.get(node.backendDOMNodeId);
   if (info === undefined) return result;
-
-  if (info.test_id !== undefined) result.test_id = info.test_id;
 
   result.bounds = info.bounds;
   result.visible =

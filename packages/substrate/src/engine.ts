@@ -20,6 +20,8 @@ export type SemanticNode = {
   backendNodeId?: number;
   /** The author's stable automation hook, when the node has one. */
   test_id?: string;
+  /** DOM attributes for this node, when it has a layout box. */
+  attributes?: Record<string, string>;
   ignored: boolean;
   /** False when ignored, unstyled, zero-sized, or hidden by CSS. */
   visible: boolean;

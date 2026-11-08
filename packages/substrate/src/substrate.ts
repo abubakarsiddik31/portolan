@@ -70,6 +70,12 @@ export class Substrate {
     return { snapshot, refs };
   }
 
+  /** Navigate, then capture. The `goto` substrate verb. */
+  async goto(url: string): Promise<SubstrateView> {
+    await this.engine.navigate(url);
+    return this.view();
+  }
+
   /** The last captured document and refs, without taking a new snapshot. */
   state(): SubstrateView | undefined {
     if (this.last === undefined || this.current === undefined) return undefined;

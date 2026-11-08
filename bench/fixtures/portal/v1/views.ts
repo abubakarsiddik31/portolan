@@ -128,7 +128,7 @@ export function portalPage(page: RowPage, filters: RowFilters, email: string): s
         <td>${escapeHtml(row.vendor)}</td>
         <td>${escapeHtml(row.category)}</td>
         <td>${formatMoney(row.amountCents)}</td>
-        <td><span class="badge ${row.status}" data-status="${row.status}">${row.status}</span></td>
+        <td data-status="${row.status}"><span class="badge ${row.status}">${row.status}</span></td>
         <td>${escapeHtml(row.date)}</td>
       </tr>`,
     )

@@ -19,6 +19,7 @@ const PAGES = [
   { file: "docs/spec/map-v0.md", slug: "map-spec", title: "Map format v0" },
   { file: "docs/SECURITY.md", slug: "security", title: "Security" },
   { file: "docs/PACKAGING.md", slug: "packaging", title: "Packaging" },
+  { file: "docs/LICENSING.md", slug: "licensing", title: "Licensing" },
 ];
 
 const LINKS = new Map(
@@ -59,7 +60,7 @@ function rewriteLinks(html) {
     const mapped = LINKS.get(path);
     if (mapped !== undefined) return `href="./${mapped}${hash === undefined ? "" : `#${hash}`}"`;
 
-    if (path.startsWith("../") && path.endsWith(".md")) {
+    if (path.startsWith("../")) {
       return `href="${REPO}/blob/main/${path.replace(/^\.\.\//, "")}"`;
     }
 

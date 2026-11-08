@@ -18,6 +18,7 @@ const SLUGS = [
   "map-spec",
   "security",
   "packaging",
+  "licensing",
 ];
 const dirs: string[] = [];
 

@@ -227,6 +227,109 @@ The project, repository, CLI, packages, MCP server and skills are named **Portol
 
 ---
 
+## ADR-005 — G1/G2 are not passed; release gate stays closed
+
+**Status:** Accepted, 2026-11-09
+**Deciders:** Abubakar Siddik
+**Related:** `docs/G1-G2.md`; `docs/PROJECT_PLAN.md` §1 (R4), §4 (T4.14); ADR-002, ADR-003
+
+### Context
+
+The plan makes G0, G1, and G2 stop/go gates, and R4 requires all three to be
+passed and recorded here before v0.1.0.
+
+The harness now runs end to end on the frozen commit
+`98d8af4cd800f7720da76ab7ea6acf3b933fab03`:
+
+- the compiler produces maps from fallback traces and verifies every op on
+  three fresh sessions;
+- the held-out maps are frozen with a SHA and a model;
+- arm C produced 48 scored rows on 16 held-out templates;
+- the drift run repaired 3/3 ops with 0 duplicate writes and 3/3 drift-day
+  success;
+- Claude Code and Gemini CLI pass the MCP conformance prompt; Codex CLI is
+  blocked by a 402 from its own account.
+
+But every row is `provider: scripted`, `model: scripted`. No provider key was
+configured. There are no oracle rows, no second provider, no real-model
+failure, and the drift sample is three ops and one run. The filter and
+paginate drifts are semantic (the op succeeds but returns the wrong rows) and
+are not caught by the drift script.
+
+### Decision
+
+1. **G0, G1, and G2 are not passed.** Do not claim them in the README, a
+   release note, a launch asset, or a benchmark table.
+2. **R4 stays open.** v0.1.0 is not released on this evidence.
+3. **The current artifacts are harness validations**, not gate results. They
+   may be published only with that label.
+4. **Run the missing measurement** before revisiting this ADR: arms A, B, C,
+   and D-oracle on the 16 held-out templates, two providers, a model-Y
+   transfer run, N=3 with billed usage, oracle rows, and a drift run with real
+   models including the semantic filter and paginate failures and an
+   idempotency-key retry.
+5. **The plan's branch points apply only after that run:** G1 below 60% of the
+   oracle's win → narrow to human-recorded maps; G2 below 80% repair or any
+   duplicate write → reads-only release or stop.
+
+### Rationale
+
+- **The gates are economic, not feature checks.** "The compiler works" and
+  "the compiler wins" are different claims. The scripted rows can prove the
+  first; they cannot prove the second.
+- **A false pass is worse than a delay.** Declaring G1 on $0 scripted rows
+  would put a number in a launch post that no customer could reproduce.
+- **The drift result is encouraging but small.** 3/3 is not 80% of a
+  representative sample; it is a smoke test of the repair loop.
+- **The client result is real.** Two clients passing the same MCP prompt is
+  evidence for R2, not for G1 or G2.
+- **The safety evidence is strong where it exists.** The forced mid-write
+  failure (T2.24) and the review gate for irreversible ops are real; the
+  drift run's zero duplicates is structural and does not replace them.
+
+### Consequences
+
+**Positive**
+- The project does not ship a gate claim it cannot defend.
+- The harness, maps, and repair loop are ready for the real run.
+- The analysis names exactly which numbers are missing and how to get them.
+
+**Negative**
+- The release is blocked on provider access and a real-model run.
+- The open-source runtime is usable experimentally, but the benchmark story
+  is incomplete.
+- The delay has a cost; the plan's schedule assumes the gates close on time.
+
+**Mitigations**
+- Keep the provider-backed run small: 16 templates, N=3, two providers, one
+  transfer run.
+- Publish the harness results with the `scripted` label so the work is
+  visible without being mistaken for a gate.
+- Use the plan's branch points rather than an open-ended delay.
+
+### Alternatives rejected
+
+| Alternative | Why rejected |
+|---|---|
+| **Declare G1/G2 passed on the scripted rows** | The rows have no oracle denominator, no provider, and no model failure. It would be a fabricated gate. |
+| **Declare G1/G2 failed and stop** | The gates were not measured; a failure cannot be inferred from missing data. |
+| **Narrow to human-recorded maps now** | That is the branch for a measured G1 miss, not for an unmeasured gate. |
+| **Reads-only release now** | That is the branch for a measured G2 miss or a duplicate write; neither was observed at scale. |
+| **Ship without the gates** | R4 is a release criterion, not a suggestion. |
+
+### Revisit triggers
+
+Revisit and supersede this ADR when:
+
+1. the provider-backed N=3 run produces arm and oracle rows on two providers;
+2. the drift run covers the semantic failures and a retried write;
+3. the canary has a 7-day pass rate for R5;
+4. a measured G1 or G2 failure triggers one of the plan's branch points.
+
+Until then, this decision stands.
+
+---
+
 ## ADR-007 — One session, two projections: agent-native execution with a human-visible cockpit
 
 **Status:** Accepted, 2026-11-08

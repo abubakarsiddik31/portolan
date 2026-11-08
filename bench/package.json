@@ -6,7 +6,8 @@
   "scripts": {
     "fixtures": "tsx fixtures/server.ts",
     "fixtures:store": "tsx fixtures/server.ts --fixture store --port 4100",
-    "fixtures:wizard": "tsx fixtures/server.ts --fixture wizard --port 4101"
+    "fixtures:wizard": "tsx fixtures/server.ts --fixture wizard --port 4101",
+    "fixtures:portal": "tsx fixtures/server.ts --fixture portal --port 4102"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.5",

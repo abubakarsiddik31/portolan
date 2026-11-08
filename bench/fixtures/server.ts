@@ -1,3 +1,4 @@
+import { buildPortalApp } from "./portal/v1/app.js";
 import { buildStoreApp } from "./store/v1/app.js";
 import { buildWizardApp } from "./wizard/v1/app.js";
 
@@ -10,6 +11,7 @@ function readArg(name: string, fallback: string): string {
 const fixtures = {
   store: { build: buildStoreApp, label: "store v1", port: "4100" },
   wizard: { build: buildWizardApp, label: "wizard v1", port: "4101" },
+  portal: { build: buildPortalApp, label: "portal v1", port: "4102" },
 } as const;
 
 type FixtureName = keyof typeof fixtures;

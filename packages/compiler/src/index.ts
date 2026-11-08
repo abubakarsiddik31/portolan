@@ -1,3 +1,4 @@
+export * from "./compile.js";
 export * from "./http.js";
 export * from "./lift.js";
 export * from "./parameterize.js";

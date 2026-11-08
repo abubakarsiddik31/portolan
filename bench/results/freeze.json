@@ -1,0 +1,17 @@
+{
+  "commit": "98d8af4cd800f7720da76ab7ea6acf3b933fab03",
+  "model": "scripted",
+  "created_at": "2026-11-08T20:26:05.235Z",
+  "maps": {
+    "library": {
+      "version": 4,
+      "path": "maps/heldout/library/v4.json",
+      "ops": ["search", "get_book", "borrow"]
+    },
+    "support": {
+      "version": 5,
+      "path": "maps/heldout/support/v5.json",
+      "ops": ["login", "list_tickets", "filter_tickets", "paginate", "create_ticket"]
+    }
+  }
+}

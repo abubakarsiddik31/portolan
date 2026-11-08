@@ -1,0 +1,191 @@
+{
+  "site": "library",
+  "origins": ["http://127.0.0.1:4120"],
+  "version": 1,
+  "states": [
+    {
+      "id": "catalog",
+      "url": "/",
+      "marks": [
+        {
+          "role": "textbox",
+          "name": "Search books"
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "url": "/search",
+      "marks": [
+        {
+          "test_id": "book-grid"
+        }
+      ]
+    },
+    {
+      "id": "book",
+      "url": "/books/:id",
+      "marks": [
+        {
+          "test_id": "book-detail"
+        }
+      ]
+    },
+    {
+      "id": "loans",
+      "url": "/loans",
+      "marks": [
+        {
+          "role": "heading",
+          "name": "Your loans"
+        }
+      ]
+    }
+  ],
+  "ops": [
+    {
+      "name": "search",
+      "version": 1,
+      "summary": "Search the library catalog.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "from": ["catalog", "results"],
+      "to": ["results"],
+      "post": [
+        {
+          "kind": "state",
+          "state": "results"
+        }
+      ],
+      "effect": "read",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "ui",
+          "steps": [
+            {
+              "do": "click",
+              "target": {
+                "role": "button",
+                "name": "Placeholder"
+              }
+            }
+          ],
+          "extract": {
+            "kind": "none"
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_book",
+      "version": 1,
+      "summary": "Read one book and its availability.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["book_id"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object"
+      },
+      "from": ["catalog", "results", "book"],
+      "to": ["book"],
+      "post": [
+        {
+          "kind": "state",
+          "state": "book"
+        }
+      ],
+      "effect": "read",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "ui",
+          "steps": [
+            {
+              "do": "click",
+              "target": {
+                "role": "button",
+                "name": "Placeholder"
+              }
+            }
+          ],
+          "extract": {
+            "kind": "none"
+          }
+        }
+      ]
+    },
+    {
+      "name": "borrow",
+      "version": 1,
+      "summary": "Borrow an available book.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["book_id"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object"
+      },
+      "from": ["book"],
+      "to": ["loans"],
+      "post": [
+        {
+          "kind": "state",
+          "state": "loans"
+        }
+      ],
+      "effect": "write",
+      "status": "verified",
+      "impls": [
+        {
+          "tier": "ui",
+          "steps": [
+            {
+              "do": "click",
+              "target": {
+                "role": "button",
+                "name": "Placeholder"
+              }
+            }
+          ],
+          "extract": {
+            "kind": "none"
+          }
+        }
+      ]
+    }
+  ],
+  "entities": {},
+  "compiled_from": ["seed:library"],
+  "verified_at": "2026-11-09T00:00:00Z"
+}

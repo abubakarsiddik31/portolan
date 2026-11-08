@@ -29,3 +29,4 @@ jobs:
       - run: pnpm build
       - run: pnpm package:check:tarballs
       - run: pnpm release:dry-run --out /tmp/portolan-release
+      - run: pnpm docs:build --out /tmp/portolan-docs

@@ -24,7 +24,8 @@
     "package:check:tarballs": "node scripts/verify-packages.mjs --tarballs",
     "version-packages": "changeset version && pnpm install --lockfile-only",
     "release": "pnpm build && changeset publish",
-    "release:dry-run": "node scripts/release-dry-run.mjs"
+    "release:dry-run": "node scripts/release-dry-run.mjs",
+    "docs:build": "node scripts/build-docs.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -42,6 +43,7 @@
     "@commitlint/load": "21.2.4",
     "@types/node": "24.19.2",
     "@vitest/coverage-v8": "5.1.0",
+    "marked": "^18.1.3",
     "typescript": "5.9.3",
     "vitest": "5.1.0",
     "yaml": "2.9.1"

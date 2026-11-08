@@ -170,6 +170,10 @@ transport every MCP client supports. `dist/mcp-stdio.js` is the standalone
 entry point; `portolan mcp` calls the same function. It reads `MAPS_DIR` and
 `DATABASE_PATH`. Nothing but protocol frames may go to stdout.
 
+Pass `substrateFactory` and `browsers` to enable `view`, `act`, and `read` and
+to close the browser with the server. `portolan mcp` builds one that launches
+Chrome and loads `policies/<site>.json` when the file exists.
+
 ## Notes
 
 - The store is `better-sqlite3`; sessions survive a restart. An open session

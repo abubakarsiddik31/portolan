@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose a capability, a tier, a map-format change, or a cockpit improvement.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Portolan is agent-native first. Before proposing a feature, say which
+        layer it belongs to: read/search, browse, operate, research, or cockpit.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What can an agent or a human not do today? Who has the problem?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The smallest version that solves it. Include the protocol or map change if there is one.
+    validations:
+      required: true
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Layer
+      options:
+        - read / search
+        - browse (substrate)
+        - operate (maps, ops, writes)
+        - research (caller-side composition)
+        - cockpit (human view, takeover)
+        - infrastructure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What did you consider, and why is it worse?
+    validations:
+      required: false
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks
+      description: Write safety, credentials, drift, cost, or scope. New ideas go to the roadmap, not into a gate.
+    validations:
+      required: false

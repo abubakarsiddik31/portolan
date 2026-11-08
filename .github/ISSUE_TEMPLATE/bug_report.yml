@@ -1,0 +1,66 @@
+name: Bug report
+description: Something is broken in the runtime, a fixture, the compiler, or the benchmark.
+title: "fix: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, cookies, tokens, or captured page text.
+        Security issues go through SECURITY.md, not this form.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: One paragraph. What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: The smallest map, task id, fixture, or command that shows the bug.
+      placeholder: |
+        1. pnpm fixtures:store
+        2. pnpm --filter @portolan/bench exec tsx oracle/main.ts
+        3. call add_to_cart with ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - runtime
+        - protocol / map format
+        - substrate / browser
+        - compiler
+        - model port
+        - skills
+        - fixtures
+        - benchmark / results
+        - docs
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or version
+      placeholder: a3a9f90
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node, pnpm, browser, and model provider if relevant.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Redact credentials, cookies, and page text before pasting.
+      render: text
+    validations:
+      required: false

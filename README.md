@@ -6,20 +6,23 @@
 
 Portolan turns a website into a **map an agent can call**: the site's states, and typed operations like `search(query)`, `add_to_cart(product_id, size)` or `export(filter)` that move between them. Agents call operations instead of looking at screens and clicking. Maps are learned from real runs, verified by replay, and repaired when the site changes. Portolan works with **any model and any MCP client**: MCP carries execution and safety, Agent Skills carry the know-how.
 
+Portolan is **open source** (Apache-2.0) and **agent-native with a human cockpit**: agents use maps, humans watch the same session and can take over. Read [the vision](./docs/VISION.md) and [ADR-007](./docs/DECISIONS.md).
+
 ---
 
 ## Status
 
-**Pre-build. Documentation and build plan only. No code yet.**
+**Early build. Open source (Apache-2.0). The gates have not been run yet.**
 
 | | |
 |---|---|
-| Stage | Pre-build / validated on paper, unvalidated in code |
+| Stage | Phase 1: fixtures, task suite, model port and the oracle arm are built; G0 is next |
 | Date of analysis | 2026-11-08 |
 | Current plan | [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) (what and how) · [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) (when and who) |
 | First release | v0.1.0 public alpha, target **Tue 2027-03-02** |
-| First gate | Day 2: hand-written ops must beat the best free tool by ≥3x on steps and ≥5x on cost, or we stop |
-| Key decisions | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic; MCP + Skills), ADR-004 (name) in [docs/DECISIONS.md](./docs/DECISIONS.md) |
+| First gate | G0: hand-written ops must beat the best free tool by ≥3x on steps and ≥5x on cost, or we stop |
+| Key decisions | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic), ADR-004 (name), ADR-007 (one session, two projections), ADR-008 (open source) in [docs/DECISIONS.md](./docs/DECISIONS.md) |
+| License | Apache-2.0 (runtime, SDK, CLI, skills) · MIT (cockpit) · CC-BY-4.0 (map spec) |
 
 ---
 
@@ -49,13 +52,18 @@ open_site("acme-store")
 
 | File | What's in it |
 |---|---|
-| [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) | **Start here.** Map model, op runtime, write safety, compiler, agent surface, stack, benchmark, gates, 15-day build order, landscape |
+| [docs/VISION.md](./docs/VISION.md) | **Start here for the why.** Agent-native maps, the human cockpit, the capability ladder, open-source model |
+| [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) | Map model, op runtime, write safety, compiler, agent surface, stack, benchmark, gates, 15-day build order, landscape |
 | [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) | Schedule to v0.1.0 (Mar 2, 2027): release criteria, milestones, ~95 tasks with estimates and dependencies, gates, risks, commit and PR conventions |
 | [docs/DECISIONS.md](./docs/DECISIONS.md) | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic; MCP + Skills), ADR-004 (name), one-line rationale for other choices |
 | [docs/SUBSTRATE.md](./docs/SUBSTRATE.md) | The stateful browser layer underneath: engine adapter, semantic engine, refs, effects, hibernation, meter |
 | [docs/ANALYSIS.md](./docs/ANALYSIS.md) | Market evidence, cost model, competitive landscape, reasoning trail (v1 → v4), falsification criteria |
 | [PRD.md](./PRD.md) | v0.1 requirements. Partly superseded by ADR-002; its verbs and architecture now describe the substrate. Rewrite pending. |
 | [docs/archive/BUILD_PLAN_v1.md](./docs/archive/BUILD_PLAN_v1.md) | The v1 plan (affordance browser) and its adversarial review, written under the old name Facet, kept for the record |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Setup, commit and branch rules, PR process, code standards |
+| [SECURITY.md](./SECURITY.md) | How to report a vulnerability privately; the security invariants |
+| [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | Contributor Covenant 2.1 |
+| [LICENSE](./LICENSE) | Apache-2.0 |
 
 ---
 
@@ -79,7 +87,7 @@ These were argued through and should not be re-litigated without new evidence.
 
 1. **First vertical.** Where map quality and write safety matter most: insurance eligibility, procurement portals, logistics carriers, or support ops?
 2. **Who builds maps in the product:** compiled from agent runs (the plan's default), recorded by customers, or curated by us per vertical?
-3. **Open-source the runtime?** Lean: open map format and runtime, hosted compiler and verified map library.
+3. **Map registry governance.** How do community maps get verified, signed and distributed without turning the registry into a malware vector?
 4. **ToS posture** for in-page calls to sites' private endpoints. Counsel before any hosted offering.
 5. **Trademark and name clearance.** Renamed from Facet to Portolan (ADR-004). Run a proper class 9/42 search, and resolve the npm `portolan` package (an unrelated UI-flow format, Aug 2026) and the `Portolan: Local Dev Servers` Mac app before launch.
 
@@ -87,7 +95,7 @@ These were argued through and should not be re-litigated without new evidence.
 
 ## Start here (new session prompt)
 
-> Read `README.md`, `docs/DECISIONS.md`, `docs/BUILD_PLAN.md`, and `docs/SUBSTRATE.md` in full before writing anything.
+> Read `README.md`, `docs/VISION.md`, `docs/DECISIONS.md`, `docs/BUILD_PLAN.md`, and `docs/SUBSTRATE.md` in full before writing anything.
 >
 > We are building **Portolan**, a site-map runtime: agents call typed operations from a verified map of each site. Follow `docs/BUILD_PLAN.md` §11 in order. TypeScript on Node 24 LTS, pnpm monorepo, Fastify + Zod, Ajv for map schemas, Playwright/Chromium + CDP for the substrate, MCP TS SDK for the agent surface, Agent Skills (`SKILL.md`) for site knowledge, Vercel AI SDK behind `ModelPort` for any model, SQLite + map files in git.
 >
@@ -108,3 +116,11 @@ These were argued through and should not be re-litigated without new evidence.
 - [ ] One table: success, steps/task, $/task (vs A and B, compile cost amortized), op coverage, compile yield, tier mix, drift survival, repair time
 
 If G0 fails, we stop on Day 2. That is the point of testing perfect maps before building the compiler.
+
+---
+
+## License
+
+Apache-2.0 for the runtime, SDK, CLI and skills. MIT for the human cockpit. CC-BY-4.0 for the protocol and map spec. See [LICENSE](./LICENSE) and [ADR-008](./docs/DECISIONS.md).
+
+Contributions are accepted under the same licenses. Read [CONTRIBUTING.md](./CONTRIBUTING.md) first; one task, one branch, one PR.

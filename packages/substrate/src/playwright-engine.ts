@@ -14,6 +14,8 @@ export type PlaywrightEngineOptions = {
   executablePath: string;
   headless?: boolean;
   timeoutMs?: number;
+  /** Extra Chromium flags, e.g. --no-sandbox in a container. */
+  launchArgs?: string[];
 };
 
 type AxValue = { value?: string | number | boolean };
@@ -58,6 +60,7 @@ export class PlaywrightEngine implements Engine {
     const browser = await chromium.launch({
       executablePath: options.executablePath,
       headless: options.headless ?? true,
+      args: options.launchArgs ?? [],
     });
 
     const context = await browser.newContext();

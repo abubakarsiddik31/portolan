@@ -26,6 +26,14 @@ const PAGE = `<!doctype html>
 
 const CHROME = findChrome();
 
+/**
+ * Browser tests run locally, where a usable Chrome is installed. The CI
+ * runner exposes a Chrome binary that cannot launch in the container, so the
+ * suite is opt-in there with PORTOLAN_BROWSER_TESTS=1.
+ */
+const ENABLED =
+  CHROME !== undefined && (process.env.CI !== "true" || process.env.PORTOLAN_BROWSER_TESTS === "1");
+
 function chromePath(): string {
   if (CHROME === undefined) throw new Error("Chrome is required");
   return CHROME;
@@ -43,7 +51,7 @@ function target(snapshot: Snapshot, role: string, name: string): number {
   return node.backendNodeId;
 }
 
-describe.skipIf(CHROME === undefined)("playwright engine", () => {
+describe.skipIf(!ENABLED)("playwright engine", () => {
   let server: Server | undefined;
   let baseUrl = "";
   let engine: PlaywrightEngine | undefined;
@@ -74,8 +82,11 @@ describe.skipIf(CHROME === undefined)("playwright engine", () => {
     }
     baseUrl = `http://127.0.0.1:${address.port}/`;
 
-    engine = await PlaywrightEngine.launch({ executablePath: chromePath() });
-  });
+    engine = await PlaywrightEngine.launch({
+      executablePath: chromePath(),
+      launchArgs: process.env.CI === "true" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [],
+    });
+  }, 60_000);
 
   afterAll(async () => {
     if (engine !== undefined) await engine.close();

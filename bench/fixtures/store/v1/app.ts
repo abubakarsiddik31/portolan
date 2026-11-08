@@ -71,7 +71,10 @@ function readCustomer(body: Record<string, unknown>): CustomerResult {
   return { ok: true, customer: { name, email, address, city, postal } };
 }
 
-export async function buildStoreApp(options: { logger?: boolean } = {}): Promise<FastifyInstance> {
+export async function buildStoreApp(
+  options: { logger?: boolean; variant?: "v1" | "v2" } = {},
+): Promise<FastifyInstance> {
+  const variant = options.variant ?? "v1";
   const app = Fastify({ logger: options.logger ?? false });
   await app.register(cookie);
   await app.register(formbody);
@@ -176,14 +179,19 @@ export async function buildStoreApp(options: { logger?: boolean } = {}): Promise
 
   app.get("/", async (request, reply) => {
     const cart = viewCart(cartFor(request.sid));
-    return reply.type("text/html").send(catalogPage(products, "", cart.count));
+    return reply.type("text/html").send(catalogPage(products, "", cart.count, variant));
   });
 
-  app.get<{ Querystring: { q?: string } }>("/search", async (request, reply) => {
-    const query = request.query.q ?? "";
-    const cart = viewCart(cartFor(request.sid));
-    return reply.type("text/html").send(catalogPage(searchProducts(query), query, cart.count));
-  });
+  app.get<{ Querystring: { q?: string } }>(
+    variant === "v2" ? "/catalog" : "/search",
+    async (request, reply) => {
+      const query = request.query.q ?? "";
+      const cart = viewCart(cartFor(request.sid));
+      return reply
+        .type("text/html")
+        .send(catalogPage(searchProducts(query), query, cart.count, variant));
+    },
+  );
 
   app.get<{ Params: { id: string } }>("/p/:id", async (request, reply) => {
     const product = findProduct(request.params.id);
@@ -191,7 +199,7 @@ export async function buildStoreApp(options: { logger?: boolean } = {}): Promise
       return reply.code(404).type("text/html").send(errorPage("Product not found"));
     }
     const cart = viewCart(cartFor(request.sid));
-    return reply.type("text/html").send(productPage(product, cart.count));
+    return reply.type("text/html").send(productPage(product, cart.count, undefined, variant));
   });
 
   app.post<{ Body: { product_id?: string; variant_id?: string; qty?: string } }>(
@@ -211,7 +219,7 @@ export async function buildStoreApp(options: { logger?: boolean } = {}): Promise
           return reply
             .code(400)
             .type("text/html")
-            .send(productPage(product, cart.count, result.error));
+            .send(productPage(product, cart.count, result.error, variant));
         }
         return reply
           .code(400)
@@ -262,7 +270,7 @@ export async function buildStoreApp(options: { logger?: boolean } = {}): Promise
   app.get("/checkout", async (request, reply) => {
     const cart = viewCart(cartFor(request.sid));
     if (cart.lines.length === 0) return reply.code(303).redirect("/cart");
-    return reply.type("text/html").send(checkoutPage(cart, cart.count));
+    return reply.type("text/html").send(checkoutPage(cart, cart.count, {}, variant));
   });
 
   app.post<{ Body: Record<string, unknown> }>("/checkout", async (request, reply) => {
@@ -274,7 +282,7 @@ export async function buildStoreApp(options: { logger?: boolean } = {}): Promise
       return reply
         .code(400)
         .type("text/html")
-        .send(checkoutPage(cart, cart.count, customer.fields));
+        .send(checkoutPage(cart, cart.count, customer.fields, variant));
     }
 
     const result = createOrder(request.sid, customer.customer);
@@ -282,7 +290,7 @@ export async function buildStoreApp(options: { logger?: boolean } = {}): Promise
       return reply
         .code(400)
         .type("text/html")
-        .send(checkoutPage(cart, cart.count, { form: result.error }));
+        .send(checkoutPage(cart, cart.count, { form: result.error }, variant));
     }
     return reply.code(303).redirect(`/orders/${result.order.id}`);
   });
@@ -326,13 +334,15 @@ export async function buildStoreApp(options: { logger?: boolean } = {}): Promise
     return reply.type("text/html").send(orderPage(order, cart.count));
   });
 
-  app.get<{ Querystring: { q?: string } }>("/api/products", async (request) => ({
-    products: searchProducts(request.query.q ?? "").map((product) => ({
-      id: product.id,
-      name: product.name,
-      price_cents: product.priceCents,
-      url: `/p/${product.id}`,
-    })),
+  app.get<{ Querystring: { q?: string; query?: string } }>("/api/products", async (request) => ({
+    products: searchProducts((variant === "v2" ? request.query.query : request.query.q) ?? "").map(
+      (product) => ({
+        id: product.id,
+        name: product.name,
+        price_cents: product.priceCents,
+        url: `/p/${product.id}`,
+      }),
+    ),
   }));
 
   app.get<{ Params: { id: string } }>("/api/products/:id", async (request, reply) => {

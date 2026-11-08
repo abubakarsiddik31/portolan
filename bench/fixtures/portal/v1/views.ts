@@ -75,7 +75,7 @@ function shell(title: string, body: string, email?: string): string {
 </html>`;
 }
 
-export function loginPage(error?: string): string {
+export function loginPage(error?: string, variant: "v1" | "v2" = "v1"): string {
   return shell(
     "Sign in",
     `<section class="login">
@@ -83,7 +83,7 @@ export function loginPage(error?: string): string {
        <p class="muted">Demo account: analyst@example.com / portolan</p>
        ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ""}
        <form method="post" action="/login" data-testid="login-form" novalidate>
-         <label for="email">Email</label>
+         <label for="email">${variant === "v2" ? "Work email" : "Email"}</label>
          <input id="email" name="email" type="email" autocomplete="username" required>
          <label for="password">Password</label>
          <input id="password" name="password" type="password" autocomplete="current-password" required>
@@ -93,25 +93,31 @@ export function loginPage(error?: string): string {
   );
 }
 
-function pageHref(page: number, filters: RowFilters): string {
+function pageHref(page: number, filters: RowFilters, variant: "v1" | "v2" = "v1"): string {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
-  if (filters.status) params.set("status", filters.status);
+  if (filters.status) params.set(variant === "v2" ? "state" : "status", filters.status);
   if (filters.category) params.set("category", filters.category);
-  params.set("page", String(page));
+  params.set(variant === "v2" ? "p" : "page", String(page));
   return `/?${params.toString()}`;
 }
 
-function exportHref(filters: RowFilters): string {
+function exportHref(filters: RowFilters, variant: "v1" | "v2" = "v1"): string {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
-  if (filters.status) params.set("status", filters.status);
+  if (filters.status) params.set(variant === "v2" ? "state" : "status", filters.status);
   if (filters.category) params.set("category", filters.category);
   const query = params.toString();
-  return query ? `/export.csv?${query}` : "/export.csv";
+  const path = variant === "v2" ? "/invoices.csv" : "/export.csv";
+  return query ? `${path}?${query}` : path;
 }
 
-export function portalPage(page: RowPage, filters: RowFilters, email: string): string {
+export function portalPage(
+  page: RowPage,
+  filters: RowFilters,
+  email: string,
+  variant: "v1" | "v2" = "v1",
+): string {
   const statusOptions = STATUSES.map(
     (status) =>
       `<option value="${status}" ${filters.status === status ? "selected" : ""}>${status}</option>`,
@@ -140,8 +146,8 @@ export function portalPage(page: RowPage, filters: RowFilters, email: string): s
      <p class="muted">${page.total} matching invoices · page ${page.page} of ${page.pages}</p>
      <form class="filters" method="get" action="/" data-testid="filter-form">
        <label>Search <input name="q" value="${escapeHtml(filters.q)}" placeholder="invoice or vendor"></label>
-       <label>Status
-         <select name="status">
+       <label>${variant === "v2" ? "Invoice status" : "Status"}
+         <select name="${variant === "v2" ? "state" : "status"}">
            <option value="">All</option>
            ${statusOptions}
          </select>
@@ -153,7 +159,7 @@ export function portalPage(page: RowPage, filters: RowFilters, email: string): s
          </select>
        </label>
        <button type="submit">Filter</button>
-       <a class="button" href="${exportHref(filters)}" data-testid="export-csv">Export CSV</a>
+       <a class="button" href="${exportHref(filters, variant)}" data-testid="export-csv">Export CSV</a>
      </form>
      <table data-testid="invoice-table">
        <thead><tr><th>Invoice</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
@@ -162,13 +168,13 @@ export function portalPage(page: RowPage, filters: RowFilters, email: string): s
      <div class="pager" data-testid="pager">
        ${
          page.page > 1
-           ? `<a href="${pageHref(page.page - 1, filters)}" data-testid="page-prev">Previous</a>`
+           ? `<a href="${pageHref(page.page - 1, filters, variant)}" data-testid="page-prev">Previous</a>`
            : '<span class="disabled">Previous</span>'
        }
        <span>Page ${page.page} of ${page.pages}</span>
        ${
          page.page < page.pages
-           ? `<a href="${pageHref(page.page + 1, filters)}" data-testid="page-next">Next</a>`
+           ? `<a href="${pageHref(page.page + 1, filters, variant)}" data-testid="page-next">${variant === "v2" ? "Next page" : "Next"}</a>`
            : '<span class="disabled">Next</span>'
        }
      </div>`,

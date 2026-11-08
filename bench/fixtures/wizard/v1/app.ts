@@ -65,7 +65,12 @@ function fileError(filename: string, size: number): string | undefined {
   return undefined;
 }
 
-export async function buildWizardApp(options: { logger?: boolean } = {}): Promise<FastifyInstance> {
+export async function buildWizardApp(
+  options: { logger?: boolean; variant?: "v1" | "v2" } = {},
+): Promise<FastifyInstance> {
+  const variant = options.variant ?? "v1";
+  const base = variant === "v2" ? "/apply" : "/step";
+  const submitPath = variant === "v2" ? "/apply/submit" : "/submit";
   const app = Fastify({ logger: options.logger ?? false });
   await app.register(cookie);
   await app.register(formbody);
@@ -96,24 +101,24 @@ export async function buildWizardApp(options: { logger?: boolean } = {}): Promis
     return state;
   };
 
-  app.get("/health", async () => ({ ok: true, fixture: "wizard", version: "v1" }));
+  app.get("/health", async () => ({ ok: true, fixture: "wizard", version: variant }));
 
-  app.get("/", async (_request, reply) => reply.code(303).redirect("/step/1"));
+  app.get("/", async (_request, reply) => reply.code(303).redirect(`${base}/1`));
 
-  app.get<{ Params: { step: string } }>("/step/:step", async (request, reply) => {
+  app.get<{ Params: { step: string } }>(`${base}/:step`, async (request, reply) => {
     const step = Number.parseInt(request.params.step, 10);
     if (step !== 1 && step !== 2 && step !== 3) {
       return reply.code(404).type("text/html").send(errorPage("Step not found"));
     }
     const state = stateFor(request.sid);
-    if (step > state.step) return reply.code(303).redirect(`/step/${state.step}`);
+    if (step > state.step) return reply.code(303).redirect(`${base}/${state.step}`);
 
-    if (step === 1) return reply.type("text/html").send(step1Page(state));
-    if (step === 2) return reply.type("text/html").send(step2Page(state));
-    return reply.type("text/html").send(step3Page(state));
+    if (step === 1) return reply.type("text/html").send(step1Page(state, {}, variant));
+    if (step === 2) return reply.type("text/html").send(step2Page(state, {}, variant));
+    return reply.type("text/html").send(step3Page(state, {}, variant));
   });
 
-  app.post<{ Body: Record<string, unknown> }>("/step/1", async (request, reply) => {
+  app.post<{ Body: Record<string, unknown> }>(`${base}/1`, async (request, reply) => {
     const state = stateFor(request.sid);
     const result = validateStep1(request.body);
     if (!result.data) {
@@ -125,14 +130,17 @@ export async function buildWizardApp(options: { logger?: boolean } = {}): Promis
           email: text(request.body, "email"),
         },
       };
-      return reply.code(400).type("text/html").send(step1Page(draft, result.errors));
+      return reply
+        .code(400)
+        .type("text/html")
+        .send(step1Page(draft, result.errors, variant));
     }
     state.data = { ...state.data, ...result.data };
     state.step = 2;
-    return reply.code(303).redirect("/step/2");
+    return reply.code(303).redirect(`${base}/2`);
   });
 
-  app.post<{ Body: Record<string, unknown> }>("/step/2", async (request, reply) => {
+  app.post<{ Body: Record<string, unknown> }>(`${base}/2`, async (request, reply) => {
     const state = stateFor(request.sid);
     const result = validateStep2(request.body);
     if (!result.data) {
@@ -146,16 +154,19 @@ export async function buildWizardApp(options: { logger?: boolean } = {}): Promis
           ...(Number.isFinite(parsedTeamSize) ? { teamSize: parsedTeamSize } : {}),
         },
       };
-      return reply.code(400).type("text/html").send(step2Page(draft, result.errors));
+      return reply
+        .code(400)
+        .type("text/html")
+        .send(step2Page(draft, result.errors, variant));
     }
     state.data = { ...state.data, ...result.data };
     state.step = 3;
-    return reply.code(303).redirect("/step/3");
+    return reply.code(303).redirect(`${base}/3`);
   });
 
-  app.post("/submit", async (request, reply) => {
+  app.post(submitPath, async (request, reply) => {
     const state = stateFor(request.sid);
-    if (state.step !== 3) return reply.code(303).redirect(`/step/${state.step}`);
+    if (state.step !== 3) return reply.code(303).redirect(`${base}/${state.step}`);
 
     const fields: Record<string, string> = {};
     let attachment: { filename: string; size: number } | undefined;
@@ -173,14 +184,14 @@ export async function buildWizardApp(options: { logger?: boolean } = {}): Promis
       return reply
         .code(413)
         .type("text/html")
-        .send(step3Page(state, { attachment: "Attachment must be 1 MB or smaller" }));
+        .send(step3Page(state, { attachment: "Attachment must be 1 MB or smaller" }, variant));
     }
 
     if (!attachment) {
       return reply
         .code(400)
         .type("text/html")
-        .send(step3Page(state, { attachment: "Attach a PDF, TXT or PNG file" }));
+        .send(step3Page(state, { attachment: "Attach a PDF, TXT or PNG file" }, variant));
     }
 
     const problem = fileError(attachment.filename, attachment.size);
@@ -188,14 +199,14 @@ export async function buildWizardApp(options: { logger?: boolean } = {}): Promis
       return reply
         .code(400)
         .type("text/html")
-        .send(step3Page(state, { attachment: problem }));
+        .send(step3Page(state, { attachment: problem }, variant));
     }
 
     if (fields.terms !== "on" && fields.terms !== "true") {
       return reply
         .code(400)
         .type("text/html")
-        .send(step3Page(state, { terms: "Confirm the details above are correct" }));
+        .send(step3Page(state, { terms: "Confirm the details above are correct" }, variant));
     }
 
     const submission: Submission = {
@@ -218,7 +229,7 @@ export async function buildWizardApp(options: { logger?: boolean } = {}): Promis
     if (!submission || submission.sid !== request.sid) {
       return reply.code(404).type("text/html").send(errorPage("Submission not found"));
     }
-    return reply.type("text/html").send(donePage(submission));
+    return reply.type("text/html").send(donePage(submission, variant));
   });
 
   app.get("/api/state", async (request) => {

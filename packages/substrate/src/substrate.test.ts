@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { findChrome } from "./chrome.js";
 import { PlaywrightEngine } from "./playwright-engine.js";
+import type { BlockedRequest } from "./policy.js";
 import type { RefMap } from "./refs.js";
 import { Substrate } from "./substrate.js";
 
@@ -216,6 +217,31 @@ describe.skipIf(!ENABLED)("substrate act", () => {
     );
     expect(result.delta.navigation).toBe(true);
     expect(result.delta.entries).toEqual([]);
+  });
+
+  it("blocks an off-allowlist fetch and records it", async () => {
+    const { engine } = current();
+    const events: BlockedRequest[] = [];
+    const guarded = new Substrate(engine, {
+      policy: { site: "test", allow: ["127.0.0.1"] },
+      onBlocked: (event) => events.push(event),
+    });
+
+    await engine.navigate(`${baseUrl}/`);
+
+    await expect(guarded.fetch({ method: "GET", url: `${baseUrl}/api` })).resolves.toMatchObject({
+      status: 200,
+    });
+    await expect(
+      guarded.fetch({ method: "POST", url: "https://example.com/collect" }),
+    ).rejects.toThrow(/egress blocked/);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      url: "https://example.com/collect",
+      method: "POST",
+      reason: "not_allowed",
+    });
   });
 
   it("reports a stale ref after a navigation", async () => {

@@ -26,6 +26,13 @@ describe("map store", () => {
     expect(maps.getVersion("store", 99)).toBeUndefined();
   });
 
+  it("refuses a site name that escapes the maps directory", () => {
+    expect(maps.get("../maps/store")).toBeUndefined();
+    expect(maps.get("..")).toBeUndefined();
+    expect(maps.latestVersion("../maps/store")).toBeUndefined();
+    expect(maps.getVersion("../maps/store", 1)).toBeUndefined();
+  });
+
   it("renders a compact map", () => {
     const map = maps.get("store");
     if (map === undefined) throw new Error("the store map is missing");

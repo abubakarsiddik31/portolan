@@ -94,6 +94,22 @@ export async function runWrite(input: WriteSafetyInput): Promise<WriteSafetyResu
   if (idempotencyKey !== undefined) {
     const existing = ledger.get(idempotencyKey);
 
+    // A key identifies one write. Reusing it for another site or op would
+    // replay a result the caller never asked for, so refuse the collision
+    // instead of returning the wrong answer.
+    if (existing !== undefined && (existing.site !== map.site || existing.op !== op.name)) {
+      return {
+        ok: false,
+        code: "invalid_params",
+        message: `idempotency key "${idempotencyKey}" was used for ${existing.site}.${existing.op}`,
+        details: {
+          idempotency_key_reused: true,
+          site: existing.site,
+          op: existing.op,
+        },
+      };
+    }
+
     if (existing?.status === "done") {
       return { ok: true, result: existing.result, replayed: true };
     }

@@ -30,6 +30,13 @@ export type SiteSummary = {
  * `getVersion` is what a call resolves against. A missing file returns
  * undefined rather than throwing; the caller turns that into `map_not_found`.
  */
+const SAFE_SITE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/** A site name is a directory name; it may not escape the maps directory. */
+function safeSite(site: string): boolean {
+  return SAFE_SITE.test(site) && !site.includes("..");
+}
+
 export class MapStore {
   constructor(private readonly directory: string) {}
 
@@ -70,6 +77,8 @@ export class MapStore {
   }
 
   getVersion(site: string, version: number): SiteMap | undefined {
+    if (!safeSite(site)) return undefined;
+
     try {
       return parseMap(readFileSync(join(this.directory, site, `v${version}.json`), "utf8"));
     } catch (error) {
@@ -79,6 +88,8 @@ export class MapStore {
   }
 
   latestVersion(site: string): number | undefined {
+    if (!safeSite(site)) return undefined;
+
     let files: string[];
 
     try {

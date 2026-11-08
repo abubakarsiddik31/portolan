@@ -120,6 +120,24 @@ export class Substrate {
     return { snapshot: this.last, refs: this.current };
   }
 
+  /** Read the page, or one ref's accessible text. */
+  async read(ref?: string): Promise<{ text: string }> {
+    const view = this.state() ?? (await this.view());
+
+    if (ref === undefined) {
+      const parts = view.snapshot.nodes
+        .filter((node) => node.visible && node.name.length > 0)
+        .map((node) => node.name);
+      return { text: parts.join("\n") };
+    }
+
+    const entry = view.refs.byRef.get(ref);
+    if (entry === undefined) return { text: "" };
+
+    const node = view.snapshot.nodes.find((candidate) => candidate.nodeId === entry.nodeId);
+    return { text: node?.name ?? "" };
+  }
+
   async act(request: ActRequest): Promise<ActResult> {
     const before = this.last;
     const beforeRefs = this.current;

@@ -5,17 +5,20 @@ import {
   type ErrorCode,
   type OpDef,
   type ProtocolError,
+  type SessionRecord,
   type SiteMap,
   toolName,
   validateJsonSchema,
 } from "@portolan/protocol";
 import {
+  FallbackScopes,
   MemoryWriteLedger,
   runWrite,
   type WriteExecution,
   type WriteFailureCode,
   type WriteLedger,
 } from "@portolan/runtime";
+import { rankAffordances, renderAffordances, type Substrate } from "@portolan/substrate";
 import { z } from "zod";
 
 import { notReadyExecutor, type OpAudit, type OpExecutor } from "./executor.js";
@@ -31,7 +34,13 @@ export type McpDeps = {
   toolBudget?: number;
   /** Idempotency ledger. Defaults to an in-memory ledger per server. */
   ledger?: WriteLedger;
+  /** Fallback scopes. Defaults to a per-server registry. */
+  scopes?: FallbackScopes;
+  /** Creates the substrate used by view, act, and read. */
+  substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
 };
+
+export type FallbackSubstrate = Pick<Substrate, "view" | "act" | "state" | "read">;
 
 export type CallInput = {
   op: string;
@@ -51,6 +60,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
   const server = new McpServer({ name: "portolan", version: "0.0.1" });
   const executor = deps.executor ?? notReadyExecutor;
   const ledger = deps.ledger ?? new MemoryWriteLedger();
+  const scopes = deps.scopes ?? new FallbackScopes();
   const budget = deps.toolBudget ?? 30;
   let currentSid: string | undefined;
   let nativeTools: RegisteredTool[] = [];
@@ -92,6 +102,17 @@ export function createMcpServer(deps: McpDeps): McpServer {
 
     deps.sessions.touch(session.sid);
 
+    if (opDef.effect !== "read") {
+      const open = scopes.blocksWrite(session.sid);
+      if (open !== undefined) {
+        return failure(
+          "precondition_failed",
+          `a fallback write scope is open for "${open.intent}"`,
+          { scope_id: open.id, intent: open.intent },
+        );
+      }
+    }
+
     let auditInfo: OpAudit | undefined;
 
     const runExecutor = (
@@ -116,9 +137,35 @@ export function createMcpServer(deps: McpDeps): McpServer {
       });
 
     if (opDef.effect === "read") {
-      return text(
-        JSON.stringify(await runExecutor(opDef, params, input.confirm, input.idempotency_key)),
-      );
+      const envelope = await runExecutor(opDef, params, input.confirm, input.idempotency_key);
+
+      if (
+        !envelope.ok &&
+        (envelope.error.code === "op_broken" || envelope.error.code === "precondition_failed")
+      ) {
+        const scope = scopes.begin({
+          sid: session.sid,
+          intent: `${opDef.summary} ${JSON.stringify(params)}`,
+          effect: opDef.effect,
+        });
+
+        return text(
+          JSON.stringify({
+            ...envelope,
+            error: {
+              ...envelope.error,
+              details: {
+                ...envelope.error.details,
+                scope_id: scope.id,
+                allowed: scope.allowed,
+                expires: scope.expiresAt,
+              },
+            },
+          }),
+        );
+      }
+
+      return text(JSON.stringify(envelope));
     }
 
     const safety = await runWrite({
@@ -146,6 +193,15 @@ export function createMcpServer(deps: McpDeps): McpServer {
             },
     });
 
+    const scope =
+      !safety.ok && (safety.code === "op_broken" || safety.code === "precondition_failed")
+        ? scopes.begin({
+            sid: session.sid,
+            intent: `${opDef.summary} ${JSON.stringify(params)}`,
+            effect: opDef.effect,
+          })
+        : undefined;
+
     deps.sessions.recordAudit({
       id: randomUUID(),
       sid: session.sid,
@@ -171,11 +227,34 @@ export function createMcpServer(deps: McpDeps): McpServer {
               error: {
                 code: safety.code,
                 message: safety.message,
-                ...(safety.details !== undefined ? { details: safety.details } : {}),
+                ...(safety.details !== undefined || scope !== undefined
+                  ? {
+                      details: {
+                        ...safety.details,
+                        ...(scope !== undefined
+                          ? {
+                              scope_id: scope.id,
+                              allowed: scope.allowed,
+                              expires: scope.expiresAt,
+                            }
+                          : {}),
+                      },
+                    }
+                  : {}),
               },
             },
       ),
     );
+  }
+
+  async function substrateFor(): Promise<FallbackSubstrate | undefined> {
+    if (currentSid === undefined) return undefined;
+
+    const session = deps.sessions.get(currentSid);
+    if (session === undefined || session.closed_at !== undefined) return undefined;
+    if (deps.substrateFactory === undefined) return undefined;
+
+    return deps.substrateFactory(session);
   }
 
   function clearNativeTools(): void {
@@ -271,6 +350,151 @@ export function createMcpServer(deps: McpDeps): McpServer {
       },
     },
     async (input) => callOp(input),
+  );
+
+  server.registerTool(
+    "fallback_begin",
+    {
+      description: "Open a fallback scope to finish an intent with view, act, and read.",
+      inputSchema: {
+        intent: z.string().min(1),
+        effect: z.enum(["read", "write", "irreversible"]).optional(),
+      },
+    },
+    async ({ intent, effect }) => {
+      if (currentSid === undefined) {
+        return failure("session_not_found", "call open_site first");
+      }
+
+      const session = deps.sessions.get(currentSid);
+      if (session === undefined || session.closed_at !== undefined) {
+        currentSid = undefined;
+        return failure("session_not_found", "the open session is closed");
+      }
+
+      const scope = scopes.begin({
+        sid: session.sid,
+        intent,
+        effect: effect ?? "write",
+      });
+
+      return text(
+        JSON.stringify({
+          scope_id: scope.id,
+          intent: scope.intent,
+          effect: scope.effect,
+          allowed: scope.allowed,
+          expires: scope.expiresAt,
+        }),
+      );
+    },
+  );
+
+  server.registerTool(
+    "view",
+    {
+      description: "Show the current affordances inside a fallback scope.",
+      inputSchema: {},
+    },
+    async () => {
+      const substrate = await substrateFor();
+      if (substrate === undefined) {
+        return failure("op_broken", "fallback substrate is not available");
+      }
+
+      const { snapshot, refs } = await substrate.view();
+      const ranked = rankAffordances(snapshot.nodes, { refs });
+      const rendered = renderAffordances(ranked.affordances);
+
+      return text(
+        JSON.stringify({
+          url: snapshot.url,
+          doc: snapshot.doc,
+          v: snapshot.v,
+          affordances: ranked.affordances.map((affordance) => ({
+            ref: affordance.ref,
+            role: affordance.role,
+            name: affordance.name,
+            ctx: affordance.ctx,
+          })),
+          text: rendered.text,
+          omitted: ranked.omitted,
+        }),
+      );
+    },
+  );
+
+  server.registerTool(
+    "act",
+    {
+      description: "Act on a ref inside a fallback scope.",
+      inputSchema: {
+        ref: z.string().min(1),
+        do: z.enum(["click", "check", "uncheck", "fill", "select", "press"]),
+        value: z.string().optional(),
+        key: z.string().optional(),
+        files: z.array(z.string()).optional(),
+      },
+    },
+    async (input) => {
+      const substrate = await substrateFor();
+      if (substrate === undefined) {
+        return failure("op_broken", "fallback substrate is not available");
+      }
+      if (input.files !== undefined) {
+        return failure("op_broken", "file uploads are not supported by fallback act yet");
+      }
+
+      const result = await substrate.act({
+        ref: input.ref,
+        do: input.do,
+        value: input.value,
+        key: input.key,
+      });
+
+      return text(JSON.stringify(result));
+    },
+  );
+
+  server.registerTool(
+    "read",
+    {
+      description: "Read the page or one ref inside a fallback scope.",
+      inputSchema: { ref: z.string().optional() },
+    },
+    async ({ ref }) => {
+      const substrate = await substrateFor();
+      if (substrate === undefined) {
+        return failure("op_broken", "fallback substrate is not available");
+      }
+
+      return text(JSON.stringify(await substrate.read(ref)));
+    },
+  );
+
+  server.registerTool(
+    "fallback_done",
+    {
+      description: "Close a fallback scope.",
+      inputSchema: {
+        scope_id: z.string().min(1),
+        result: z.unknown().optional(),
+      },
+    },
+    async ({ scope_id, result }) => {
+      const closed = scopes.close(scope_id, result);
+      if (closed === undefined) {
+        return failure("op_broken", `no open scope "${scope_id}"`);
+      }
+
+      return text(
+        JSON.stringify({
+          scope_id,
+          closed: true,
+          intent: closed.intent,
+        }),
+      );
+    },
   );
 
   return server;

@@ -150,7 +150,16 @@ describe("server", () => {
       await client.connect(transport);
       const tools = await client.listTools();
 
-      expect(tools.tools.map((tool) => tool.name)).toEqual(["list_sites", "open_site", "call"]);
+      expect(tools.tools.map((tool) => tool.name)).toEqual([
+        "list_sites",
+        "open_site",
+        "call",
+        "fallback_begin",
+        "view",
+        "act",
+        "read",
+        "fallback_done",
+      ]);
     } finally {
       await client.close();
       await http.close();

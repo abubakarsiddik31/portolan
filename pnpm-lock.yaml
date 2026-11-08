@@ -114,6 +114,9 @@ importers:
       '@portolan/runtime':
         specifier: workspace:*
         version: link:../runtime
+      '@portolan/substrate':
+        specifier: workspace:*
+        version: link:../substrate
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3

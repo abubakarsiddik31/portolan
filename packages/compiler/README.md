@@ -112,6 +112,23 @@ route and extractor. The store search lifts to `/search?q={query}` and the
 portal filter to `/?status={status}`; both are run with a new param in the
 bench test, not just compared as strings.
 
+## HTTP lift
+
+`liftHttp({ segment, returns, outcomeCheck })` rebuilds the non-GET requests
+the trace captured:
+
+- **Every 2xx write request** becomes a step with the same method, path, and
+  body.
+- **A bound param's value** becomes `{name}` in the URL and body.
+- **A value from an earlier response that appears in a later request** becomes
+  a `bind`, so a token or id can reach the next step.
+
+`withHttpLift(op, lift, returns, outcomeCheck)` replaces the op's `http` impl
+and records the check. The store add-to-cart lifts to
+`POST /api/cart/items` with `view_cart` as `outcome_check`. The bench test
+sends the request, loses the response, reconciles with `view_cart`, and
+asserts the cart still has one item and the executor ran once.
+
 ## Local models
 
 The repair role is provider-agnostic. Any OpenAI-compatible endpoint works:

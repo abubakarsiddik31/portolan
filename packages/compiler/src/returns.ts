@@ -10,7 +10,7 @@ import type { SemanticNode, Snapshot, SubstrateView } from "@portolan/substrate"
 import { z } from "zod";
 
 export type InferredReturns = {
-  kind: "rows" | "fields" | "none";
+  kind: "rows" | "fields" | "json" | "none";
   extractor: Extractor;
   value: unknown;
   schema: JsonSchema;
@@ -345,6 +345,16 @@ function descendants(snapshot: Snapshot, root: SemanticNode, includeRoot = false
   if (includeRoot) ids.add(root.nodeId);
 
   return snapshot.nodes.filter((node) => ids.has(node.nodeId));
+}
+
+/** A returns inference from a JSON response body, for the http tier. */
+export function inferJsonReturns(body: unknown): InferredReturns {
+  return {
+    kind: "json",
+    extractor: { kind: "json", path: "" },
+    value: body,
+    schema: inferSchema(body),
+  };
 }
 
 export function inferSchema(value: unknown): JsonSchema {

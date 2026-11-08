@@ -157,6 +157,38 @@ describe("server", () => {
     }
   });
 
+  it("lists the audit log for a session", async () => {
+    const created = await app.inject({ method: "POST", url: "/v1/sessions" });
+    const { sid } = created.json().result;
+
+    store.recordAudit({
+      id: "a1",
+      sid,
+      site: "store",
+      op: "checkout",
+      effect: "irreversible",
+      params: {},
+      outcome: "done",
+      created_at: "2026-11-08T00:00:00Z",
+    });
+
+    const response = await app.inject({ method: "GET", url: `/v1/sessions/${sid}/audit` });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().result).toHaveLength(1);
+    expect(response.json().result[0]).toMatchObject({ op: "checkout", outcome: "done" });
+  });
+
+  it("returns session_not_found for an unknown audit session", async () => {
+    const response = await app.inject({ method: "GET", url: "/v1/sessions/nope/audit" });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      ok: false,
+      error: { code: "session_not_found" },
+    });
+  });
+
   it("returns invalid_request for an unknown route", async () => {
     const response = await app.inject({ method: "GET", url: "/nope" });
 

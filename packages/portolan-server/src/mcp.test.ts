@@ -25,6 +25,12 @@ describe("mcp surface", () => {
 
   const executor: OpExecutor = async (input) => {
     calls.push(input);
+    input.audit?.({
+      tier: "ui",
+      beforeState: "cart",
+      afterState: "order",
+      requests: [{ method: "POST", url: "/api/checkout", status: 200 }],
+    });
     return { ok: true, result: { op: input.op.name, params: input.params } };
   };
 
@@ -257,10 +263,11 @@ describe("mcp surface", () => {
     const extra = await connect({ executor: failing });
 
     try {
-      await extra.client.callTool({
+      const opened = await extra.client.callTool({
         name: "open_site",
         arguments: { site: "store" },
       });
+      const { sid } = JSON.parse(textOf(opened)) as { sid: string };
 
       const result = await extra.client.callTool({
         name: "call",
@@ -271,10 +278,37 @@ describe("mcp surface", () => {
         ok: false,
         error: { code: "unknown_outcome" },
       });
+      expect(sessions.listAudit(sid)).toMatchObject([{ op: "checkout", outcome: "unknown" }]);
     } finally {
       await extra.client.close();
       await extra.server.close();
     }
+  });
+
+  it("records an audit entry for a write", async () => {
+    const opened = (await call("open_site", { site: "store" })) as { sid: string };
+
+    await call("call", {
+      op: "checkout",
+      confirm: true,
+      idempotency_key: "order-1",
+      params: checkoutParams(),
+    });
+
+    const entries = sessions.listAudit(opened.sid);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      op: "checkout",
+      effect: "irreversible",
+      tier: "ui",
+      before_state: "cart",
+      after_state: "order",
+      outcome: "done",
+      idempotency_key: "order-1",
+      params: checkoutParams(),
+      requests: [{ method: "POST", url: "/api/checkout", status: 200 }],
+    });
   });
 
   it("caps native tools at the budget and keeps call working", async () => {

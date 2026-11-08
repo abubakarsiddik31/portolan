@@ -76,6 +76,16 @@ export function createServer(options: ServerOptions): FastifyInstance {
     return { ok: true, result: record };
   });
 
+  app.get<{ Params: { sid: string } }>("/v1/sessions/:sid/audit", async (request, reply) => {
+    const record = options.store.get(request.params.sid);
+    if (record === undefined) {
+      reply.code(404).send(sessionNotFound(request.params.sid));
+      return;
+    }
+
+    return { ok: true, result: options.store.listAudit(request.params.sid) };
+  });
+
   app.delete<{ Params: { sid: string } }>("/v1/sessions/:sid", async (request, reply) => {
     const { sid } = request.params;
     if (!options.store.close(sid)) {

@@ -19,6 +19,7 @@ DATABASE_PATH=portolan.db PORT=4200 pnpm --filter @portolan/server start
 | `GET` | `/v1/health` | `{ ok: true, result: { status: "ok" } }` |
 | `POST` | `/v1/sessions` | `201 { ok: true, result: { sid, site?, profile?, created_at, last_used_at } }` |
 | `GET` | `/v1/sessions/:sid` | the record, including `closed_at` after close |
+| `GET` | `/v1/sessions/:sid/audit` | the write audit entries for the session |
 | `DELETE` | `/v1/sessions/:sid` | `{ ok: true, result: { sid, closed: true } }` |
 
 Every response, including errors, uses the protocol envelope:
@@ -50,7 +51,9 @@ After `open_site`, the site's ops also appear as native tools (`store__search`, 
 
 The op executor is injected. Until T2.17–T2.21 it is `notReadyExecutor`, which returns `op_broken` with `details.stage = "executor"` — the call reached the runtime, but no op ran.
 
-Writes go through `@portolan/runtime`'s `runWrite`: irreversible ops need `confirm: true`, an idempotency key replays a completed result, and a write that fails after dispatch returns `unknown_outcome` instead of retrying. The ledger is in memory per server for now; the audit work makes it durable.
+Writes go through `@portolan/runtime`'s `runWrite`: irreversible ops need `confirm: true`, an idempotency key replays a completed result, and a write that fails after dispatch returns `unknown_outcome` instead of retrying. The ledger is in memory per server for now.
+
+Every write is also recorded in SQLite: params, effect, outcome, idempotency key, and — when the executor reports them — tier, before/after state, and the network requests. `GET /v1/sessions/:sid/audit` returns them.
 
 ## Notes
 

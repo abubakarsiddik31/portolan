@@ -53,3 +53,31 @@ export const sessionRecordSchema = z.object({
 });
 
 export type SessionRecord = z.infer<typeof sessionRecordSchema>;
+
+/** A network request recorded with an audited write. */
+export const auditRequestSchema = z.object({
+  method: z.string().min(1),
+  url: z.string().min(1),
+  status: z.number().int().optional(),
+});
+
+export type AuditRequest = z.infer<typeof auditRequestSchema>;
+
+/** One audited write: what was called, how, and what happened. */
+export const auditRecordSchema = z.object({
+  id: z.string().min(1),
+  sid: z.string().min(1),
+  site: z.string().min(1),
+  op: z.string().min(1),
+  effect: z.enum(["read", "write", "irreversible"]),
+  tier: z.enum(["webmcp", "url", "http", "ui"]).optional(),
+  params: z.record(z.string(), z.unknown()),
+  idempotency_key: z.string().min(1).optional(),
+  before_state: z.string().min(1).optional(),
+  after_state: z.string().min(1).optional(),
+  outcome: z.enum(["done", "not_done", "unknown"]),
+  requests: z.array(auditRequestSchema).optional(),
+  created_at: z.string().min(1),
+});
+
+export type AuditRecord = z.infer<typeof auditRecordSchema>;

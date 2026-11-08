@@ -579,7 +579,10 @@ export class PlaywrightEngine implements Engine {
 
     await navigated;
     await this.page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => {});
-    await this.page.waitForLoadState("networkidle", { timeout: 1_000 }).catch(() => {});
+    // Do not wait for networkidle here: Playwright defines it as 500ms of
+    // quiet, which adds half a second to every click even when the next
+    // state is already rendered. `dispatch` awaits the requests it captured,
+    // and an op that needs a later state declares `await_state`.
   }
 
   private async contains(target: number, candidate: number): Promise<boolean> {

@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-11-08T23:18:39.259Z",
+  "samples": [
+    {
+      "site": "store",
+      "op": "search",
+      "tier": "url",
+      "runs": 10,
+      "p50": 8.4,
+      "p95": 9.9,
+      "max": 9.859249999999975,
+      "ok": true
+    },
+    {
+      "site": "store",
+      "op": "get_product",
+      "tier": "url",
+      "runs": 10,
+      "p50": 8.5,
+      "p95": 11.1,
+      "max": 11.137083000000075,
+      "ok": true
+    },
+    {
+      "site": "store",
+      "op": "list_products_api",
+      "tier": "http",
+      "runs": 10,
+      "p50": 1,
+      "p95": 1.8,
+      "max": 1.834292000000005,
+      "ok": true
+    },
+    {
+      "site": "store",
+      "op": "get_product_api",
+      "tier": "http",
+      "runs": 10,
+      "p50": 1.8,
+      "p95": 2.1,
+      "max": 2.1302500000000464,
+      "ok": true
+    },
+    {
+      "site": "store",
+      "op": "add_to_cart",
+      "tier": "ui",
+      "runs": 10,
+      "p50": 25.4,
+      "p95": 27.1,
+      "max": 27.135582999999997,
+      "ok": true
+    }
+  ]
+}

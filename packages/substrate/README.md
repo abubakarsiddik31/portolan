@@ -113,6 +113,23 @@ later. This is what makes a trace usable for lifting an `http` op: the
 request body is the template, and the response body is what `returns` can be
 inferred from.
 
+## Egress policy
+
+`loadPolicy(site)` reads `policies/<site>.json`. Pass it to the substrate:
+
+```ts
+const substrate = new Substrate(engine, {
+  policy: loadPolicy("store"),
+  onBlocked: (event) => log.warn(event),
+});
+```
+
+The guard is default-deny. `fetch` (the in-page `http` tier and fallback) and
+`goto` (the `url` tier) are checked before they reach the page. A blocked
+request throws `EgressBlockedError`, is kept in `blockedRequests()`, and is
+passed to `onBlocked`. A page's own navigation is not intercepted by this
+layer.
+
 ## Not here yet
 
 This package is the transport, the capture, the addressing layer, and the

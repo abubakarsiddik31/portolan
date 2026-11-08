@@ -1,5 +1,6 @@
 import type { Action, Effect, Engine, Snapshot } from "./engine.js";
 import { EngineError } from "./engine.js";
+import { type BlockedRequest, EgressGuard, type EgressPolicy } from "./policy.js";
 import { type RefMap, RefRegistry } from "./refs.js";
 
 export type SubstrateView = {
@@ -67,12 +68,25 @@ export type ActResult =
  * document so the caller gets effects and a small delta instead of a full
  * re-read.
  */
+export type SubstrateOptions = {
+  /** When present, `fetch` and `goto` are default-deny. */
+  policy?: EgressPolicy;
+  onBlocked?: (event: BlockedRequest) => void;
+};
+
 export class Substrate {
   private readonly registry = new RefRegistry();
+  private readonly guard: EgressGuard | undefined;
   private current: RefMap | undefined;
   private last: Snapshot | undefined;
 
-  constructor(private readonly engine: Engine) {}
+  constructor(
+    private readonly engine: Engine,
+    options: SubstrateOptions = {},
+  ) {
+    this.guard =
+      options.policy === undefined ? undefined : new EgressGuard(options.policy, options.onBlocked);
+  }
 
   async view(): Promise<SubstrateView> {
     const snapshot = await this.engine.snapshot();
@@ -85,6 +99,8 @@ export class Substrate {
 
   /** Run a fetch inside the live page, with the page's cookies and origin. */
   async fetch(request: HttpRequest): Promise<HttpResponse> {
+    this.guard?.check(absolute(request.url, this.last?.url ?? "http://localhost"), request.method);
+
     const body =
       request.body === undefined ? "undefined" : `JSON.stringify(${JSON.stringify(request.body)})`;
 
@@ -110,6 +126,7 @@ export class Substrate {
 
   /** Navigate, then capture. The `goto` substrate verb. */
   async goto(url: string): Promise<SubstrateView> {
+    this.guard?.check(url, "GET");
     await this.engine.navigate(url);
     return this.view();
   }
@@ -204,6 +221,14 @@ export class Substrate {
 
       throw error;
     }
+  }
+}
+
+function absolute(url: string, base: string): string {
+  try {
+    return new URL(url, base).toString();
+  } catch {
+    return url;
   }
 }
 

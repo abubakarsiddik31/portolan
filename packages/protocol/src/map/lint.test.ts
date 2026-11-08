@@ -155,6 +155,20 @@ describe("portable lint", () => {
     expect(lintMap(map)).toContainEqual(expect.objectContaining({ rule: "tool/name" }));
   });
 
+  it("does not warn about a missing post-check for an http op", () => {
+    const map = clone(MINIMAL);
+    opAt(map, 0).post = [];
+    opAt(map, 0).impls = [
+      {
+        tier: "http",
+        steps: [{ method: "GET", url: "/api" }],
+        extract: { kind: "json" },
+      },
+    ];
+
+    expect(lintMap(map)).toEqual([]);
+  });
+
   it("warns when an op has no post-check", () => {
     const map = clone(MINIMAL);
     opAt(map, 0).post = [];

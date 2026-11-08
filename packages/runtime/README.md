@@ -73,6 +73,23 @@ navigates, checks the postconditions, extracts, and validates.
 - The tier is read-only. A write must use `ui` or `http`, because a navigation
   has no outcome check and no confirmation step.
 
+## HTTP tier
+
+`runHttpOp({ map, op, params, substrate, baseUrl? })` runs the op's steps with
+`fetch` inside the live page, so requests use the page's cookies, origin, and
+TLS fingerprint.
+
+- `bind` captures a value from a response for a later step
+  (`"bind": { "token": "csrf" }`).
+- `fillDeep` fills `{param}` placeholders in URLs, headers, and bodies.
+- The extractor must be `json` (with an optional dot path) or `none`.
+- A non-2xx response is `op_broken` with the status and a truncated body.
+- An `http` op is verified by its status and `returns` schema, so the lint does
+  not require a DOM post-check.
+
+The fixtures have no CSRF endpoint; the parity test exercises `bind` with a
+product name returned by the first request. A CSRF token is the same mechanism.
+
 ## Not here yet
 
-The `http` tier is T2.21; write safety is T2.22–T2.24.
+Write safety is T2.22–T2.24; download capture is still open.

@@ -33,6 +33,11 @@ export function extract(extractor: Extractor, view: SubstrateView): ExtractResul
       return extractRows(extractor, view);
     case "composite":
       return extractComposite(extractor, view);
+    case "json":
+      return {
+        ok: false,
+        message: "json extractors are only valid for the http tier",
+      };
     case "download":
       return {
         ok: false,

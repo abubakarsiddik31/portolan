@@ -7,6 +7,19 @@ export type SubstrateView = {
   refs: RefMap;
 };
 
+export type HttpRequest = {
+  method: string;
+  url: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+};
+
+export type HttpResponse = {
+  status: number;
+  text: string;
+  json: unknown;
+};
+
 export type ActRequest = {
   ref: string;
   do: "click" | "check" | "uncheck" | "fill" | "select" | "press";
@@ -68,6 +81,31 @@ export class Substrate {
     this.last = snapshot;
 
     return { snapshot, refs };
+  }
+
+  /** Run a fetch inside the live page, with the page's cookies and origin. */
+  async fetch(request: HttpRequest): Promise<HttpResponse> {
+    const body =
+      request.body === undefined ? "undefined" : `JSON.stringify(${JSON.stringify(request.body)})`;
+
+    const expression = `(async () => {
+      const response = await fetch(${JSON.stringify(request.url)}, {
+        method: ${JSON.stringify(request.method)},
+        headers: ${JSON.stringify(request.headers ?? {})},
+        body: ${body},
+        credentials: "same-origin",
+      });
+      const text = await response.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = undefined;
+      }
+      return { status: response.status, text, json };
+    })()`;
+
+    return this.engine.evaluate<HttpResponse>(expression);
   }
 
   /** Navigate, then capture. The `goto` substrate verb. */

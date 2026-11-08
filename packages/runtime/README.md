@@ -103,6 +103,10 @@ product name returned by the first request. A CSRF token is the same mechanism.
 
 `MemoryWriteLedger` is the default; a durable ledger is the audit work.
 
+The bench test forces a mid-write failure on the store: the request reaches
+the server, the response is lost, `runWrite` returns `unknown_outcome`, and a
+retry with the same key creates no second order.
+
 ## Not here yet
 
 A durable write ledger and the audit log are T2.23–T2.24; download capture is

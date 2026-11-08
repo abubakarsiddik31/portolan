@@ -12,6 +12,15 @@ export default defineConfig({
       reporter: ["text", "lcov"],
       include: ["packages/*/src/**/*.ts"],
       exclude: ["**/*.test.ts", "**/dist/**"],
+      // The runtime and its write path are the safety-critical code. Other
+      // packages have their own tests but no enforced floor yet.
+      thresholds: {
+        "packages/runtime/src/**": {
+          lines: 80,
+          statements: 80,
+          functions: 80,
+        },
+      },
     },
   },
 });

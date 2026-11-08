@@ -1,7 +1,8 @@
 {
   "name": "@portolan/server",
   "version": "0.0.0",
-  "private": true,
+  "description": "HTTP and MCP server for Portolan maps.",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,6 +15,22 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abubakarsiddik31/portolan.git",
+    "directory": "packages/portolan-server"
+  },
+  "homepage": "https://github.com/abubakarsiddik31/portolan#readme",
+  "bugs": {
+    "url": "https://github.com/abubakarsiddik31/portolan/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsc -b",
     "start": "node dist/start.js",

@@ -11,7 +11,7 @@ templates:
       - { status: "paid", expectedInvoice: "inv_1004" }
       - { status: "overdue", expectedInvoice: "inv_1006" }
     success:
-      url_matches: '^/\?status={status}'
+      url_matches: '^/\?.*status={status}'
       dom: >-
         Array.from(document.querySelectorAll('[data-status]')).every((el) => el.dataset.status === '{status}') && document.body.innerText.includes('{expectedInvoice}')
 

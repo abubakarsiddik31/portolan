@@ -1,0 +1,27 @@
+{
+  "name": "@portolan/model",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "4.0.99",
+    "@ai-sdk/openai": "4.0.111",
+    "@ai-sdk/openai-compatible": "3.0.87",
+    "ai": "7.0.165",
+    "zod": "4.6.7"
+  }
+}

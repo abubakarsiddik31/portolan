@@ -1,0 +1,166 @@
+site: wizard
+templates:
+  - id: wizard-apply-basic
+    goal: "Complete the application for {name} at {company} with team size {teamSize}, then upload {fileName}."
+    start: /step/1
+    max_steps: 20
+    params:
+      - {
+          name: "Ada Lovelace",
+          email: "ada@example.com",
+          company: "Analytical Engines",
+          role: "Engineer",
+          teamSize: "12",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Grace Hopper",
+          email: "grace@example.com",
+          company: "Compiler Works",
+          role: "Engineer",
+          teamSize: "40",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Katherine Johnson",
+          email: "katherine@example.com",
+          company: "Orbital Maths",
+          role: "Operations",
+          teamSize: "8",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Alan Turing",
+          email: "alan@example.com",
+          company: "Bletchley Labs",
+          role: "Product manager",
+          teamSize: "25",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Margaret Hamilton",
+          email: "margaret@example.com",
+          company: "Apollo Systems",
+          role: "Designer",
+          teamSize: "60",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+    success:
+      url_matches: '^/done/sub_\d+$'
+      dom: >-
+        !!document.querySelector('[data-submission-id]')
+
+  - id: wizard-validation-recovery
+    goal: "Start the application for {name}, submit an invalid email once, correct it to {email}, and finish with {fileName}."
+    start: /step/1
+    max_steps: 25
+    params:
+      - {
+          name: "Ada Lovelace",
+          email: "ada@example.com",
+          company: "Analytical Engines",
+          role: "Engineer",
+          teamSize: "12",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Grace Hopper",
+          email: "grace@example.com",
+          company: "Compiler Works",
+          role: "Engineer",
+          teamSize: "40",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Katherine Johnson",
+          email: "katherine@example.com",
+          company: "Orbital Maths",
+          role: "Operations",
+          teamSize: "8",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Alan Turing",
+          email: "alan@example.com",
+          company: "Bletchley Labs",
+          role: "Product manager",
+          teamSize: "25",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Margaret Hamilton",
+          email: "margaret@example.com",
+          company: "Apollo Systems",
+          role: "Designer",
+          teamSize: "60",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+    success:
+      url_matches: '^/done/sub_\d+$'
+      dom: >-
+        !!document.querySelector('[data-submission-id]')
+
+  - id: wizard-upload
+    goal: "Submit an application for {name} with the attachment {fileName} and confirm the file name appears on the receipt."
+    start: /step/1
+    max_steps: 20
+    params:
+      - {
+          name: "Ada Lovelace",
+          email: "ada@example.com",
+          company: "Analytical Engines",
+          role: "Engineer",
+          teamSize: "12",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Grace Hopper",
+          email: "grace@example.com",
+          company: "Compiler Works",
+          role: "Engineer",
+          teamSize: "40",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Katherine Johnson",
+          email: "katherine@example.com",
+          company: "Orbital Maths",
+          role: "Operations",
+          teamSize: "8",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Alan Turing",
+          email: "alan@example.com",
+          company: "Bletchley Labs",
+          role: "Product manager",
+          teamSize: "25",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+      - {
+          name: "Margaret Hamilton",
+          email: "margaret@example.com",
+          company: "Apollo Systems",
+          role: "Designer",
+          teamSize: "60",
+          fileName: "sample.txt",
+          file: "bench/tasks/files/sample.txt",
+        }
+    success:
+      url_matches: '^/done/sub_\d+$'
+      dom: >-
+        document.body.innerText.includes('{fileName}')

@@ -1,0 +1,46 @@
+site: portal
+templates:
+  - id: portal-filter-status
+    goal: "Sign in to the ledger and filter invoices to status {status}. Confirm only {status} invoices are visible, including {expectedInvoice}."
+    start: /login
+    max_steps: 15
+    params:
+      - { status: "paid", expectedInvoice: "inv_1001" }
+      - { status: "pending", expectedInvoice: "inv_1002" }
+      - { status: "overdue", expectedInvoice: "inv_1003" }
+      - { status: "paid", expectedInvoice: "inv_1004" }
+      - { status: "overdue", expectedInvoice: "inv_1006" }
+    success:
+      url_matches: '^/\?status={status}'
+      dom: >-
+        Array.from(document.querySelectorAll('[data-status]')).every((el) => el.dataset.status === '{status}') && document.body.innerText.includes('{expectedInvoice}')
+
+  - id: portal-paginate
+    goal: "Sign in, {filterClause}open page {page} of the invoice table. Confirm {expectedInvoice} is visible."
+    start: /login
+    max_steps: 15
+    params:
+      - { page: "2", expectedInvoice: "inv_1011", filterClause: "" }
+      - { page: "3", expectedInvoice: "inv_1021", filterClause: "" }
+      - { page: "4", expectedInvoice: "inv_1031", filterClause: "" }
+      - { page: "5", expectedInvoice: "inv_1041", filterClause: "" }
+      - { page: "2", expectedInvoice: "inv_1031", filterClause: "filter to paid, then " }
+    success:
+      url_matches: '^/\?.*page={page}'
+      dom: >-
+        document.querySelector('[data-testid="invoice-table"]')?.innerText.includes('{expectedInvoice}')
+
+  - id: portal-export
+    goal: "Sign in, filter invoices to status {status}, and export the result as a CSV file containing {expectedInvoice}."
+    start: /login
+    max_steps: 15
+    params:
+      - { status: "paid", expectedInvoice: "inv_1001" }
+      - { status: "pending", expectedInvoice: "inv_1002" }
+      - { status: "overdue", expectedInvoice: "inv_1003" }
+      - { status: "paid", expectedInvoice: "inv_1004" }
+      - { status: "overdue", expectedInvoice: "inv_1006" }
+    success:
+      download:
+        filename_matches: "invoices.csv"
+        contains: "{expectedInvoice}"

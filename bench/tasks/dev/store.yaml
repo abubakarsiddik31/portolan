@@ -1,0 +1,48 @@
+site: store
+templates:
+  - id: store-buy-variant
+    goal: "Buy one {product} in size {size} and color {color}, then reach the order confirmation."
+    start: /
+    max_steps: 25
+    params:
+      - { product: "Everyday Tee", size: "M", color: "Blue" }
+      - { product: "Everyday Tee", size: "L", color: "Black" }
+      - { product: "Canvas Tote", size: "One Size", color: "Natural" }
+      - { product: "Merino Socks", size: "S", color: "Charcoal" }
+      - { product: "Camp Mug", size: "One Size", color: "Enamel" }
+    success:
+      url_matches: '^/orders/ord_\d+$'
+      dom: >-
+        !!document.querySelector('[data-order-id]')
+      extracted:
+        order_id: "[data-order-id]"
+
+  - id: store-search-read
+    goal: "Search the catalog for {query} and open the {product} product page."
+    start: /
+    max_steps: 15
+    params:
+      - { query: "socks", product: "Merino Socks" }
+      - { query: "jacket", product: "Field Jacket" }
+      - { query: "mug", product: "Camp Mug" }
+      - { query: "cap", product: "Trail Cap" }
+      - { query: "tote", product: "Canvas Tote" }
+    success:
+      url_matches: '^/p/p_\d+$'
+      dom: >-
+        document.body.innerText.includes('{product}')
+
+  - id: store-cart-update
+    goal: "Add {qty} of {product} in size {size} and color {color} to the cart, then confirm the subtotal is {subtotal}."
+    start: /
+    max_steps: 20
+    params:
+      - { qty: "2", product: "Everyday Tee", size: "M", color: "Blue", subtotal: "$48.00" }
+      - { qty: "3", product: "Merino Socks", size: "S", color: "Charcoal", subtotal: "$48.00" }
+      - { qty: "1", product: "Field Jacket", size: "L", color: "Olive", subtotal: "$128.00" }
+      - { qty: "2", product: "Camp Mug", size: "One Size", color: "Enamel", subtotal: "$28.00" }
+      - { qty: "4", product: "Canvas Tote", size: "One Size", color: "Natural", subtotal: "$72.00" }
+    success:
+      url_matches: "^/cart$"
+      dom: >-
+        document.querySelector('[data-testid="cart-subtotal"]')?.textContent?.trim() === '{subtotal}'

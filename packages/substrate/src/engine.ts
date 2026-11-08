@@ -27,6 +27,8 @@ export type SemanticNode = {
 };
 
 export type Snapshot = {
+  /** Document epoch. Increments on every committed main-frame navigation. */
+  doc: number;
   url: string;
   title: string;
   nodes: SemanticNode[];

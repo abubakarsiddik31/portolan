@@ -61,6 +61,7 @@ type CallResult = {
 
 export class PlaywrightEngine implements Engine {
   private readonly timeoutMs: number;
+  private doc = 0;
 
   private constructor(
     private readonly browser: Browser,
@@ -82,7 +83,13 @@ export class PlaywrightEngine implements Engine {
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
 
-    return new PlaywrightEngine(browser, page, cdp, options.timeoutMs ?? 30_000);
+    const engine = new PlaywrightEngine(browser, page, cdp, options.timeoutMs ?? 30_000);
+
+    page.on("framenavigated", (frame) => {
+      if (frame === page.mainFrame()) engine.doc += 1;
+    });
+
+    return engine;
   }
 
   async navigate(url: string): Promise<NavigateResult> {
@@ -118,6 +125,7 @@ export class PlaywrightEngine implements Engine {
     const layout = indexLayout(dom);
 
     return {
+      doc: this.doc,
       url: this.page.url(),
       title: await this.page.title(),
       nodes: ax.nodes.map((node) => toSemanticNode(node, layout)),

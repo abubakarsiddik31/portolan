@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { estimateTokens, rankAffordances, renderAffordances } from "./affordances.js";
 import type { Bounds, SemanticNode } from "./engine.js";
+import { buildRefMap } from "./refs.js";
 
 function rect(): Bounds {
   return { x: 0, y: 0, width: 10, height: 10 };
@@ -122,5 +123,18 @@ describe("estimateTokens", () => {
     expect(estimateTokens("abcd")).toBe(1);
     expect(estimateTokens("abcde")).toBe(2);
     expect(estimateTokens("")).toBe(0);
+  });
+});
+
+describe("refs in affordances", () => {
+  it("attaches a unique ref to every affordance", () => {
+    const refs = buildRefMap(NODES, 1);
+    const { affordances } = rankAffordances(NODES, { refs });
+
+    expect(affordances.every((affordance) => affordance.ref !== undefined)).toBe(true);
+    expect(new Set(affordances.map((affordance) => affordance.ref)).size).toBe(affordances.length);
+
+    const rendered = renderAffordances(affordances);
+    expect(rendered.text).toMatch(/^e[0-9a-z]+ button "Go"/);
   });
 });

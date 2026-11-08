@@ -7,6 +7,7 @@
     { "path": "packages/compiler" },
     { "path": "packages/runtime" },
     { "path": "packages/portolan-server" },
-    { "path": "bench" }
+    { "path": "bench" },
+    { "path": "packages/skills" }
   ]
 }

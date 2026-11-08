@@ -3,6 +3,7 @@ import { runBench } from "./commands/bench.js";
 import { runCompile } from "./commands/compile.js";
 import { runExportSkills } from "./commands/export-skills.js";
 import { runInit } from "./commands/init.js";
+import { runMcp } from "./commands/mcp.js";
 import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
 import { loadConfig } from "./config.js";
@@ -13,6 +14,7 @@ export const USAGE = `portolan <command> [options]
 Commands:
   init [dir]             write a config, a policy, and the maps/skills dirs
   serve                  start the HTTP and MCP server
+  mcp                    serve MCP over stdio (for a client to spawn)
   compile <trace...>     compile traces into a new map version
   verify                 verify a map's ops on a fresh session
   export-skills          export a portolan-<site> skill from a map
@@ -27,6 +29,7 @@ Common options:
 export type CliDeps = {
   init?: typeof runInit;
   serve?: typeof runServe;
+  mcp?: typeof runMcp;
   compile?: typeof runCompile;
   verify?: typeof runVerify;
   exportSkills?: typeof runExportSkills;
@@ -84,6 +87,13 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         });
         out(`listening on ${handle.url}`);
         installShutdown(deps.serve === undefined, handle);
+        return 0;
+      }
+
+      case "mcp": {
+        const config = loadConfig(stringFlag(args, "config"));
+        const handle = await (deps.mcp ?? runMcp)({ config });
+        installShutdown(deps.mcp === undefined, handle);
         return 0;
       }
 

@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import type { CompiledCandidate, PublishResult, VerifyReport } from "@portolan/compiler";
 import type { SiteMap } from "@portolan/protocol";
+import type { StdioServerHandle } from "@portolan/server";
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -291,6 +292,19 @@ describe("main", () => {
     const sink = capture();
     expect(await main(["init", dir, "--site", "store"], sink)).toBe(0);
     expect(existsSync(join(dir, "portolan.config.json"))).toBe(true);
+  });
+
+  it("runs mcp through the dispatcher without writing to stdout", async () => {
+    const sink = capture();
+    const handle = { close: async () => undefined } as unknown as StdioServerHandle;
+
+    expect(
+      await main(["mcp"], {
+        ...sink,
+        mcp: async () => handle,
+      }),
+    ).toBe(0);
+    expect(sink.lines).toEqual([]);
   });
 
   it("runs bench --list through the dispatcher", async () => {

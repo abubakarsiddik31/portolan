@@ -1,0 +1,167 @@
+# Install
+
+One binary serves MCP over stdio, which is the transport every client
+supports. Install it, then add it to the client.
+
+```bash
+npm install -g @portolan/cli
+portolan init ./my-site
+```
+
+`portolan mcp` speaks MCP on stdin/stdout and prints nothing else, so a client
+can spawn it directly. It reads:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MAPS_DIR` | `maps` | Directory of `maps/<site>/v<n>.json`. |
+| `DATABASE_PATH` | `portolan.db` | Session and audit database. |
+
+Set both to absolute paths in a client config: a client spawns the server from
+its own working directory, not yours.
+
+Until a release is published, replace `portolan` with `npx @portolan/cli` or the
+absolute path to `dist/bin.js`.
+
+## Claude Code
+
+```bash
+claude mcp add portolan -- portolan mcp
+```
+
+Or write `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "portolan": {
+      "command": "portolan",
+      "args": ["mcp"],
+      "env": {
+        "MAPS_DIR": "/absolute/path/to/maps",
+        "DATABASE_PATH": "/absolute/path/to/portolan.db"
+      }
+    }
+  }
+}
+```
+
+## Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` on
+macOS, or `~/.config/Claude/claude_desktop_config.json` on Linux:
+
+```json
+{
+  "mcpServers": {
+    "portolan": {
+      "command": "portolan",
+      "args": ["mcp"],
+      "env": {
+        "MAPS_DIR": "/absolute/path/to/maps",
+        "DATABASE_PATH": "/absolute/path/to/portolan.db"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop after saving.
+
+## Codex CLI
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.portolan]
+command = "portolan"
+args = ["mcp"]
+env = { MAPS_DIR = "/absolute/path/to/maps", DATABASE_PATH = "/absolute/path/to/portolan.db" }
+```
+
+## Cursor
+
+Edit `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+
+```json
+{
+  "mcpServers": {
+    "portolan": {
+      "command": "portolan",
+      "args": ["mcp"],
+      "env": {
+        "MAPS_DIR": "/absolute/path/to/maps",
+        "DATABASE_PATH": "/absolute/path/to/portolan.db"
+      }
+    }
+  }
+}
+```
+
+## Gemini CLI
+
+Edit `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "portolan": {
+      "command": "portolan",
+      "args": ["mcp"],
+      "env": {
+        "MAPS_DIR": "/absolute/path/to/maps",
+        "DATABASE_PATH": "/absolute/path/to/portolan.db"
+      },
+      "timeout": 30000
+    }
+  }
+}
+```
+
+## VS Code
+
+VS Code uses `servers` and a `type`, not `mcpServers`. Add
+`.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "portolan": {
+      "type": "stdio",
+      "command": "portolan",
+      "args": ["mcp"],
+      "env": {
+        "MAPS_DIR": "/absolute/path/to/maps",
+        "DATABASE_PATH": "/absolute/path/to/portolan.db"
+      }
+    }
+  }
+}
+```
+
+## Check the install
+
+```bash
+portolan doctor
+```
+
+`doctor` reports whether a client config mentions `portolan`, along with the
+browser, config file, and provider variables. It does not change any file.
+
+## HTTP instead of stdio
+
+`portolan serve` starts the same tools over streamable HTTP at
+`http://127.0.0.1:4200/mcp`. A client that supports HTTP can use that URL and
+skip the stdio config; the CLI commands and the server share the map store.
+
+## Honest limits
+
+- **`call` returns `op_broken`.** The MCP server's op executor is still
+  `notReadyExecutor`; the `open_site` / `view` / `act` / `read` fallback works,
+  but a named op does not execute yet.
+- **The snippets were validated, not run in each client.** The stdio command
+  they invoke is covered by a test; the client-side config files were checked
+  for shape, not exercised in Claude, Codex, Cursor, Gemini, or VS Code here.
+- **Global install is assumed.** Project-local installs need `npx` or an
+  absolute path in `command`.
+- **Windows needs `command: "npx.cmd"`** (or the `.cmd` shim) rather than
+  `npx`.

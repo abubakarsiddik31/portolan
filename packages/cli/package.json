@@ -47,6 +47,7 @@
     "@portolan/substrate": "workspace:*"
   },
   "devDependencies": {
-    "fastify": "5.12.8"
+    "fastify": "5.12.8",
+    "@modelcontextprotocol/sdk": "1.32.2"
   }
 }

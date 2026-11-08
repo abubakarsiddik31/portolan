@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+export type LogLevelName = "debug" | "info" | "warn" | "error";
+
 export type CliConfig = {
   /** The site name used by init, compile, and export-skills. */
   site: string;
@@ -16,6 +18,20 @@ export type CliConfig = {
   port: number;
   /** Optional base URL for a live site; compile and verify use it. */
   baseUrl?: string;
+  /** Optional Chrome binary; otherwise CHROME_PATH or auto-detection. */
+  chrome?: string;
+  /** Run the browser headless. */
+  headless: boolean;
+  /** Idle time after which a session is closed. */
+  sessionTtlMs: number;
+  /** Maximum open sessions. */
+  maxOpenSessions: number;
+  /** How often the expiry sweep runs. */
+  cleanupIntervalMs: number;
+  /** Close sessions left open by a previous process at startup. */
+  recoverSessions: boolean;
+  /** Structured log level. */
+  logLevel: LogLevelName;
 };
 
 export const DEFAULT_CONFIG: CliConfig = {
@@ -26,9 +42,17 @@ export const DEFAULT_CONFIG: CliConfig = {
   database: "portolan.db",
   host: "127.0.0.1",
   port: 4200,
+  headless: true,
+  sessionTtlMs: 30 * 60 * 1000,
+  maxOpenSessions: 100,
+  cleanupIntervalMs: 60_000,
+  recoverSessions: true,
+  logLevel: "info",
 };
 
 export const CONFIG_FILE = "portolan.config.json";
+
+const LOG_LEVELS: LogLevelName[] = ["debug", "info", "warn", "error"];
 
 /**
  * Read `portolan.config.json`, merged over the defaults.
@@ -70,6 +94,7 @@ export function mergeConfig(
     "database",
     "host",
     "baseUrl",
+    "chrome",
   ] as const) {
     const value = raw[key];
     if (value === undefined) continue;
@@ -79,11 +104,30 @@ export function mergeConfig(
     result[key] = value;
   }
 
-  if (raw.port !== undefined) {
-    if (typeof raw.port !== "number" || !Number.isInteger(raw.port) || raw.port < 0) {
-      throw new Error(`${source}: "port" must be a non-negative integer`);
+  for (const key of ["headless", "recoverSessions"] as const) {
+    const value = raw[key];
+    if (value === undefined) continue;
+    if (typeof value !== "boolean") {
+      throw new Error(`${source}: "${key}" must be a boolean`);
     }
-    result.port = raw.port;
+    result[key] = value;
+  }
+
+  for (const key of ["port", "sessionTtlMs", "maxOpenSessions", "cleanupIntervalMs"] as const) {
+    const value = raw[key];
+    if (value === undefined) continue;
+    const minimum = key === "port" ? 0 : 1;
+    if (typeof value !== "number" || !Number.isInteger(value) || value < minimum) {
+      throw new Error(`${source}: "${key}" must be an integer >= ${minimum}`);
+    }
+    result[key] = value;
+  }
+
+  if (raw.logLevel !== undefined) {
+    if (!LOG_LEVELS.includes(raw.logLevel as LogLevelName)) {
+      throw new Error(`${source}: "logLevel" must be one of ${LOG_LEVELS.join(", ")}`);
+    }
+    result.logLevel = raw.logLevel as LogLevelName;
   }
 
   return result;

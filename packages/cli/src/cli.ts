@@ -93,11 +93,14 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         const traces = [...args.positional, ...listFlag(args, "trace")];
         const baseUrl = stringFlag(args, "base-url") ?? config.baseUrl;
         const outcomeChecksPath = stringFlag(args, "outcome-checks");
+        const chrome = stringFlag(args, "chrome") ?? config.chrome;
         const result = await (deps.compile ?? runCompile)({
           mapPath,
           tracePaths: traces,
           ...(baseUrl !== undefined ? { baseUrl } : {}),
           ...(outcomeChecksPath !== undefined ? { outcomeChecksPath } : {}),
+          ...(chrome !== undefined ? { chrome } : {}),
+          headless: booleanFlag(args, "headed") ? false : config.headless,
         });
         out(
           `published v${result.published.version} at ${result.published.path} (${result.candidates.length} candidates)`,
@@ -112,13 +115,14 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         const config = loadConfig(stringFlag(args, "config"));
         const ops = listFlag(args, "op");
         const baseUrl = stringFlag(args, "base-url") ?? config.baseUrl;
-        const chrome = stringFlag(args, "chrome");
+        const chrome = stringFlag(args, "chrome") ?? config.chrome;
         const result = await (deps.verify ?? runVerify)({
           mapPath: required(args, "map"),
           paramsPath: required(args, "params"),
           ...(ops.length > 0 ? { ops } : {}),
           ...(baseUrl !== undefined ? { baseUrl } : {}),
           ...(chrome !== undefined ? { executablePath: chrome } : {}),
+          headless: booleanFlag(args, "headed") ? false : config.headless,
         });
         for (const report of result.reports) {
           out(

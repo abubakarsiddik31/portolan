@@ -42,7 +42,14 @@ export async function runServe(input: ServeInput, deps: ServeDeps = {}): Promise
     store,
     maps: new MapStore(maps),
     logger: true,
-    log: createLogger({ base: { service: "portolan-server" } }),
+    log: createLogger({
+      level: input.config.logLevel,
+      base: { service: "portolan-server" },
+    }),
+    sessionTtlMs: input.config.sessionTtlMs,
+    maxOpenSessions: input.config.maxOpenSessions,
+    cleanupIntervalMs: input.config.cleanupIntervalMs,
+    recoverSessions: input.config.recoverSessions,
   });
 
   await app.listen({ port, host });

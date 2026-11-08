@@ -35,7 +35,8 @@ evidence. A url op's post-state is captured from a live browser when
 
 Options: `--map <path>` (required), `--base-url <url>`,
 `--outcome-checks <json>` (op name to the read op that proves the write),
-`--trace <path>` (repeatable, instead of positionals).
+`--trace <path>` (repeatable, instead of positionals), `--chrome <path>`,
+`--headed`.
 
 ### `portolan verify`
 
@@ -43,7 +44,7 @@ Verifies a map's ops on a fresh session. Each op needs at least three param
 sets; an op without one is reported unverified, and the command exits `1`.
 
 Options: `--map <path>`, `--params <path>` (required), `--op <name>`
-(repeatable), `--base-url <url>`, `--chrome <path>`.
+(repeatable), `--base-url <url>`, `--chrome <path>`, `--headed`.
 
 The params file is a JSON object:
 
@@ -85,7 +86,10 @@ Provider values are never printed, only the provider names.
 
 ## Config
 
-`portolan.config.json`, merged over these defaults:
+`portolan.config.json`, merged over defaults. Every option is documented with
+its default in [docs/CONFIG.md](../../docs/CONFIG.md).
+
+The short version:
 
 ```json
 {
@@ -95,10 +99,15 @@ Provider values are never printed, only the provider names.
   "policies": "policies",
   "database": "portolan.db",
   "host": "127.0.0.1",
-  "port": 4200
+  "port": 4200,
+  "headless": true,
+  "sessionTtlMs": 1800000,
+  "maxOpenSessions": 100,
+  "cleanupIntervalMs": 60000,
+  "recoverSessions": true,
+  "logLevel": "info"
 }
 ```
 
-`baseUrl` is optional and used by `compile` and `verify` when the flag is not
-given. An unknown key is ignored so a newer config does not break an older
-CLI.
+`baseUrl` and `chrome` are optional. An unknown key is ignored so a newer
+config does not break an older CLI.

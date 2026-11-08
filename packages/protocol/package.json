@@ -16,5 +16,9 @@
   ],
   "scripts": {
     "build": "tsc -b"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "zod": "4.6.7"
   }
 }

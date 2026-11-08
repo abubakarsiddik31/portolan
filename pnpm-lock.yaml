@@ -66,6 +66,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@portolan/substrate':
+        specifier: workspace:*
+        version: link:../packages/substrate
       agent-browser:
         specifier: 0.41.2
         version: 0.41.2

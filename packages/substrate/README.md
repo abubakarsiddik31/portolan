@@ -40,6 +40,17 @@ tree, bounds and computed style from the DOM snapshot, joined on
 non-zero box, and is not `display: none`, `visibility: hidden`, or
 `opacity: 0`.
 
+## Affordances
+
+`rankAffordances(nodes)` filters the capture to visible, actionable,
+measurable nodes, adds the nearest named ancestor or landmark as `ctx`, and
+ranks by role weight, name presence, and document order. `renderAffordances`
+fits the list into a token budget (default 800) and reports what it dropped.
+
+The fixture tests capture every page the benchmark tasks touch — store
+catalog and product, all three wizard steps, portal login and ledger — and
+assert the required interactions are present within the budget.
+
 ## Not here yet
 
 Semantic ranking, refs, hit-testing, overlays, quiescence and effects are

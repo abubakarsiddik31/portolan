@@ -35,6 +35,8 @@ export type VerifyOptions = {
   baseUrl?: string;
   executablePath?: string;
   headless?: boolean;
+  /** Ops to run on the same fresh session before the candidate. */
+  setup?: Array<{ op: string; params: Record<string, unknown> }>;
 };
 
 const MIN_PARAM_SETS = 3;
@@ -81,6 +83,7 @@ export async function verifyOp(options: VerifyOptions): Promise<VerifyReport> {
           params,
           executablePath,
           headless: options.headless ?? true,
+          setup: options.setup ?? [],
           ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),
         }),
       );
@@ -116,6 +119,7 @@ async function runOnce(input: {
   executablePath: string;
   headless: boolean;
   baseUrl?: string;
+  setup: Array<{ op: string; params: Record<string, unknown> }>;
 }): Promise<VerifyRun> {
   const validation = validateJsonSchema(input.op.params, input.params);
   if (!validation.ok) {
@@ -134,7 +138,43 @@ async function runOnce(input: {
   try {
     const substrate = new Substrate(engine);
     const baseUrl = input.baseUrl ?? input.map.origins[0] ?? "";
-    await engine.navigate(startUrl(input.map, input.op, input.params, baseUrl));
+    const firstSetup = input.setup[0];
+    const startOp =
+      firstSetup === undefined
+        ? input.op
+        : (input.map.ops.find((candidate) => candidate.name === firstSetup.op) ?? input.op);
+    const startParams = firstSetup?.params ?? input.params;
+    await engine.navigate(startUrl(input.map, startOp, startParams, baseUrl));
+
+    for (const step of input.setup) {
+      const setupOp = input.map.ops.find((candidate) => candidate.name === step.op);
+      const setupImpl = setupOp?.impls[0];
+
+      if (setupOp === undefined || setupImpl === undefined) {
+        return {
+          params: input.params,
+          ok: false,
+          message: `setup op "${step.op}" is not in the map`,
+        };
+      }
+
+      const setupResult = await runImpl(
+        input.map,
+        setupOp,
+        setupImpl,
+        step.params,
+        substrate,
+        input.baseUrl,
+      );
+
+      if (!setupResult.ok) {
+        return {
+          params: input.params,
+          ok: false,
+          message: `setup "${step.op}" failed: ${setupResult.message}`,
+        };
+      }
+    }
 
     const result = await runImpl(
       input.map,

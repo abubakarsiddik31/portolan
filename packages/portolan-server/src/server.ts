@@ -11,7 +11,9 @@ import Fastify, {
 } from "fastify";
 import type { ZodError } from "zod";
 
+import type { CanaryScheduler } from "./canary.js";
 import { notReadyExecutor, type OpExecutor } from "./executor.js";
+import { mergeHealth } from "./health.js";
 import type { MapStore } from "./maps.js";
 import { createMcpServer } from "./mcp.js";
 import type { SessionStore } from "./store.js";
@@ -22,6 +24,8 @@ export type ServerOptions = {
   /** Enables the MCP surface at POST /mcp when present. */
   maps?: MapStore;
   executor?: OpExecutor;
+  /** Started with the server and stopped when it closes. */
+  canary?: CanaryScheduler;
 };
 
 /**
@@ -55,6 +59,26 @@ export function createServer(options: ServerOptions): FastifyInstance {
     ok: true as const,
     result: { status: "ok" },
   }));
+
+  options.canary?.start();
+  app.addHook("onClose", async () => {
+    options.canary?.stop();
+  });
+
+  app.get<{ Params: { site: string } }>("/v1/sites/:site/health", async (request, reply) => {
+    if (options.maps === undefined) {
+      reply.code(404).send(failure("invalid_request", "maps are not configured"));
+      return;
+    }
+
+    const map = options.maps.get(request.params.site);
+    if (map === undefined) {
+      reply.code(404).send(failure("map_not_found", `no map for ${request.params.site}`));
+      return;
+    }
+
+    return { ok: true, result: mergeHealth(map, options.store.listOpHealth(map.site)) };
+  });
 
   app.post("/v1/sessions", async (request, reply) => {
     const parsed = createSessionRequestSchema.safeParse(request.body ?? {});

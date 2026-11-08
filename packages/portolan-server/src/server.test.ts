@@ -32,6 +32,62 @@ describe("server", () => {
     expect(response.json()).toEqual({ ok: true, result: { status: "ok" } });
   });
 
+  it("starts and stops the canary scheduler with the server", async () => {
+    const calls: string[] = [];
+    const canary = {
+      start: () => calls.push("start"),
+      stop: () => calls.push("stop"),
+    } as unknown as import("./canary.js").CanaryScheduler;
+
+    const http = createServer({ store, canary });
+    expect(calls).toEqual(["start"]);
+
+    await http.close();
+    expect(calls).toEqual(["start", "stop"]);
+  });
+
+  it("reports per-op health for a site", async () => {
+    const http = createServer({ store, maps: new MapStore(MAPS) });
+    store.recordOpHealth({
+      site: "store",
+      op: "search",
+      map_version: 1,
+      status: "healthy",
+      checked_at: "2026-11-09T00:00:00.000Z",
+      ms: 5,
+    });
+
+    const response = await http.inject({ method: "GET", url: "/v1/sites/store/health" });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.result).toMatchObject({ site: "store", version: 1 });
+    expect(body.result.ops.find((op: { name: string }) => op.name === "search")).toMatchObject({
+      status: "healthy",
+      checked_at: "2026-11-09T00:00:00.000Z",
+      ms: 5,
+    });
+    expect(body.result.ops.find((op: { name: string }) => op.name === "get_product")).toMatchObject(
+      { status: "unknown" },
+    );
+
+    await http.close();
+  });
+
+  it("returns 404 for an unknown site's health", async () => {
+    const http = createServer({ store, maps: new MapStore(MAPS) });
+
+    const response = await http.inject({ method: "GET", url: "/v1/sites/nope/health" });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      ok: false,
+      error: { code: "map_not_found" },
+    });
+
+    await http.close();
+  });
+
   it("creates a session bound to a site", async () => {
     const response = await app.inject({
       method: "POST",

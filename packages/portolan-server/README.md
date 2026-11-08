@@ -21,6 +21,7 @@ DATABASE_PATH=portolan.db PORT=4200 pnpm --filter @portolan/server start
 | `GET` | `/v1/sessions/:sid` | the record, including `closed_at` after close |
 | `GET` | `/v1/sessions/:sid/audit` | the write audit entries for the session |
 | `DELETE` | `/v1/sessions/:sid` | `{ ok: true, result: { sid, closed: true } }` |
+| `GET` | `/v1/sites/:site/health` | per-op canary status for the latest map version |
 
 Every response, including errors, uses the protocol envelope:
 
@@ -30,6 +31,23 @@ Every response, including errors, uses the protocol envelope:
 
 Malformed JSON and schema violations are `invalid_request` with
 `details.issues`. An unknown or already-closed session is `session_not_found`.
+
+## Canary and op health
+
+`CanaryScheduler` runs read ops on an interval and records one status per op
+in SQLite:
+
+- **Writes are never canaried.** A canary must not place an order or delete an
+  account.
+- **A read op with required params is skipped** until the caller supplies
+  param sets; the health endpoint reports it as `unknown`, not healthy.
+- **Status is per op:** `healthy` when every param set passes, `degraded` when
+  some pass, `broken` when none do.
+
+`GET /v1/sites/:site/health` merges the latest record with every op in the
+latest map, so an op that has never been canaried still appears. Pass a
+`CanaryScheduler` as `ServerOptions.canary` and it starts with the server and
+stops when the server closes.
 
 ## MCP
 

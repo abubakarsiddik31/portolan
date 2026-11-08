@@ -2,7 +2,7 @@ import type { ErrorObject } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
 
 import { MAP_SCHEMA } from "./schema.js";
-import type { Impl, JsonSchema, OpDef, SiteMap } from "./types.js";
+import type { Extractor, Impl, JsonSchema, Locator, OpDef, SiteMap } from "./types.js";
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -199,7 +199,91 @@ function checkReferences(map: SiteMap): MapIssue[] {
     checkJsonSchema(schema, `/entities/${name}`, issues);
   }
 
+  for (const { locator, path } of locatorsOf(map)) {
+    if (locator.pattern === undefined) continue;
+    try {
+      new RegExp(locator.pattern);
+    } catch (error) {
+      issues.push({
+        path: `${path}/pattern`,
+        message: `invalid regular expression: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+    }
+  }
+
   return issues;
+}
+
+/** Every locator in the map, with its JSON Pointer. */
+function* locatorsOf(map: SiteMap): Generator<{ locator: Locator; path: string }> {
+  for (const [stateIndex, state] of map.states.entries()) {
+    for (const [position, locator] of state.marks.entries()) {
+      yield { locator, path: `/states/${stateIndex}/marks/${position}` };
+    }
+    for (const [position, locator] of (state.not ?? []).entries()) {
+      yield { locator, path: `/states/${stateIndex}/not/${position}` };
+    }
+  }
+
+  for (const [opIndex, op] of map.ops.entries()) {
+    for (const [position, check] of op.post.entries()) {
+      if (check.kind === "exists" || check.kind === "absent" || check.kind === "text") {
+        yield { locator: check.locator, path: `/ops/${opIndex}/post/${position}/locator` };
+      }
+    }
+
+    for (const [implIndex, impl] of op.impls.entries()) {
+      if (impl.tier === "url" || impl.tier === "http" || impl.tier === "ui") {
+        yield* extractorLocators(impl.extract, `/ops/${opIndex}/impls/${implIndex}/extract`);
+      }
+      if (impl.tier === "ui") {
+        for (const [stepIndex, step] of impl.steps.entries()) {
+          if ("target" in step) {
+            yield {
+              locator: step.target,
+              path: `/ops/${opIndex}/impls/${implIndex}/steps/${stepIndex}/target`,
+            };
+          }
+        }
+      }
+    }
+  }
+}
+
+function* extractorLocators(
+  extractor: Extractor,
+  path: string,
+): Generator<{ locator: Locator; path: string }> {
+  if (extractor.kind === "fields") {
+    for (const [name, locator] of Object.entries(extractor.fields)) {
+      yield { locator, path: `${path}/fields/${name}` };
+    }
+    return;
+  }
+
+  if (extractor.kind === "rows") {
+    yield { locator: extractor.container, path: `${path}/container` };
+    yield { locator: extractor.row, path: `${path}/row` };
+    for (const [name, locator] of Object.entries(extractor.cols)) {
+      yield { locator, path: `${path}/cols/${name}` };
+    }
+    return;
+  }
+
+  if (extractor.kind === "composite") {
+    for (const [name, locator] of Object.entries(extractor.fields ?? {})) {
+      yield { locator, path: `${path}/fields/${name}` };
+    }
+    if (extractor.rows !== undefined) {
+      yield { locator: extractor.rows.container, path: `${path}/rows/container` };
+      yield { locator: extractor.rows.row, path: `${path}/rows/row` };
+      for (const [name, locator] of Object.entries(extractor.rows.cols)) {
+        yield { locator, path: `${path}/rows/cols/${name}` };
+      }
+    }
+  }
 }
 
 function checkImpl(

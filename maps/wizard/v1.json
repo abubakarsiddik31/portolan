@@ -1,0 +1,137 @@
+{
+  "site": "wizard",
+  "origins": ["http://127.0.0.1:4101"],
+  "version": 1,
+  "states": [
+    {
+      "id": "step1",
+      "url": "/step/1",
+      "marks": [{ "role": "heading", "name": "Tell us about you" }]
+    },
+    {
+      "id": "step2",
+      "url": "/step/2",
+      "marks": [{ "role": "heading", "name": "Tell us about your team" }]
+    },
+    {
+      "id": "step3",
+      "url": "/step/3",
+      "marks": [{ "role": "heading", "name": "Review and upload" }]
+    },
+    {
+      "id": "done",
+      "url": "/done/:id",
+      "marks": [{ "test_id": "submission-id" }]
+    }
+  ],
+  "ops": [
+    {
+      "name": "submit_application",
+      "version": 1,
+      "summary": "Complete a three-step application with an upload.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "email": { "type": "string", "minLength": 3 },
+          "company": { "type": "string", "minLength": 1 },
+          "role": { "type": "string", "minLength": 1 },
+          "team_size": { "type": "integer", "minimum": 1, "maximum": 1000 },
+          "file_path": { "type": "string", "minLength": 1 }
+        },
+        "required": ["name", "email", "company", "role", "team_size", "file_path"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "submission_id": { "type": "string" }
+        },
+        "required": ["submission_id"],
+        "additionalProperties": false
+      },
+      "from": ["step1"],
+      "to": ["done"],
+      "post": [{ "kind": "state", "state": "done" }],
+      "effect": "write",
+      "impls": [
+        {
+          "tier": "ui",
+          "steps": [
+            {
+              "do": "fill",
+              "target": { "label": "Full name" },
+              "value": "{name}"
+            },
+            {
+              "do": "fill",
+              "target": { "label": "Work email" },
+              "value": "{email}"
+            },
+            {
+              "do": "click",
+              "target": { "role": "button", "name": "Continue" }
+            },
+            { "do": "await_state", "state": "step2" },
+            {
+              "do": "fill",
+              "target": { "label": "Company" },
+              "value": "{company}"
+            },
+            {
+              "do": "select",
+              "target": { "label": "Your role" },
+              "value": "{role}"
+            },
+            {
+              "do": "fill",
+              "target": { "label": "Team size" },
+              "value": "{team_size}"
+            },
+            {
+              "do": "click",
+              "target": { "role": "button", "name": "Continue" }
+            },
+            { "do": "await_state", "state": "step3" },
+            {
+              "do": "fill",
+              "target": { "label": "Attachment (PDF, TXT or PNG, max 1 MB)" },
+              "value": "{file_path}"
+            },
+            {
+              "do": "check",
+              "target": {
+                "role": "checkbox",
+                "name": "I confirm the details above are correct."
+              }
+            },
+            {
+              "do": "click",
+              "target": { "role": "button", "name": "Submit application" }
+            },
+            { "do": "await_state", "state": "done" }
+          ],
+          "extract": {
+            "kind": "fields",
+            "fields": {
+              "submission_id": { "test_id": "submission-id", "attr": "text" }
+            }
+          }
+        }
+      ],
+      "status": "verified"
+    }
+  ],
+  "entities": {
+    "Submission": {
+      "type": "object",
+      "properties": {
+        "submission_id": { "type": "string" }
+      },
+      "required": ["submission_id"],
+      "additionalProperties": false
+    }
+  },
+  "compiled_from": [],
+  "verified_at": "2026-11-08T00:00:00Z"
+}

@@ -1,0 +1,224 @@
+{
+  "site": "portal",
+  "origins": ["http://127.0.0.1:4102"],
+  "version": 1,
+  "states": [
+    {
+      "id": "login",
+      "url": "/login",
+      "marks": [{ "role": "button", "name": "Sign in" }]
+    },
+    {
+      "id": "invoices",
+      "url": "/",
+      "marks": [{ "test_id": "invoice-table" }]
+    }
+  ],
+  "ops": [
+    {
+      "name": "login",
+      "version": 1,
+      "summary": "Sign in to the ledger.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "minLength": 3 },
+          "password": { "type": "string", "minLength": 1 }
+        },
+        "required": ["email", "password"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "from": ["login"],
+      "to": ["invoices"],
+      "post": [{ "kind": "state", "state": "invoices" }],
+      "effect": "write",
+      "impls": [
+        {
+          "tier": "ui",
+          "steps": [
+            {
+              "do": "fill",
+              "target": { "label": "Email" },
+              "value": "{email}"
+            },
+            {
+              "do": "fill",
+              "target": { "label": "Password" },
+              "value": "{password}"
+            },
+            {
+              "do": "click",
+              "target": { "role": "button", "name": "Sign in" }
+            },
+            { "do": "await_state", "state": "invoices" }
+          ],
+          "extract": { "kind": "none" }
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "name": "filter_invoices",
+      "version": 1,
+      "summary": "Filter invoices by status.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "minLength": 1 }
+        },
+        "required": ["status"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "vendor": { "type": "string" },
+            "category": { "type": "string" },
+            "amount": { "type": "string" },
+            "status": { "type": "string" },
+            "date": { "type": "string" }
+          },
+          "required": ["id", "vendor", "category", "amount", "status", "date"],
+          "additionalProperties": false
+        }
+      },
+      "from": ["invoices"],
+      "to": ["invoices"],
+      "post": [{ "kind": "state", "state": "invoices" }],
+      "effect": "read",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/?status={status}",
+          "extract": {
+            "kind": "rows",
+            "container": { "test_id": "invoice-table" },
+            "row": { "test_id": "invoice-row" },
+            "cols": {
+              "id": { "role": "cell", "ordinal": 0 },
+              "vendor": { "role": "cell", "ordinal": 1 },
+              "category": { "role": "cell", "ordinal": 2 },
+              "amount": { "role": "cell", "ordinal": 3 },
+              "status": { "role": "cell", "ordinal": 4 },
+              "date": { "role": "cell", "ordinal": 5 }
+            }
+          }
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "name": "paginate",
+      "version": 1,
+      "summary": "Open a page of invoices.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["page"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "vendor": { "type": "string" },
+            "category": { "type": "string" },
+            "amount": { "type": "string" },
+            "status": { "type": "string" },
+            "date": { "type": "string" }
+          },
+          "required": ["id", "vendor", "category", "amount", "status", "date"],
+          "additionalProperties": false
+        }
+      },
+      "from": ["invoices"],
+      "to": ["invoices"],
+      "post": [{ "kind": "state", "state": "invoices" }],
+      "effect": "read",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/?page={page}",
+          "extract": {
+            "kind": "rows",
+            "container": { "test_id": "invoice-table" },
+            "row": { "test_id": "invoice-row" },
+            "cols": {
+              "id": { "role": "cell", "ordinal": 0 },
+              "vendor": { "role": "cell", "ordinal": 1 },
+              "category": { "role": "cell", "ordinal": 2 },
+              "amount": { "role": "cell", "ordinal": 3 },
+              "status": { "role": "cell", "ordinal": 4 },
+              "date": { "role": "cell", "ordinal": 5 }
+            }
+          }
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "name": "export_csv",
+      "version": 1,
+      "summary": "Export invoices as CSV.",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "minLength": 1 }
+        },
+        "required": ["status"],
+        "additionalProperties": false
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "filename": { "type": "string" },
+          "content": { "type": "string" }
+        },
+        "required": ["filename", "content"],
+        "additionalProperties": false
+      },
+      "from": ["invoices"],
+      "to": ["invoices"],
+      "post": [{ "kind": "state", "state": "invoices" }],
+      "effect": "read",
+      "impls": [
+        {
+          "tier": "url",
+          "route": "/export.csv?status={status}",
+          "extract": { "kind": "download" }
+        }
+      ],
+      "status": "verified"
+    }
+  ],
+  "entities": {
+    "Invoice": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "vendor": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "string" },
+        "status": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "vendor", "category", "amount", "status", "date"],
+      "additionalProperties": false
+    }
+  },
+  "auth": { "state": "invoices", "login_op": "login" },
+  "compiled_from": [],
+  "verified_at": "2026-11-08T00:00:00Z"
+}

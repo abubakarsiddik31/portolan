@@ -1,7 +1,10 @@
 import type { Bounds, SemanticNode } from "./engine.js";
+import type { RefMap } from "./refs.js";
 
 export type Affordance = {
-  /** CDP backend node id; stable within one document. Refs land in T2.12. */
+  /** Document-scoped handle, when a ref map was supplied. */
+  ref?: string;
+  /** CDP backend node id; stable within one document. */
   backendNodeId: number;
   role: string;
   name: string;
@@ -16,6 +19,8 @@ export type Affordance = {
 export type RankOptions = {
   /** Maximum number of affordances. Default 60. */
   limit?: number;
+  /** Attach a ref from this document's map. */
+  refs?: RefMap;
 };
 
 export type RankedAffordances = {
@@ -128,6 +133,9 @@ export function rankAffordances(
 
     if (ctx !== undefined) affordance.ctx = ctx;
 
+    const ref = options.refs?.byNode.get(node.nodeId)?.ref;
+    if (ref !== undefined) affordance.ref = ref;
+
     candidates.push({ affordance, index: order.get(node.nodeId) ?? 0 });
   }
 
@@ -235,7 +243,8 @@ function weightOf(node: SemanticNode, ctx: string | undefined): number {
 }
 
 function formatAffordance(affordance: Affordance): string {
+  const ref = affordance.ref !== undefined ? `${affordance.ref} ` : "";
   const name = affordance.name.length > 0 ? JSON.stringify(affordance.name) : "(unnamed)";
   const ctx = affordance.ctx !== undefined ? ` in ${affordance.ctx}` : "";
-  return `${affordance.role} ${name}${ctx}`;
+  return `${ref}${affordance.role} ${name}${ctx}`;
 }

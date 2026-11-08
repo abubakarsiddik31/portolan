@@ -51,7 +51,18 @@ The fixture tests capture every page the benchmark tasks touch — store
 catalog and product, all three wizard steps, portal login and ledger — and
 assert the required interactions are present within the budget.
 
+## Refs
+
+`buildRefMap(nodes, doc)` assigns each node a document-scoped ref: `e` plus a
+base36 hash of `role|name|framePath|ordinal`. Collisions extend the prefix by
+one character until unique.
+
+`RefRegistry` keeps the current and previous maps, so a missing ref resolves to
+`stale_ref` with the current document and, when role and name still match, a
+`new_ref`. A ref is only valid for the document that produced it;
+`snapshot.doc` increments on every committed main-frame navigation.
+
 ## Not here yet
 
-Semantic ranking, refs, hit-testing, overlays, quiescence and effects are
-T2.11–T2.14. This package is the transport and the capture, not the model.
+Hit-testing, overlays, quiescence and effects are T2.13–T2.14. This package is
+the transport, the capture, and the addressing layer, not the op runtime.

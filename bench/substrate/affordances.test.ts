@@ -1,5 +1,6 @@
 import type { Affordance, Snapshot } from "@portolan/substrate";
 import {
+  buildRefMap,
   findChrome,
   PlaywrightEngine,
   rankAffordances,
@@ -76,7 +77,8 @@ describe.skipIf(!ENABLED)("fixture affordances", () => {
   async function capture(url: string): Promise<Capture> {
     await current().navigate(url);
     const snapshot = await current().snapshot();
-    const ranked = rankAffordances(snapshot.nodes);
+    const refs = buildRefMap(snapshot.nodes, snapshot.doc);
+    const ranked = rankAffordances(snapshot.nodes, { refs });
     const rendered = renderAffordances(ranked.affordances);
 
     return {
@@ -128,6 +130,9 @@ describe.skipIf(!ENABLED)("fixture affordances", () => {
       ),
     ).toBe(true);
     expect(page.tokens).toBeLessThanOrEqual(800);
+    expect(page.list.every((affordance) => affordance.ref !== undefined)).toBe(true);
+    expect(new Set(page.list.map((affordance) => affordance.ref)).size).toBe(page.list.length);
+    expect(page.text).toMatch(/^e[0-9a-z]+ /);
   });
 
   it("captures the store product actions", async () => {

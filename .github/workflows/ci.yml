@@ -13,6 +13,11 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # The browser paths — substrate, MCP execution, fixtures — are the core
+      # of the product. Skipping them in CI would leave the most important
+      # code untested.
+      PORTOLAN_BROWSER_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -23,6 +28,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: google-chrome --version || chromium --version
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm coverage

@@ -43,7 +43,7 @@ a malicious map is equivalent to a malicious operator.
 
 | Threat | Mitigation | Where |
 |---|---|---|
-| Credential appears in a map, trace, log, or skill | Site-scoped credential store; audit/trace redaction by key; skill secret scan | `credentials.ts`, `redact.ts`, `skills/export.ts` |
+| Credential appears in a map, trace, log, or skill | Site-scoped credential store; audit/trace redaction by key and value shape; skill secret scan | `credentials.ts`, `redact.ts`, `skills/export.ts` |
 | Off-allowlist request leaves the page | Default-deny egress guard on `fetch` and `goto`; the final URL after a redirect is checked too; every block recorded | `substrate/policy.ts`, `substrate/substrate.ts` |
 | Page text becomes a tool call | Every page-derived MCP result is labeled `untrusted` with a notice; injection fixture asserts the scripted runner never calls a tool | `server/mcp.ts`, `bench/security` |
 | Irreversible write without consent | `confirm: true` required before dispatch | `runtime/write.ts` |
@@ -53,11 +53,12 @@ a malicious map is equivalent to a malicious operator.
 | `serve` and `mcp` had no substrate factory, so the fallback verbs and egress policies were unavailable outside tests | **Fixed:** `createServer` takes a `substrateFactory`; `serve` and `mcp` share one that launches Chrome, registers the engine, and loads `policies/<site>.json` | `server/server.ts`, `cli/browser.ts` |
 | `serve` had no authentication and could bind a public interface | **Fixed:** `authToken` adds a constant-time bearer check to every route except `/v1/health`; a non-loopback bind is refused without a token or `PORTOLAN_ALLOW_REMOTE=1` | `server/server.ts`, `server/host.ts` |
 | A redirect could land outside the allowlist | **Fixed:** `fetch` reports the final URL and the guard checks it, recording `reason: "redirect"` | `substrate/substrate.ts` |
+| A credential in a free-text field survived key-based redaction | **Fixed:** values are also matched by shape — provider keys, GitHub/AWS/Google/Stripe tokens, JWTs, SSNs, and Luhn-valid card numbers | `runtime/redact.ts`, `server/log.ts` |
 | Site name escapes the maps directory | **Fixed:** `MapStore` accepts only `[A-Za-z0-9][A-Za-z0-9._-]*` and rejects `..` | `server/maps.ts` |
 | Orphan browsers after a crash | Session TTL/cap/recovery; `reapOrphans` kills tagged Chromium | `server`, `substrate/reaper.ts` |
 | Session leak from a previous process | Startup recovery closes every open session | `server/server.ts` |
 | Unbounded sessions or browsers | `maxOpenSessions` returns `429 session_limit`; idle sweep | `server/server.ts` |
-| Audit log records a secret | Params redacted by key before the insert | `runtime/redact.ts` |
+| Audit log records a secret | Params redacted by key and value shape before the insert | `runtime/redact.ts` |
 | Arbitrary file read via file upload | `act` rejects `files` until upload is implemented | `server/mcp.ts` |
 | Malicious map exfiltrates data | Egress policy is the control; a map cannot widen it | `substrate/policy.ts` |
 
@@ -100,7 +101,6 @@ three failure classes, thrown errors, and the key-collision fix
 | Issue | Finding | Why it is not fixed here |
 |---|---|---|
 | [#88](https://github.com/abubakarsiddik31/portolan/issues/88) | The egress guard matches the hostname, not the resolved address (DNS rebinding) | Needs address pinning before the browser connects |
-| [#77](https://github.com/abubakarsiddik31/portolan/issues/77) | Redaction is key-based only; a secret in a free-text field survives | Needs value-shape detection or per-op field allowlists |
 | [#78](https://github.com/abubakarsiddik31/portolan/issues/78) | The Docker image runs Chromium with `--no-sandbox` | Needs a seccomp/userns setup or a trust statement |
 
 ## Residual risks
@@ -122,6 +122,9 @@ three failure classes, thrown errors, and the key-collision fix
   upload feature is a file-read risk; `act` currently rejects uploads.
 - **The audit log is only as complete as the executor.** A write that never
   reaches `runWrite` is not audited.
+- **Redaction covers known credential shapes, not every secret.** A novel
+  format, or a secret that looks like ordinary prose, can survive. The field
+  name and the value shape are two filters, not a guarantee.
 - **No multi-tenant isolation.** One server, one database, one browser pool;
   sessions are not authenticated principals.
 - **The benchmark evidence is scripted.** Security claims here are code

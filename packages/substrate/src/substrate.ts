@@ -54,6 +54,7 @@ export type ActResult =
       title: string;
       effects: Effect[];
       delta: Delta;
+      download?: { path: string; filename: string };
     }
   | { ok: false; code: "stale_ref"; current_doc: number; new_ref?: string }
   | {
@@ -182,6 +183,15 @@ export class Substrate {
     const entry = view.refs.byRef.get(ref);
     if (entry === undefined) return { text: "" };
 
+    // A form control's accessible name is its label ("Email"), not what the
+    // user typed. Ask the page for the current value first.
+    try {
+      const value = await this.engine.readValue(entry.backendNodeId);
+      if (value !== undefined && value.length > 0) return { text: value };
+    } catch {
+      // A node without a value falls back to its accessible name.
+    }
+
     const node = view.snapshot.nodes.find((candidate) => candidate.nodeId === entry.nodeId);
     return { text: node?.name ?? "" };
   }
@@ -264,6 +274,7 @@ export class Substrate {
         title: result.title,
         effects: result.effects,
         delta,
+        ...(result.download !== undefined ? { download: result.download } : {}),
       };
     } catch (error) {
       if (error instanceof EngineError && error.code === "disabled") {

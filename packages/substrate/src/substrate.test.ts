@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -38,6 +38,7 @@ const HOME = `<!doctype html>
     <button type="button" id="pick">Pick file</button>
     <input id="resume" type="file" aria-label="Resume file" hidden>
   </form>
+  <a href="/download">Download file</a>
   <output id="out"></output>
   <script>
     document.getElementById("combo").addEventListener("click", () => {
@@ -234,6 +235,14 @@ describe.skipIf(!ENABLED)("substrate act", () => {
       if (url === "/done") {
         response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         response.end(DONE);
+        return;
+      }
+      if (url === "/download") {
+        response.writeHead(200, {
+          "content-type": "text/plain",
+          "content-disposition": 'attachment; filename="hello.txt"',
+        });
+        response.end("hello download");
         return;
       }
       if (url === "/blocked") {
@@ -476,6 +485,31 @@ describe.skipIf(!ENABLED)("substrate act", () => {
       "document.getElementById('resume')?.files?.length ?? 0",
     );
     expect(count).toBe(1);
+  });
+
+  it("reads the current value of an input", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const key = refFor(view.refs, "textbox", "Key input");
+
+    await substrate.act({ ref: key, do: "fill", value: "abc" });
+
+    expect((await substrate.read(key)).text).toBe("abc");
+  });
+
+  it("captures a download", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const link = refFor(view.refs, "link", "Download file");
+
+    const result = await substrate.act({ ref: link, do: "click" });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected the download click to succeed");
+    expect(result.download?.filename).toBe("hello.txt");
+    expect(readFileSync(result.download?.path ?? "", "utf8")).toBe("hello download");
   });
 
   it("reports the blocker when the target is covered", async () => {

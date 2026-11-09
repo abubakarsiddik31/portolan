@@ -92,14 +92,23 @@ export class FallbackScopes {
 
   begin(input: FallbackScopeInput): FallbackScope {
     const now = input.now ?? Date.now;
+    const at = now();
+
+    // A session has at most one active scope. Beginning a new intent
+    // abandons the old one: otherwise `active` returns the oldest scope,
+    // view/act/read record into a stale scope, and a write scope can
+    // linger after the agent has moved on.
+    const previous = this.active(input.sid, at);
+    if (previous !== undefined) this.scopes.delete(previous.id);
+
     const scope: FallbackScope = {
       id: randomUUID(),
       sid: input.sid,
       intent: input.intent,
       effect: input.effect ?? "write",
       allowed: ALLOWED,
-      expiresAt: now() + (input.ttlMs ?? DEFAULT_TTL_MS),
-      started_at: new Date(now()).toISOString(),
+      expiresAt: at + (input.ttlMs ?? DEFAULT_TTL_MS),
+      started_at: new Date(at).toISOString(),
       trace: [],
     };
 

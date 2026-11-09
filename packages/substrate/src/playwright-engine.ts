@@ -1,8 +1,13 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { type Browser, type CDPSession, chromium, type Frame, type Page } from "playwright-core";
 
 import {
   type Action,
   type DispatchResult,
+  type DownloadInfo,
   type Effect,
   type Engine,
   EngineError,
@@ -113,6 +118,10 @@ export class PlaywrightEngine implements Engine {
   private networkSeq = 0;
   private readonly requestCaptures = new Map<string, Promise<void>>();
   private readonly responseCaptures = new Map<string, Promise<void>>();
+  private downloadStarted = false;
+  private downloadPromise: Promise<DownloadInfo | undefined> | undefined;
+  private lastDownload: DownloadInfo | undefined;
+  private downloadWaiters: Array<(info: DownloadInfo | undefined) => void> = [];
 
   private constructor(
     private readonly browser: Browser,
@@ -135,14 +144,29 @@ export class PlaywrightEngine implements Engine {
       args,
     });
 
-    const context = await browser.newContext();
+    const context = await browser.newContext({ acceptDownloads: true });
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
+    const downloadDir = await mkdtemp(join(tmpdir(), "portolan-download-"));
 
     const engine = new PlaywrightEngine(browser, page, cdp, options.timeoutMs ?? 30_000);
 
     page.on("framenavigated", (frame) => {
       if (frame === page.mainFrame()) engine.doc += 1;
+    });
+
+    page.on("download", (download) => {
+      engine.downloadStarted = true;
+      engine.downloadPromise = (async () => {
+        const filename = download.suggestedFilename();
+        const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const target = join(downloadDir, `${Date.now()}-${safe}`);
+        await download.saveAs(target);
+        const info = { path: target, filename };
+        engine.lastDownload = info;
+        for (const resolve of engine.downloadWaiters.splice(0)) resolve(info);
+        return info;
+      })();
     });
 
     void cdp.send("Network.enable").catch(() => {});
@@ -204,6 +228,9 @@ export class PlaywrightEngine implements Engine {
     const beforeUrl = this.page.url();
     const beforeDoc = this.doc;
     const networkMark = this.networkSeq;
+    this.downloadStarted = false;
+    this.downloadPromise = undefined;
+    this.lastDownload = undefined;
 
     switch (action.do) {
       case "click":
@@ -233,6 +260,18 @@ export class PlaywrightEngine implements Engine {
 
     this.v += 1;
     const effects = this.effectsSince(networkMark, action, beforeUrl, beforeDoc);
+    // A site often fetches a PDF and then clicks a blob link, so the download
+    // starts after the action returns. Wait when the action fetched something
+    // that looks like a file, not on every click.
+    const downloadLike = effects.some(
+      (effect) =>
+        effect.kind === "network" &&
+        (effect.mime_type?.includes("pdf") === true ||
+          effect.mime_type?.includes("octet-stream") === true ||
+          /\/pdf(\?|$)/.test(effect.url)),
+    );
+    const download =
+      this.downloadStarted || downloadLike ? await this.waitForDownload(3_000) : undefined;
 
     return {
       ok: true,
@@ -241,6 +280,7 @@ export class PlaywrightEngine implements Engine {
       url: this.page.url(),
       title: await this.page.title(),
       effects,
+      ...(download !== undefined ? { download } : {}),
     };
   }
 
@@ -761,6 +801,59 @@ export class PlaywrightEngine implements Engine {
     }
 
     await this.cdp.send("DOM.setFileInputFiles", { files, backendNodeId: target });
+  }
+
+  /** Wait for a download that starts after the action returns. */
+  private async waitForDownload(ms: number): Promise<DownloadInfo | undefined> {
+    if (this.lastDownload !== undefined) {
+      const info = this.lastDownload;
+      this.lastDownload = undefined;
+      return info;
+    }
+
+    if (this.downloadPromise !== undefined) {
+      return Promise.race([
+        this.downloadPromise,
+        new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms)),
+      ]);
+    }
+
+    return new Promise((resolve) => {
+      const waiter = (info: DownloadInfo | undefined): void => {
+        clearTimeout(timer);
+        this.downloadWaiters = this.downloadWaiters.filter((candidate) => candidate !== waiter);
+        resolve(info);
+      };
+      const timer = setTimeout(() => {
+        this.downloadWaiters = this.downloadWaiters.filter((candidate) => candidate !== waiter);
+        resolve(undefined);
+      }, ms);
+      this.downloadWaiters.push(waiter);
+    });
+  }
+
+  /** The current value of a form control, for a ref read. */
+  async readValue(backendNodeId: number): Promise<string | undefined> {
+    const objectId = await this.resolveObject(backendNodeId);
+
+    return this.callOn<string | undefined>(
+      objectId,
+      `function () {
+        if (
+          this instanceof HTMLInputElement ||
+          this instanceof HTMLTextAreaElement ||
+          this instanceof HTMLSelectElement
+        ) {
+          return this.value;
+        }
+        if (this.getAttribute?.("role") === "combobox") {
+          return (this.textContent ?? "").trim();
+        }
+        const aria = this.getAttribute?.("aria-valuetext") ?? this.getAttribute?.("aria-valuenow");
+        return aria === null || aria === undefined ? undefined : String(aria);
+      }`,
+      [],
+    );
   }
 
   private async fill(backendNodeId: number, value: string): Promise<void> {

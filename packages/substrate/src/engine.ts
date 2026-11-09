@@ -73,6 +73,13 @@ export type Action =
   | { do: "fill" | "select"; backendNodeId: number; value: string }
   | { do: "press"; key: string; backendNodeId?: number };
 
+export type DownloadInfo = {
+  /** Server-local path the download was saved to. */
+  path: string;
+  /** The filename the site suggested. */
+  filename: string;
+};
+
 export type DispatchResult = {
   ok: true;
   doc: number;
@@ -80,6 +87,7 @@ export type DispatchResult = {
   url: string;
   title: string;
   effects: Effect[];
+  download?: DownloadInfo;
 };
 
 export type EngineErrorCode =
@@ -123,6 +131,8 @@ export interface Engine {
   dispatch(action: Action): Promise<DispatchResult>;
   /** Set files on a file input, or on the nearest file input to a trigger. */
   setFiles(backendNodeId: number, files: string[]): Promise<void>;
+  /** The current value of a form control, or undefined when it has none. */
+  readValue(backendNodeId: number): Promise<string | undefined>;
   evaluate<T>(expression: string): Promise<T>;
   close(): Promise<void>;
 }

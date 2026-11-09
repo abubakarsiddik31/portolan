@@ -485,10 +485,14 @@ export function createMcpServer(deps: McpDeps): McpServer {
   server.registerTool(
     "view",
     {
-      description: "Show the current affordances inside a fallback scope.",
-      inputSchema: {},
+      description:
+        "Show the current affordances inside a fallback scope. Text by default; ask for json when a client needs structure.",
+      inputSchema: {
+        format: z.enum(["text", "json", "both"]).optional(),
+      },
     },
-    async () => {
+    async ({ format }) => {
+      const mode = format ?? "text";
       const substrate = await substrateFor();
       if (substrate === undefined) {
         return failure("op_broken", "fallback substrate is not available");
@@ -521,14 +525,28 @@ export function createMcpServer(deps: McpDeps): McpServer {
             doc: snapshot.doc,
             v: snapshot.v,
             ...(state !== undefined ? { state } : {}),
-            affordances: ranked.affordances.map((affordance) => ({
-              ref: affordance.ref,
-              role: affordance.role,
-              name: affordance.name,
-              ordinal: affordance.ordinal,
-              ctx: affordance.ctx,
-            })),
-            text: rendered.text,
+            ...(mode !== "json"
+              ? { text: rendered.text }
+              : {
+                  affordances: ranked.affordances.map((affordance) => ({
+                    ref: affordance.ref,
+                    role: affordance.role,
+                    name: affordance.name,
+                    ordinal: affordance.ordinal,
+                    ctx: affordance.ctx,
+                  })),
+                }),
+            ...(mode === "both"
+              ? {
+                  affordances: ranked.affordances.map((affordance) => ({
+                    ref: affordance.ref,
+                    role: affordance.role,
+                    name: affordance.name,
+                    ordinal: affordance.ordinal,
+                    ctx: affordance.ctx,
+                  })),
+                }
+              : {}),
             omitted: ranked.omitted,
           }),
         ),

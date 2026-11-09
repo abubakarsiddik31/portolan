@@ -70,7 +70,10 @@ describe("startStdioServer", () => {
     await client.connect(clientTransport);
     await client.callTool({ name: "open_site", arguments: { site: "store" } });
 
-    const result = await client.callTool({ name: "view", arguments: {} });
+    const result = await client.callTool({
+      name: "view",
+      arguments: { format: "both" },
+    });
     const text = (result.content as Array<{ text?: string }>)[0]?.text ?? "";
     const body = JSON.parse(text) as {
       untrusted: boolean;

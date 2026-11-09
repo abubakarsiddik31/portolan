@@ -50,6 +50,19 @@ describe("rankAffordances", () => {
     expect(affordances.map((affordance) => affordance.name)).toEqual(["Go", "Search", "Home"]);
   });
 
+  it("numbers duplicate role and name pairs", () => {
+    const nodes = [
+      node({ nodeId: "a", role: "button", name: "Add", backendNodeId: 201, bounds: rect() }),
+      node({ nodeId: "b", role: "button", name: "Add", backendNodeId: 202, bounds: rect() }),
+      node({ nodeId: "c", role: "button", name: "Other", backendNodeId: 203, bounds: rect() }),
+    ];
+
+    const { affordances } = rankAffordances(nodes);
+    const adds = affordances.filter((affordance) => affordance.name === "Add");
+
+    expect(adds.map((affordance) => affordance.ordinal)).toEqual([0, 1]);
+  });
+
   it("ranks a button above a textbox and a link", () => {
     const { affordances } = rankAffordances(NODES);
 

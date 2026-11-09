@@ -591,8 +591,15 @@ export class PlaywrightEngine implements Engine {
         (await this.ancestorsOf(backendNodeId)).has(blocker);
 
       if (!related) {
+        const info = await this.describeBackend(blocker);
         throw new EngineError("not_interactive", `node ${backendNodeId} is covered by ${blocker}`, {
-          details: { blockerBackendNodeId: blocker },
+          details: {
+            blockerBackendNodeId: blocker,
+            ...(info.tag !== undefined ? { blockerTag: info.tag } : {}),
+            ...(info.domId !== undefined ? { blockerDomId: info.domId } : {}),
+            ...(info.className !== undefined ? { blockerClass: info.className } : {}),
+            ...(info.text !== undefined ? { blockerText: info.text } : {}),
+          },
         });
       }
     }
@@ -634,6 +641,43 @@ export class PlaywrightEngine implements Engine {
     await this.page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => {});
   }
 
+  /** DOM facts about a node, for a blocker that has no semantic ref. */
+  private async describeBackend(backendNodeId: number): Promise<{
+    tag?: string;
+    domId?: string;
+    className?: string;
+    text?: string;
+  }> {
+    try {
+      const resolved = (await this.cdp.send("DOM.resolveNode", {
+        backendNodeId,
+      })) as unknown as ResolvedNode;
+      const objectId = resolved.object.objectId;
+      if (objectId === undefined) return {};
+
+      return await this.callOn<{
+        tag?: string;
+        domId?: string;
+        className?: string;
+        text?: string;
+      }>(
+        objectId,
+        `function () {
+          const text = String(this.textContent ?? "").trim().replace(/\\s+/g, " ").slice(0, 80);
+          return {
+            tag: this.tagName,
+            domId: this.id || undefined,
+            className: typeof this.className === "string" ? this.className.slice(0, 80) : undefined,
+            text: text || undefined,
+          };
+        }`,
+        [],
+      );
+    } catch {
+      return {};
+    }
+  }
+
   private async contains(target: number, candidate: number): Promise<boolean> {
     const described = (await this.cdp.send("DOM.describeNode", {
       backendNodeId: target,
@@ -669,6 +713,54 @@ export class PlaywrightEngine implements Engine {
     }
 
     return ids;
+  }
+
+  /**
+   * Set files on a file input.
+   *
+   * A styled "Choose file" control is usually a button or label, with the
+   * real `<input type="file">` hidden nearby. Setting files on the button does
+   * nothing, so fall back to the first file input on the page.
+   */
+  async setFiles(backendNodeId: number, files: string[]): Promise<void> {
+    const objectId = await this.resolveObject(backendNodeId);
+
+    const isFile = await this.callOn<boolean>(
+      objectId,
+      `function () {
+        return this instanceof HTMLInputElement && this.type === "file";
+      }`,
+      [],
+    );
+
+    if (isFile) {
+      await this.cdp.send("DOM.setFileInputFiles", { files, backendNodeId });
+      return;
+    }
+
+    const document = (await this.cdp.send("DOM.getDocument", { depth: 0 })) as unknown as {
+      root: { nodeId: number };
+    };
+    const found = (await this.cdp.send("DOM.querySelector", {
+      nodeId: document.root.nodeId,
+      selector: 'input[type="file"]',
+    })) as unknown as { nodeId?: number };
+
+    if (found.nodeId === undefined || found.nodeId === 0) {
+      throw new EngineError("file_input_not_found", "no file input on the page");
+    }
+
+    const described = (await this.cdp.send("DOM.describeNode", {
+      nodeId: found.nodeId,
+      depth: 0,
+    })) as unknown as { node?: { backendNodeId?: number } };
+
+    const target = described.node?.backendNodeId;
+    if (target === undefined) {
+      throw new EngineError("file_input_not_found", "no file input on the page");
+    }
+
+    await this.cdp.send("DOM.setFileInputFiles", { files, backendNodeId: target });
   }
 
   private async fill(backendNodeId: number, value: string): Promise<void> {
@@ -707,6 +799,17 @@ export class PlaywrightEngine implements Engine {
   private async select(backendNodeId: number, value: string): Promise<void> {
     const objectId = await this.resolveObject(backendNodeId);
 
+    const native = await this.callOn<boolean>(
+      objectId,
+      `function () { return this instanceof HTMLSelectElement; }`,
+      [],
+    );
+
+    if (!native) {
+      await this.selectCustom(backendNodeId, value);
+      return;
+    }
+
     await this.callOn(
       objectId,
       `function (value) {
@@ -722,6 +825,50 @@ export class PlaywrightEngine implements Engine {
       }`,
       [{ value }],
     );
+  }
+
+  /**
+   * Choose an option in a custom combobox.
+   *
+   * React component libraries (Radix, shadcn, Headless UI) render a button
+   * with `role="combobox"` and a portal listbox, not a native `<select>`.
+   * Setting `.value` does nothing there. Open the control, find the option by
+   * its visible text, and click its centre.
+   */
+  private async selectCustom(backendNodeId: number, value: string): Promise<void> {
+    await this.click(backendNodeId);
+    await this.page.waitForTimeout(200);
+
+    const found = await this.evaluate<{
+      point?: { x: number; y: number };
+      options: string[];
+    }>(
+      `(() => {
+        const wanted = ${JSON.stringify(value)}.toLowerCase();
+        const options = Array.from(document.querySelectorAll('[role="option"]'));
+        const names = options.map((node) => (node.textContent ?? "").trim());
+        const exact = options.find(
+          (node) => (node.textContent ?? "").trim().toLowerCase() === wanted,
+        );
+        const match =
+          exact ??
+          options.find((node) => (node.textContent ?? "").trim().toLowerCase().includes(wanted));
+        if (!match) return { options: names };
+        match.scrollIntoView({ block: "center", inline: "center" });
+        const rect = match.getBoundingClientRect();
+        return { point: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }, options: names };
+      })()`,
+    );
+
+    if (found.point === undefined) {
+      await this.page.keyboard.press("Escape").catch(() => {});
+      throw new EngineError("option_not_found", `no option "${value}"`, {
+        details: { options: found.options },
+      });
+    }
+
+    await this.page.mouse.click(found.point.x, found.point.y);
+    await this.page.waitForTimeout(150);
   }
 
   private async setChecked(backendNodeId: number, checked: boolean): Promise<void> {

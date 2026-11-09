@@ -28,6 +28,8 @@ export type ActRequest = {
   do: "click" | "check" | "uncheck" | "fill" | "select" | "press";
   value?: string;
   key?: string;
+  /** Set these files on the target, or the nearest file input. */
+  files?: string[];
 };
 
 export type DeltaEntry = {
@@ -61,6 +63,11 @@ export type ActResult =
       blocker_backend_node_id?: number;
       blocker_role?: string;
       blocker_name?: string;
+      /** DOM facts about the blocker, when it has no semantic ref. */
+      blocker_tag?: string;
+      blocker_text?: string;
+      blocker_dom_id?: string;
+      blocker_class?: string;
     }
   | { ok: false; code: "invalid_request"; message: string };
 
@@ -160,7 +167,10 @@ export class Substrate {
 
   /** Read the page, or one ref's accessible text. */
   async read(ref?: string): Promise<{ text: string }> {
-    const view = this.state() ?? (await this.view());
+    // A no-ref read means "the page as it is now". Reusing the last snapshot
+    // returns the page from before a `call` navigation, or before a data
+    // fetch resolved, which is an empty or stale read.
+    const view = ref === undefined ? await this.view() : (this.state() ?? (await this.view()));
 
     if (ref === undefined) {
       const parts = view.snapshot.nodes
@@ -191,6 +201,41 @@ export class Substrate {
             current_doc: resolution.current_doc,
             new_ref: resolution.new_ref,
           };
+    }
+
+    if (request.files !== undefined && request.files.length > 0) {
+      try {
+        await this.engine.setFiles(resolution.entry.backendNodeId, request.files);
+      } catch (error) {
+        if (error instanceof EngineError && error.code === "file_input_not_found") {
+          return { ok: false, code: "invalid_request", message: "no file input on the page" };
+        }
+        if (error instanceof EngineError && error.code === "not_found") {
+          return { ok: false, code: "stale_ref", current_doc: this.last?.doc ?? 0 };
+        }
+        throw error;
+      }
+
+      const snapshot = await this.engine.snapshot();
+      const refs = this.registry.build(snapshot.nodes, snapshot.doc);
+      this.current = refs;
+      this.last = snapshot;
+
+      return {
+        ok: true,
+        doc: snapshot.doc,
+        v: snapshot.v,
+        url: snapshot.url,
+        title: snapshot.title,
+        effects: [
+          {
+            kind: "value",
+            backendNodeId: resolution.entry.backendNodeId,
+            value: request.files.join(", "),
+          },
+        ],
+        delta: { navigation: false, entries: [] },
+      };
     }
 
     const action = toAction(request, resolution.entry.backendNodeId);
@@ -229,6 +274,21 @@ export class Substrate {
         };
       }
 
+      if (error instanceof EngineError && error.code === "option_not_found") {
+        const options = Array.isArray(error.details.options)
+          ? error.details.options.filter((option): option is string => typeof option === "string")
+          : [];
+
+        return {
+          ok: false,
+          code: "invalid_request",
+          message:
+            options.length > 0
+              ? `no option "${request.value ?? ""}"; available: ${options.join(", ")}`
+              : `no option "${request.value ?? ""}"`,
+        };
+      }
+
       // A node can vanish between the snapshot and the action: a client-side
       // framework (Next.js, React) hydrates and replaces the DOM without a
       // navigation. The ref points at a backend node that no longer exists,
@@ -245,9 +305,23 @@ export class Substrate {
         }
 
         const entry = this.current?.byBackend.get(blocker);
+        const dom = {
+          ...(typeof error.details.blockerTag === "string"
+            ? { blocker_tag: error.details.blockerTag }
+            : {}),
+          ...(typeof error.details.blockerText === "string"
+            ? { blocker_text: error.details.blockerText }
+            : {}),
+          ...(typeof error.details.blockerDomId === "string"
+            ? { blocker_dom_id: error.details.blockerDomId }
+            : {}),
+          ...(typeof error.details.blockerClass === "string"
+            ? { blocker_class: error.details.blockerClass }
+            : {}),
+        };
 
         return entry === undefined
-          ? { ok: false, code: "not_interactive", blocker_backend_node_id: blocker }
+          ? { ok: false, code: "not_interactive", blocker_backend_node_id: blocker, ...dom }
           : {
               ok: false,
               code: "not_interactive",
@@ -255,6 +329,7 @@ export class Substrate {
               blocker_ref: entry.ref,
               blocker_role: entry.role,
               blocker_name: entry.name,
+              ...dom,
             };
       }
 

@@ -500,9 +500,8 @@ export function createMcpServer(deps: McpDeps): McpServer {
       const rendered = renderAffordances(ranked.affordances);
 
       const scope = activeScope();
+      const state = stateOf(currentSession(), snapshot);
       if (scope !== undefined) {
-        const state = stateOf(currentSession(), snapshot);
-
         scopes.record(scope.id, {
           kind: "view",
           at: new Date().toISOString(),
@@ -518,12 +517,15 @@ export function createMcpServer(deps: McpDeps): McpServer {
         JSON.stringify(
           untrusted({
             url: snapshot.url,
+            title: snapshot.title,
             doc: snapshot.doc,
             v: snapshot.v,
+            ...(state !== undefined ? { state } : {}),
             affordances: ranked.affordances.map((affordance) => ({
               ref: affordance.ref,
               role: affordance.role,
               name: affordance.name,
+              ordinal: affordance.ordinal,
               ctx: affordance.ctx,
             })),
             text: rendered.text,
@@ -551,10 +553,6 @@ export function createMcpServer(deps: McpDeps): McpServer {
       if (substrate === undefined) {
         return failure("op_broken", "fallback substrate is not available");
       }
-      if (input.files !== undefined) {
-        return failure("op_broken", "file uploads are not supported by fallback act yet");
-      }
-
       await ensurePage(substrate);
 
       const session = currentSession();
@@ -566,8 +564,9 @@ export function createMcpServer(deps: McpDeps): McpServer {
       const result = await substrate.act({
         ref: input.ref,
         do: input.do,
-        value: input.value,
-        key: input.key,
+        ...(input.value !== undefined ? { value: input.value } : {}),
+        ...(input.key !== undefined ? { key: input.key } : {}),
+        ...(input.files !== undefined ? { files: input.files } : {}),
       });
 
       if (scope !== undefined && result.ok) {

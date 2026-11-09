@@ -184,6 +184,10 @@ function fromAct(result: Extract<ActResult, { ok: false }>, index: number): UiRu
           ...(result.blocker_ref !== undefined ? { blocker_ref: result.blocker_ref } : {}),
           ...(result.blocker_role !== undefined ? { blocker_role: result.blocker_role } : {}),
           ...(result.blocker_name !== undefined ? { blocker_name: result.blocker_name } : {}),
+          ...(result.blocker_tag !== undefined ? { blocker_tag: result.blocker_tag } : {}),
+          ...(result.blocker_text !== undefined ? { blocker_text: result.blocker_text } : {}),
+          ...(result.blocker_dom_id !== undefined ? { blocker_dom_id: result.blocker_dom_id } : {}),
+          ...(result.blocker_class !== undefined ? { blocker_class: result.blocker_class } : {}),
         },
       };
     case "invalid_request":

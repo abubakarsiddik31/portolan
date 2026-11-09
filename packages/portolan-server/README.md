@@ -179,7 +179,10 @@ one that launches Chrome, registers the engine, and loads
 
 - The store is `better-sqlite3`; sessions survive a restart. An open session
   from a dead process is closed on the next startup.
-- `createServer` takes a store, so tests use an in-memory database and
+- `createServer({ authToken })` requires `Authorization: Bearer <token>` on every
+route except `/v1/health`; the comparison is constant-time. A non-loopback
+`host` is refused without a token or `PORTOLAN_ALLOW_REMOTE=1`
+(`assertBindAllowed`). `createServer` takes a store, so tests use an in-memory database and
   `app.inject()` without binding a port.
 - A closed session stays readable for audit. `touch` and `close` both refuse
   it, so it cannot be used again.

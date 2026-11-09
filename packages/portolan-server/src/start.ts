@@ -1,5 +1,7 @@
 import { reapOrphans } from "@portolan/substrate";
 
+import { assertBindAllowed } from "./host.js";
+
 import { createLogger } from "./log.js";
 import { createServer } from "./server.js";
 import { SessionStore } from "./store.js";
@@ -16,7 +18,20 @@ if (instanceId !== undefined && instanceId !== "") {
 }
 
 const log = createLogger({ base: { service: "portolan-server" } });
-const app = createServer({ store, logger: true, log });
+const host = process.env.HOST ?? "127.0.0.1";
+const authToken = process.env.PORTOLAN_AUTH_TOKEN;
+
+assertBindAllowed(host, {
+  ...(authToken !== undefined ? { authToken } : {}),
+  allowRemote: process.env.PORTOLAN_ALLOW_REMOTE === "1",
+});
+
+const app = createServer({
+  store,
+  logger: true,
+  log,
+  ...(authToken !== undefined ? { authToken } : {}),
+});
 
 const shutdown = async (): Promise<void> => {
   try {
@@ -30,4 +45,4 @@ const shutdown = async (): Promise<void> => {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
-await app.listen({ port, host: process.env.HOST ?? "127.0.0.1" });
+await app.listen({ port, host });

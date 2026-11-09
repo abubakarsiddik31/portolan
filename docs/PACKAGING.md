@@ -101,8 +101,13 @@ docker run --rm -p 4200:4200 \
   -v "$PWD/maps:/data/maps:ro" \
   -v "$PWD/policies:/data/policies:ro" \
   -v portolan-data:/data \
+  -e PORTOLAN_AUTH_TOKEN=change-me \
   portolan
 ```
+
+A container that should be reachable from the host needs a mounted config
+with `"host": "0.0.0.0"`; the default is loopback. A non-loopback bind is
+refused without `PORTOLAN_AUTH_TOKEN` (or `PORTOLAN_ALLOW_REMOTE=1`).
 
 The image is a multi-stage build:
 

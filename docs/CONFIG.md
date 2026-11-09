@@ -72,6 +72,8 @@ These are read in addition to the config file:
 | `PORTOLAN_CONFIG` | `./portolan.config.json` | Config file, when `--config` is absent. |
 | `CHROME_PATH` | auto-detect | Chrome binary, when `chrome` is unset. |
 | `PORTOLAN_INSTANCE_ID` | unset | Stable id used to reap a hard-killed predecessor's browsers. |
+| `PORTOLAN_AUTH_TOKEN` | unset | Bearer token for `serve`; required for a non-loopback bind unless `PORTOLAN_ALLOW_REMOTE=1`. |
+| `PORTOLAN_ALLOW_REMOTE` | unset | `1` opts a non-loopback bind in without a token. |
 | `PORTOLAN_<SITE>_<KEY>` | unset | Site-scoped credential, e.g. `PORTOLAN_STORE_API_KEY`. |
 | `ANTHROPIC_API_KEY` | unset | Anthropic provider for compile and repair. |
 | `OPENAI_API_KEY` | unset | OpenAI provider for compile and repair. |

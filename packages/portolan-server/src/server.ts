@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { ErrorCode, ResultEnvelope, SessionRecord } from "@portolan/protocol";
@@ -44,6 +44,8 @@ export type ServerOptions = {
   ledger?: WriteLedger;
   /** Creates the browser substrate used by view, act, and read. */
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
+  /** When set, every route except /v1/health requires this bearer token. */
+  authToken?: string;
 };
 
 /**
@@ -96,6 +98,19 @@ export function createServer(options: ServerOptions): FastifyInstance {
     ok: true as const,
     result: { status: "ok" },
   }));
+
+  if (options.authToken !== undefined && options.authToken.length > 0) {
+    const token = options.authToken;
+
+    app.addHook("onRequest", async (request, reply) => {
+      if (request.url === "/v1/health") return;
+
+      const provided = bearer(request.headers.authorization);
+      if (provided === undefined || !sameSecret(provided, token)) {
+        reply.code(401).send(failure("needs_auth", "missing or invalid bearer token"));
+      }
+    });
+  }
 
   app.addHook("onClose", async () => {
     clearInterval(sweep);
@@ -244,6 +259,18 @@ export function createServer(options: ServerOptions): FastifyInstance {
   app.delete("/mcp", handleMcp);
 
   return app;
+}
+
+function bearer(header: string | undefined): string | undefined {
+  if (header === undefined) return undefined;
+  const [scheme, value] = header.split(" ");
+  return scheme?.toLowerCase() === "bearer" && value !== undefined ? value : undefined;
+}
+
+function sameSecret(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function failure(

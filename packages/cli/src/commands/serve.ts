@@ -1,4 +1,5 @@
 import {
+  assertBindAllowed,
   BrowserRegistry,
   createLogger,
   createServer,
@@ -17,6 +18,8 @@ export type ServeInput = {
   port?: number;
   database?: string;
   maps?: string;
+  /** Defaults to PORTOLAN_AUTH_TOKEN. */
+  authToken?: string;
 };
 
 export type ServeDeps = {
@@ -39,6 +42,12 @@ export async function runServe(input: ServeInput, deps: ServeDeps = {}): Promise
   const port = input.port ?? input.config.port;
   const database = input.database ?? input.config.database;
   const maps = input.maps ?? input.config.maps;
+  const authToken = input.authToken ?? process.env.PORTOLAN_AUTH_TOKEN;
+
+  assertBindAllowed(host, {
+    ...(authToken !== undefined ? { authToken } : {}),
+    allowRemote: process.env.PORTOLAN_ALLOW_REMOTE === "1",
+  });
 
   const store = deps.store ?? new SessionStore(database);
   const browsers = new BrowserRegistry();
@@ -49,6 +58,7 @@ export async function runServe(input: ServeInput, deps: ServeDeps = {}): Promise
     maps: new MapStore(maps),
     browsers,
     ...(factory !== undefined ? { substrateFactory: factory } : {}),
+    ...(authToken !== undefined ? { authToken } : {}),
     logger: true,
     log: createLogger({
       level: input.config.logLevel,

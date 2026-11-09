@@ -53,7 +53,9 @@ The codes are a contract. The ones an agent branches on most:
 - **stdio:** `portolan mcp`. A client spawns it. Nothing but protocol frames
   goes to stdout.
 - **HTTP:** `portolan serve` exposes `POST /mcp` at
-  `http://127.0.0.1:4200/mcp`.
+  `http://127.0.0.1:4200/mcp`. Set `PORTOLAN_AUTH_TOKEN` and send
+  `Authorization: Bearer <token>`; a non-loopback bind is refused without a
+  token or `PORTOLAN_ALLOW_REMOTE=1`.
 
 The stdio server reads `MAPS_DIR` and `DATABASE_PATH`. Both transports launch a
 browser on the first `view` / `act` / `read`, load `policies/<site>.json` when

@@ -113,7 +113,7 @@ export function rankAffordances(
   nodes: SemanticNode[],
   options: RankOptions = {},
 ): RankedAffordances {
-  const limit = options.limit ?? 60;
+  const limit = options.limit ?? 100;
   const byId = new Map(nodes.map((node) => [node.nodeId, node]));
   const parents = buildParents(nodes);
   const order = new Map(nodes.map((node, index) => [node.nodeId, index]));
@@ -173,7 +173,9 @@ export function renderAffordances(
   affordances: Affordance[],
   options: RenderOptions = {},
 ): RenderedAffordances {
-  const budget = options.tokenBudget ?? 800;
+  // Accuracy first: render every ranked affordance unless the caller asks
+  // for a cap. A silent 800-token cut can drop the one element a task needs.
+  const budget = options.tokenBudget ?? Number.POSITIVE_INFINITY;
   const lines: string[] = [];
   let tokens = 0;
 

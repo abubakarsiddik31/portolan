@@ -54,7 +54,10 @@ export type McpDeps = {
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
 };
 
-export type FallbackSubstrate = Pick<Substrate, "view" | "act" | "state" | "read">;
+export type FallbackSubstrate = Pick<Substrate, "view" | "act" | "state" | "read"> & {
+  /** Navigate to the map's entry state when the page is still blank. */
+  goto?: (url: string) => Promise<unknown>;
+};
 
 function isExecutableSubstrate(value: FallbackSubstrate | undefined): value is Substrate {
   return value !== undefined && "fetch" in value && "goto" in value;
@@ -295,6 +298,49 @@ export function createMcpServer(deps: McpDeps): McpServer {
     return currentSid === undefined ? undefined : scopes.active(currentSid);
   }
 
+  /**
+   * The page to open when a fallback verb runs before any op has navigated.
+   *
+   * `open_site` pins a map and creates a session but does not launch a browser;
+   * the first `call` navigates. A fallback scope can be the first thing an
+   * agent uses, and then the page is still `about:blank` with no affordances.
+   * Prefer the map's root state so the agent sees the site it opened.
+   */
+  function entryUrl(map: SiteMap): string | undefined {
+    const origin = map.origins[0];
+    if (origin === undefined) return undefined;
+
+    const root = map.states.find((state) => state.url === "/") ?? map.states[0];
+    if (root === undefined) return undefined;
+
+    try {
+      return new URL(root.url ?? "/", origin).toString();
+    } catch {
+      return undefined;
+    }
+  }
+
+  async function ensurePage(substrate: FallbackSubstrate): Promise<void> {
+    if (substrate.goto === undefined) return;
+
+    // A page navigated outside the substrate (a test, or an earlier op) has no
+    // captured state yet, so a missing state does not mean a blank page. Only
+    // navigate when the page itself is still `about:blank`.
+    const current = substrate.state() ?? (await substrate.view());
+    if (current.snapshot.url !== "about:blank") return;
+
+    const session = currentSession();
+    if (session?.site === undefined || session.map_version === undefined) return;
+
+    const map = deps.maps.getVersion(session.site, session.map_version);
+    if (map === undefined) return;
+
+    const url = entryUrl(map);
+    if (url === undefined) return;
+
+    await substrate.goto(url);
+  }
+
   /** The map state a snapshot is in, when the session is pinned to a map. */
   function stateOf(session: SessionRecord | undefined, snapshot: Snapshot): string | undefined {
     if (session?.site === undefined || session.map_version === undefined) return undefined;
@@ -448,6 +494,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
         return failure("op_broken", "fallback substrate is not available");
       }
 
+      await ensurePage(substrate);
       const { snapshot, refs } = await substrate.view();
       const ranked = rankAffordances(snapshot.nodes, { refs });
       const rendered = renderAffordances(ranked.affordances);
@@ -508,6 +555,8 @@ export function createMcpServer(deps: McpDeps): McpServer {
         return failure("op_broken", "file uploads are not supported by fallback act yet");
       }
 
+      await ensurePage(substrate);
+
       const session = currentSession();
       const scope = activeScope();
       const before = substrate.state();
@@ -567,6 +616,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
         return failure("op_broken", "fallback substrate is not available");
       }
 
+      await ensurePage(substrate);
       const result = await substrate.read(ref);
 
       const scope = activeScope();

@@ -50,6 +50,7 @@ a malicious map is equivalent to a malicious operator.
 | Retry double-writes | Idempotency key replays a completed result; a pending key is reconciled with `outcome_check`; a failed-after-dispatch write returns `unknown_outcome` and is never retried blindly | `runtime/write.ts` |
 | Idempotency key reused for another op/site returns the wrong result | **Fixed:** collision returns `invalid_params` with `idempotency_key_reused` | `runtime/write.ts` |
 | A restart loses the write ledger, so a retry can double-write | **Fixed:** the ledger is a SQLite table; a `pending` record from a dead process is settled to `unknown` at startup | `server/write-ledger.ts`, `server/store.ts` |
+| `serve` and `mcp` had no substrate factory, so the fallback verbs and egress policies were unavailable outside tests | **Fixed:** `createServer` takes a `substrateFactory`; `serve` and `mcp` share one that launches Chrome, registers the engine, and loads `policies/<site>.json` | `server/server.ts`, `cli/browser.ts` |
 | Site name escapes the maps directory | **Fixed:** `MapStore` accepts only `[A-Za-z0-9][A-Za-z0-9._-]*` and rejects `..` | `server/maps.ts` |
 | Orphan browsers after a crash | Session TTL/cap/recovery; `reapOrphans` kills tagged Chromium | `server`, `substrate/reaper.ts` |
 | Session leak from a previous process | Startup recovery closes every open session | `server/server.ts` |
@@ -98,7 +99,6 @@ three failure classes, thrown errors, and the key-collision fix
 |---|---|---|
 | [#74](https://github.com/abubakarsiddik31/portolan/issues/74) | The egress guard sees the request URL, not redirects or DNS rebinding | Needs the final response URL and address pinning |
 | [#75](https://github.com/abubakarsiddik31/portolan/issues/75) | `serve` has no authentication and can bind `0.0.0.0` | Needs a token or socket, and a bind policy |
-| [#76](https://github.com/abubakarsiddik31/portolan/issues/76) | `serve` and `mcp` provide no substrate factory, so fallback verbs and egress policies are unavailable outside tests | Needs a browser-per-session factory wired to `BrowserRegistry` |
 | [#77](https://github.com/abubakarsiddik31/portolan/issues/77) | Redaction is key-based only; a secret in a free-text field survives | Needs value-shape detection or per-op field allowlists |
 | [#78](https://github.com/abubakarsiddik31/portolan/issues/78) | The Docker image runs Chromium with `--no-sandbox` | Needs a seccomp/userns setup or a trust statement |
 

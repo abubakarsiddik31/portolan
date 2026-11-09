@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { ErrorCode, ResultEnvelope } from "@portolan/protocol";
+import type { ErrorCode, ResultEnvelope, SessionRecord } from "@portolan/protocol";
 import { createSessionRequestSchema } from "@portolan/protocol";
 import type { WriteLedger } from "@portolan/runtime";
 import Fastify, {
@@ -17,7 +17,7 @@ import { notReadyExecutor, type OpExecutor } from "./executor.js";
 import { mergeHealth } from "./health.js";
 import type { Logger } from "./log.js";
 import type { MapStore } from "./maps.js";
-import { createMcpServer } from "./mcp.js";
+import { createMcpServer, type FallbackSubstrate } from "./mcp.js";
 import type { SessionStore } from "./store.js";
 
 export type ServerOptions = {
@@ -42,6 +42,8 @@ export type ServerOptions = {
   log?: Logger;
   /** Write ledger. Defaults to the store's SQLite ledger. */
   ledger?: WriteLedger;
+  /** Creates the browser substrate used by view, act, and read. */
+  substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
 };
 
 /**
@@ -216,6 +218,9 @@ export function createServer(options: ServerOptions): FastifyInstance {
         sessions: options.store,
         executor: options.executor ?? notReadyExecutor,
         ledger: options.ledger ?? options.store.writeLedger(),
+        ...(options.substrateFactory !== undefined
+          ? { substrateFactory: options.substrateFactory }
+          : {}),
       });
 
       await mcp.connect(created);

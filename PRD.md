@@ -341,9 +341,7 @@ The schedule and task estimates are in
    are acceptable before the compiler is considered failed?
 4. **HTTP authentication.** `serve` has none (#75); a token or socket is needed
    before a non-loopback bind.
-5. **Substrate factory in `serve`.** `mcp` now launches a browser; `serve`
-   does not (#76).
-6. **Name clearance.** Trademark classes 9/42 (T7.06).
+5. **Name clearance.** Trademark classes 9/42 (T7.06).
 
 ---
 

@@ -94,6 +94,8 @@ These are programmatic options, passed to `createServer` by a host:
 | `executor` | `notReadyExecutor` | The op executor. |
 | `canary` | unset | A `CanaryScheduler`, started and stopped with the server. |
 | `browsers` | new registry | `BrowserRegistry` for session-owned engines. |
+| `substrateFactory` | unset | Creates the browser substrate for `view`, `act`, and `read`. |
+| `ledger` | the store's SQLite ledger | The write idempotency ledger. |
 | `logger` | `false` | Fastify's request log. |
 | `log` | unset | A structured `Logger` for lifecycle events. |
 

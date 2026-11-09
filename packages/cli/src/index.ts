@@ -1,4 +1,5 @@
 export * from "./args.js";
+export * from "./browser.js";
 export * from "./cli.js";
 export * from "./commands/bench.js";
 export * from "./commands/compile.js";

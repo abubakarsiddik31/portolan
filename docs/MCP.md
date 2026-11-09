@@ -55,11 +55,10 @@ The codes are a contract. The ones an agent branches on most:
 - **HTTP:** `portolan serve` exposes `POST /mcp` at
   `http://127.0.0.1:4200/mcp`.
 
-The stdio server reads `MAPS_DIR` and `DATABASE_PATH`. It launches a browser on
-the first `view` / `act` / `read`, loads `policies/<site>.json` when present,
-and closes the browser with the server. `serve` reads the config file and does
-not wire a browser factory yet (issue #76), so the fallback verbs are
-unavailable there; use `portolan mcp` for them.
+The stdio server reads `MAPS_DIR` and `DATABASE_PATH`. Both transports launch a
+browser on the first `view` / `act` / `read`, load `policies/<site>.json` when
+present, and close the browser with the server or the session. `serve` reads
+the config file; `mcp` reads the two environment variables.
 
 ## Sessions
 

@@ -2,6 +2,7 @@ import { join } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { buildRefMap, type SemanticNode, type Snapshot } from "@portolan/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -217,6 +218,61 @@ describe("server", () => {
         "read",
         "fallback_done",
       ]);
+    } finally {
+      await client.close();
+      await http.close();
+    }
+  });
+
+  it("serves view through a substrate factory over http", async () => {
+    const node: SemanticNode = {
+      nodeId: "button:Go",
+      role: "button",
+      name: "Go",
+      backendNodeId: 1,
+      ignored: false,
+      visible: true,
+      properties: {},
+      childIds: [],
+      bounds: { x: 0, y: 0, width: 40, height: 20 },
+    };
+    const snapshot: Snapshot = { doc: 1, v: 0, url: "http://x/", title: "", nodes: [node] };
+    const view = { snapshot, refs: buildRefMap([node], 1) };
+
+    const http = createServer({
+      store,
+      maps: new MapStore(MAPS),
+      substrateFactory: () => ({
+        view: async () => view,
+        state: () => view,
+        read: async () => ({ text: "Go" }),
+        act: async () => ({ ok: false, code: "invalid_request", message: "not in this test" }),
+      }),
+    });
+    await http.listen({ port: 0, host: "127.0.0.1" });
+
+    const address = http.server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("the server did not get a port");
+    }
+
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://127.0.0.1:${address.port}/mcp`),
+    );
+    const client = new Client({ name: "http-view", version: "0.0.0" });
+
+    try {
+      await client.connect(transport);
+      await client.callTool({ name: "open_site", arguments: { site: "store" } });
+      const result = await client.callTool({ name: "view", arguments: {} });
+      const text = (result.content as Array<{ text?: string }>)[0]?.text ?? "";
+      const body = JSON.parse(text) as {
+        untrusted: boolean;
+        affordances: Array<{ name: string }>;
+      };
+
+      expect(body.untrusted).toBe(true);
+      expect(body.affordances).toContainEqual(expect.objectContaining({ name: "Go" }));
     } finally {
       await client.close();
       await http.close();

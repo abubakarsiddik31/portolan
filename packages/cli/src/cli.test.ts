@@ -244,14 +244,29 @@ describe("serve", () => {
       close: async () => void closed.push("app"),
     } as unknown as FastifyInstance;
 
+    let seen: { browsers?: unknown; substrateFactory?: unknown } | undefined;
     const handle = await runServe(
       {
         config: { ...DEFAULT_CONFIG, site: "store", database: ":memory:", port: 0 },
       },
-      { createApp: () => fake },
+      {
+        createApp: (options) => {
+          seen = options as { browsers?: unknown; substrateFactory?: unknown };
+          return fake;
+        },
+        substrateFactory: () =>
+          ({
+            view: async () => ({ snapshot: {}, refs: {} }),
+            state: () => undefined,
+            read: async () => ({ text: "" }),
+            act: async () => ({ ok: false, code: "invalid_request", message: "test" }),
+          }) as never,
+      },
     );
 
     expect(handle.url).toBe("http://127.0.0.1:4321");
+    expect(seen?.browsers).toBeDefined();
+    expect(seen?.substrateFactory).toBeDefined();
     await handle.close();
     expect(closed).toEqual(["app"]);
   });

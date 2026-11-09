@@ -1,12 +1,11 @@
-import type { SessionRecord } from "@portolan/protocol";
 import {
   BrowserRegistry,
   type StdioServerHandle,
   type StdioServerOptions,
   startStdioServer,
 } from "@portolan/server";
-import { findChrome, loadPolicy, PlaywrightEngine, Substrate } from "@portolan/substrate";
 
+import { createBrowserFactory } from "../browser.js";
 import type { CliConfig } from "../config.js";
 
 export type McpInput = {
@@ -27,7 +26,7 @@ export type McpDeps = {
  */
 export async function runMcp(input: McpInput, deps: McpDeps = {}): Promise<StdioServerHandle> {
   const browsers = new BrowserRegistry();
-  const factory = deps.substrateFactory ?? browserFactory(input.config, browsers);
+  const factory = deps.substrateFactory ?? createBrowserFactory(input.config, browsers);
   const start = deps.start ?? startStdioServer;
 
   return start({
@@ -36,27 +35,4 @@ export async function runMcp(input: McpInput, deps: McpDeps = {}): Promise<Stdio
     browsers,
     ...(factory !== undefined ? { substrateFactory: factory } : {}),
   });
-}
-
-function browserFactory(
-  config: CliConfig,
-  browsers: BrowserRegistry,
-): StdioServerOptions["substrateFactory"] {
-  const executablePath = config.chrome ?? findChrome();
-  if (executablePath === undefined) return undefined;
-
-  const instanceId = process.env.PORTOLAN_INSTANCE_ID;
-
-  return async (session: SessionRecord) => {
-    const engine = await PlaywrightEngine.launch({
-      executablePath,
-      headless: config.headless,
-      ...(instanceId !== undefined ? { instanceId } : {}),
-    });
-    browsers.register(session.sid, engine);
-
-    const policy =
-      session.site === undefined ? undefined : loadPolicy(session.site, config.policies);
-    return new Substrate(engine, policy !== undefined ? { policy } : {});
-  };
 }

@@ -1,4 +1,5 @@
 import {
+  BrowserRegistry,
   createLogger,
   createServer,
   MapStore,
@@ -7,6 +8,7 @@ import {
 } from "@portolan/server";
 import type { FastifyInstance } from "fastify";
 
+import { createBrowserFactory } from "../browser.js";
 import type { CliConfig } from "../config.js";
 
 export type ServeInput = {
@@ -20,6 +22,8 @@ export type ServeInput = {
 export type ServeDeps = {
   createApp?: (options: ServerOptions) => FastifyInstance;
   store?: SessionStore;
+  /** Override the browser factory; tests pass a fake. */
+  substrateFactory?: ServerOptions["substrateFactory"];
 };
 
 export type ServeHandle = {
@@ -37,10 +41,14 @@ export async function runServe(input: ServeInput, deps: ServeDeps = {}): Promise
   const maps = input.maps ?? input.config.maps;
 
   const store = deps.store ?? new SessionStore(database);
+  const browsers = new BrowserRegistry();
+  const factory = deps.substrateFactory ?? createBrowserFactory(input.config, browsers);
   const create = deps.createApp ?? createServer;
   const app = create({
     store,
     maps: new MapStore(maps),
+    browsers,
+    ...(factory !== undefined ? { substrateFactory: factory } : {}),
     logger: true,
     log: createLogger({
       level: input.config.logLevel,

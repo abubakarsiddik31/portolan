@@ -125,11 +125,17 @@ const substrate = new Substrate(engine, {
 ```
 
 The guard is default-deny. `fetch` (the in-page `http` tier and fallback) and
-`goto` (the `url` tier) are checked before they reach the page. `fetch` also
-checks the final URL after a redirect; an off-allowlist redirect throws with
+`goto` (the `url` tier) are checked before they reach the page. The guard also
+resolves an allowlisted hostname and refuses a private, loopback, link-local,
+CGNAT, or reserved address (`reason: "private_address"`). `fetch` checks the
+final URL after a redirect too; an off-allowlist redirect throws with
 `reason: "redirect"`. A blocked request throws `EgressBlockedError`, is kept in
 `blockedRequests()`, and is passed to `onBlocked`. A page's own navigation is
 not intercepted by this layer.
+
+The address check is a pre-flight lookup, not address pinning: the browser
+resolves the name again when it connects. A name that changes between the two
+lookups can still reach a private address.
 
 ## Crash recovery
 

@@ -79,6 +79,20 @@ describe("substrate fetch redirects", () => {
     expect(events[0]).toMatchObject({ reason: "redirect", url: "https://evil.test/landing" });
   });
 
+  it("refuses a hostname that resolves to a private address", async () => {
+    const events: BlockedRequest[] = [];
+    const guarded = new Substrate(fakeEngine("http://public.test/api"), {
+      policy: { site: "store", allow: ["public.test"] },
+      onBlocked: (event) => events.push(event),
+      resolve: async () => ["127.0.0.1"],
+    });
+
+    await expect(guarded.fetch({ method: "GET", url: "http://public.test/api" })).rejects.toThrow(
+      /private_address/,
+    );
+    expect(events[0]?.reason).toBe("private_address");
+  });
+
   it("returns a response whose final url is on the allowlist", async () => {
     const guarded = new Substrate(fakeEngine("http://127.0.0.1/api"), {
       policy: { site: "store", allow: ["127.0.0.1"] },

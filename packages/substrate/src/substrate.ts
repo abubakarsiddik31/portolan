@@ -1,6 +1,6 @@
 import type { Action, Effect, Engine, Snapshot } from "./engine.js";
 import { EngineError } from "./engine.js";
-import { type BlockedRequest, EgressGuard, type EgressPolicy } from "./policy.js";
+import { type BlockedRequest, EgressGuard, type EgressPolicy, type Resolver } from "./policy.js";
 import { type RefMap, RefRegistry } from "./refs.js";
 
 export type SubstrateView = {
@@ -74,6 +74,8 @@ export type SubstrateOptions = {
   /** When present, `fetch` and `goto` are default-deny. */
   policy?: EgressPolicy;
   onBlocked?: (event: BlockedRequest) => void;
+  /** Hostname resolver for the rebinding check; injectable for tests. */
+  resolve?: Resolver;
 };
 
 export class Substrate {
@@ -87,7 +89,9 @@ export class Substrate {
     options: SubstrateOptions = {},
   ) {
     this.guard =
-      options.policy === undefined ? undefined : new EgressGuard(options.policy, options.onBlocked);
+      options.policy === undefined
+        ? undefined
+        : new EgressGuard(options.policy, options.onBlocked, options.resolve);
   }
 
   async view(): Promise<SubstrateView> {
@@ -101,7 +105,10 @@ export class Substrate {
 
   /** Run a fetch inside the live page, with the page's cookies and origin. */
   async fetch(request: HttpRequest): Promise<HttpResponse> {
-    this.guard?.check(absolute(request.url, this.last?.url ?? "http://localhost"), request.method);
+    await this.guard?.checkResolved(
+      absolute(request.url, this.last?.url ?? "http://localhost"),
+      request.method,
+    );
 
     const body =
       request.body === undefined ? "undefined" : `JSON.stringify(${JSON.stringify(request.body)})`;
@@ -138,7 +145,7 @@ export class Substrate {
 
   /** Navigate, then capture. The `goto` substrate verb. */
   async goto(url: string): Promise<SubstrateView> {
-    this.guard?.check(url, "GET");
+    await this.guard?.checkResolved(url, "GET");
     await this.engine.navigate(url);
     return this.view();
   }

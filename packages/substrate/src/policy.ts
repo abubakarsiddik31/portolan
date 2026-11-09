@@ -1,3 +1,4 @@
+import { lookup } from "node:dns/promises";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -13,9 +14,15 @@ export type EgressPolicy = {
 export type BlockedRequest = {
   url: string;
   method: string;
-  reason: "not_allowed" | "denied" | "redirect";
+  reason: "not_allowed" | "denied" | "redirect" | "private_address";
   at: string;
 };
+
+/** Resolve a hostname to its addresses. Injectable for tests. */
+export type Resolver = (hostname: string) => Promise<string[]>;
+
+export const defaultResolver: Resolver = async (hostname) =>
+  (await lookup(hostname, { all: true, verbatim: true })).map((entry) => entry.address);
 
 export class EgressBlockedError extends Error {
   readonly code = "egress_blocked";
@@ -41,6 +48,7 @@ export class EgressGuard {
   constructor(
     private readonly policy: EgressPolicy,
     private readonly onBlocked?: (event: BlockedRequest) => void,
+    private readonly resolve: Resolver = defaultResolver,
   ) {}
 
   allows(url: string): boolean {
@@ -57,14 +65,46 @@ export class EgressGuard {
 
   check(url: string, method = "GET", reason?: BlockedRequest["reason"]): void {
     if (this.allows(url)) return;
+    this.block(url, method, reason ?? (this.denied(url) ? "denied" : "not_allowed"));
+  }
 
-    const blocked: BlockedRequest = {
-      url,
-      method,
-      reason: reason ?? (this.denied(url) ? "denied" : "not_allowed"),
-      at: new Date().toISOString(),
-    };
+  /**
+   * Check the allowlist, then resolve the hostname and refuse a private
+   * address.
+   *
+   * This is a rebinding defense, not a proof: the browser resolves the name
+   * again when it connects, so a name that changes between the two lookups can
+   * still reach a private address. An IP literal or `localhost` is trusted
+   * when it is explicitly allowlisted.
+   */
+  async checkResolved(url: string, method = "GET"): Promise<void> {
+    this.check(url, method);
 
+    let host: string;
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      return;
+    }
+
+    if (isIpLiteral(host) || host === "localhost") return;
+
+    let addresses: string[];
+    try {
+      addresses = await this.resolve(host);
+    } catch {
+      // A name that does not resolve cannot be connected to; let the browser
+      // report the failure rather than turning DNS into an egress decision.
+      return;
+    }
+
+    if (addresses.some(isPrivateAddress)) {
+      this.block(url, method, "private_address");
+    }
+  }
+
+  private block(url: string, method: string, reason: BlockedRequest["reason"]): never {
+    const blocked: BlockedRequest = { url, method, reason, at: new Date().toISOString() };
     this.blocked.push(blocked);
     this.onBlocked?.(blocked);
     throw new EgressBlockedError(blocked);
@@ -125,6 +165,40 @@ export function loadPolicy(site: string, dir = "policies"): EgressPolicy | undef
     allow: parsed.allow as string[],
     ...(parsed.deny !== undefined ? { deny: parsed.deny as string[] } : {}),
   };
+}
+
+/** True for an IPv4 or IPv6 literal, including a bracketed IPv6 host. */
+export function isIpLiteral(host: string): boolean {
+  const value = host.replace(/^\[|\]$/g, "");
+  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value) || value.includes(":");
+}
+
+/** True for loopback, private, link-local, CGNAT, multicast, and reserved. */
+export function isPrivateAddress(address: string): boolean {
+  const value = address.replace(/^\[|\]$/g, "").toLowerCase();
+
+  if (value.startsWith("::ffff:")) return isPrivateAddress(value.slice(7));
+  if (value === "::1" || value === "::") return true;
+  if (value.startsWith("fc") || value.startsWith("fd")) return true;
+  if (/^fe[89ab]/.test(value)) return true;
+
+  const parts = value.split(".").map(Number);
+  if (
+    parts.length !== 4 ||
+    parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+  ) {
+    return false;
+  }
+
+  const [a = 0, b = 0] = parts;
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a >= 224) return true;
+
+  return false;
 }
 
 function matches(pattern: string, url: URL): boolean {

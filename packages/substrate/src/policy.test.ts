@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { EgressBlockedError, EgressGuard, loadPolicy } from "./policy.js";
+import { EgressBlockedError, EgressGuard, isPrivateAddress, loadPolicy } from "./policy.js";
 
 const dirs: string[] = [];
 
@@ -71,6 +71,84 @@ describe("EgressGuard", () => {
 
     expect(() => denied.check("https://evil.trusted.test/")).toThrow(/denied/);
     expect(denied.blockedRequests()[0]?.reason).toBe("denied");
+  });
+});
+
+describe("address classification", () => {
+  it("marks private, loopback, link-local, CGNAT, and reserved addresses", () => {
+    for (const address of [
+      "127.0.0.1",
+      "10.1.2.3",
+      "172.16.0.1",
+      "172.31.255.255",
+      "192.168.1.1",
+      "169.254.1.1",
+      "100.64.0.1",
+      "0.0.0.0",
+      "224.0.0.1",
+      "255.255.255.255",
+      "::1",
+      "fd00::1",
+      "fe80::1",
+      "::ffff:192.168.1.1",
+    ]) {
+      expect(isPrivateAddress(address), address).toBe(true);
+    }
+  });
+
+  it("leaves public addresses alone", () => {
+    for (const address of ["93.184.216.34", "8.8.8.8", "172.15.0.1", "2606:4700::1111"]) {
+      expect(isPrivateAddress(address), address).toBe(false);
+    }
+  });
+});
+
+describe("EgressGuard.checkResolved", () => {
+  it("allows a public name that resolves to a public address", async () => {
+    const guard = new EgressGuard(
+      { site: "store", allow: ["public.test"] },
+      undefined,
+      async () => ["93.184.216.34"],
+    );
+
+    await expect(guard.checkResolved("https://public.test/api")).resolves.toBeUndefined();
+  });
+
+  it("refuses a public name that resolves to a private address", async () => {
+    const events: unknown[] = [];
+    const guard = new EgressGuard(
+      { site: "store", allow: ["public.test"] },
+      (event) => events.push(event),
+      async () => ["127.0.0.1"],
+    );
+
+    await expect(guard.checkResolved("https://public.test/api")).rejects.toThrow(
+      EgressBlockedError,
+    );
+    expect(guard.blockedRequests()[0]?.reason).toBe("private_address");
+    expect(events).toHaveLength(1);
+  });
+
+  it("trusts an allowlisted IP literal and localhost without a lookup", async () => {
+    let lookups = 0;
+    const guard = new EgressGuard(
+      { site: "store", allow: ["127.0.0.1", "localhost"] },
+      undefined,
+      async () => {
+        lookups += 1;
+        return ["10.0.0.1"];
+      },
+    );
+
+    await expect(guard.checkResolved("http://127.0.0.1/api")).resolves.toBeUndefined();
+    await expect(guard.checkResolved("http://localhost/api")).resolves.toBeUndefined();
+    expect(lookups).toBe(0);
+  });
+
+  it("still refuses an off-allowlist host", async () => {
+    const guard = new EgressGuard({ site: "store", allow: ["public.test"] });
+
+    await expect(guard.checkResolved("https://other.test/")).rejects.toThrow(/not_allowed/);
   });
 });
 

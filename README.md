@@ -22,7 +22,7 @@ Portolan is **open source** (Apache-2.0) and **agent-native with a human cockpit
 | First release | v0.1.0 public alpha, target **Tue 2027-03-02** |
 | First gate | G0: hand-written ops must beat the best free tool by ≥3x on steps and ≥5x on cost, or we stop |
 | Key decisions | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic), ADR-004 (name), ADR-007 (one session, two projections), ADR-008 (open source) in [docs/DECISIONS.md](./docs/DECISIONS.md) |
-| License | Apache-2.0 (runtime, SDK, CLI, skills) · MIT (cockpit) · CC-BY-4.0 (map spec) |
+| License | Apache-2.0 (runtime, SDK, CLI, skills) · MIT (cockpit) · CC-BY-4.0 (map spec). See [docs/LICENSING.md](./docs/LICENSING.md) |
 
 ---
 
@@ -127,6 +127,6 @@ If G0 fails, we stop on Day 2. That is the point of testing perfect maps before 
 
 ## License
 
-Apache-2.0 for the runtime, SDK, CLI and skills. MIT for the human cockpit. CC-BY-4.0 for the protocol and map spec. See [LICENSE](./LICENSE) and [ADR-008](./docs/DECISIONS.md).
+Apache-2.0 for the runtime, SDK, CLI and skills. MIT for the human cockpit. CC-BY-4.0 for the published map spec. See [LICENSE](./LICENSE), [LICENSE-MIT](./LICENSE-MIT), [LICENSE-CC-BY-4.0](./LICENSE-CC-BY-4.0), [docs/LICENSING.md](./docs/LICENSING.md), and [ADR-008](./docs/DECISIONS.md).
 
 Contributions are accepted under the same licenses. Read [CONTRIBUTING.md](./CONTRIBUTING.md) first; one task, one branch, one PR.

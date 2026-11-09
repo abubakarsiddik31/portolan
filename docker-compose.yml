@@ -1,0 +1,21 @@
+services:
+  portolan:
+    build: .
+    ports:
+      - "4200:4200"
+    environment:
+      # The token is required because the config binds 0.0.0.0 in the container.
+      PORTOLAN_AUTH_TOKEN: "change-me"
+      # Turn the renderer sandbox on; this compose file opts out of the default
+      # seccomp profile so user namespaces are available.
+      PORTOLAN_CHROME_SANDBOX: "1"
+    security_opt:
+      - seccomp=unconfined
+    volumes:
+      - ./portolan.config.json:/data/portolan.config.json:ro
+      - ./maps:/data/maps:ro
+      - ./policies:/data/policies:ro
+      - portolan-data:/data
+
+volumes:
+  portolan-data:

@@ -120,8 +120,14 @@ The image is a multi-stage build:
 Details that matter:
 
 - **`CHROME_PATH=/usr/local/bin/chromium-portolan`**, a wrapper that adds
-  `--no-sandbox --disable-dev-shm-usage`. Chromium in a container needs both;
-  keeping them in the wrapper leaves the application code unchanged.
+  `--disable-dev-shm-usage` and, by default, `--no-sandbox`. Chromium's
+  renderer sandbox needs unprivileged user namespaces, which the default
+  Docker seccomp profile blocks. **The default image is therefore suitable
+  only for trusted sites.**
+- **`PORTOLAN_CHROME_SANDBOX=1`** drops `--no-sandbox`. It needs a seccomp
+  profile that permits user namespaces; `docker-compose.yml` uses
+  `seccomp=unconfined` to show the trade-off. Do not run untrusted pages in
+  the default image.
 - **`/data` is the working directory** and is owned by `node`: config, maps,
   policies, skills, and the SQLite file live there. Mount the read-only inputs
   and a volume for the database.

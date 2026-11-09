@@ -54,6 +54,7 @@ a malicious map is equivalent to a malicious operator.
 | `serve` had no authentication and could bind a public interface | **Fixed:** `authToken` adds a constant-time bearer check to every route except `/v1/health`; a non-loopback bind is refused without a token or `PORTOLAN_ALLOW_REMOTE=1` | `server/server.ts`, `server/host.ts` |
 | A redirect could land outside the allowlist | **Fixed:** `fetch` reports the final URL and the guard checks it, recording `reason: "redirect"` | `substrate/substrate.ts` |
 | A credential in a free-text field survived key-based redaction | **Fixed:** values are also matched by shape — provider keys, GitHub/AWS/Google/Stripe tokens, JWTs, SSNs, and Luhn-valid card numbers | `runtime/redact.ts`, `server/log.ts` |
+| The Docker image ran Chromium with `--no-sandbox` unconditionally | **Documented and configurable:** the wrapper defaults to `--no-sandbox` and the image is trusted-sites only; `PORTOLAN_CHROME_SANDBOX=1` drops it for a host with a seccomp profile | `docker/chromium.sh`, `Dockerfile` |
 | Site name escapes the maps directory | **Fixed:** `MapStore` accepts only `[A-Za-z0-9][A-Za-z0-9._-]*` and rejects `..` | `server/maps.ts` |
 | Orphan browsers after a crash | Session TTL/cap/recovery; `reapOrphans` kills tagged Chromium | `server`, `substrate/reaper.ts` |
 | Session leak from a previous process | Startup recovery closes every open session | `server/server.ts` |
@@ -101,7 +102,6 @@ three failure classes, thrown errors, and the key-collision fix
 | Issue | Finding | Why it is not fixed here |
 |---|---|---|
 | [#88](https://github.com/abubakarsiddik31/portolan/issues/88) | The egress guard matches the hostname, not the resolved address (DNS rebinding) | Needs address pinning before the browser connects |
-| [#78](https://github.com/abubakarsiddik31/portolan/issues/78) | The Docker image runs Chromium with `--no-sandbox` | Needs a seccomp/userns setup or a trust statement |
 
 ## Residual risks
 

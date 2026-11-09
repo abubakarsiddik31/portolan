@@ -221,6 +221,14 @@ export class Substrate {
         delta,
       };
     } catch (error) {
+      // A node can vanish between the snapshot and the action: a client-side
+      // framework (Next.js, React) hydrates and replaces the DOM without a
+      // navigation. The ref points at a backend node that no longer exists,
+      // which is a stale ref, not an engine failure.
+      if (error instanceof EngineError && error.code === "not_found") {
+        return { ok: false, code: "stale_ref", current_doc: this.last?.doc ?? 0 };
+      }
+
       if (error instanceof EngineError && error.code === "not_interactive") {
         const blocker = error.details.blockerBackendNodeId;
 

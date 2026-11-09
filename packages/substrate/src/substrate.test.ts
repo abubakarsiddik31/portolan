@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { findChrome } from "./chrome.js";
 import type { Engine } from "./engine.js";
+import { EngineError } from "./engine.js";
 import { PlaywrightEngine } from "./playwright-engine.js";
 import type { BlockedRequest } from "./policy.js";
 import type { RefMap } from "./refs.js";
@@ -54,6 +55,48 @@ function refFor(refs: RefMap, role: string, name: string): string {
   }
   throw new Error(`no ${role} named "${name}"`);
 }
+
+describe("substrate act", () => {
+  const node = {
+    nodeId: "n1",
+    role: "button",
+    name: "Go",
+    backendNodeId: 7,
+    ignored: false,
+    visible: true,
+    bounds: { x: 0, y: 0, width: 10, height: 10 },
+    properties: {},
+    childIds: [],
+  };
+
+  it("treats a vanished DOM node as a stale ref", async () => {
+    const engine = {
+      navigate: async () => ({ url: "http://127.0.0.1/", title: "", status: null }),
+      snapshot: async () => ({
+        doc: 1,
+        v: 0,
+        url: "http://127.0.0.1/",
+        title: "",
+        nodes: [node],
+      }),
+      dispatch: async () => {
+        throw new EngineError("not_found", "no DOM node with backend id 7");
+      },
+      evaluate: async () => ({ status: 200, text: "{}", json: {}, url: "http://127.0.0.1/" }),
+      close: async () => undefined,
+    } as unknown as Engine;
+
+    const substrate = new Substrate(engine);
+    const view = await substrate.view();
+    const ref = refFor(view.refs, "button", "Go");
+
+    expect(await substrate.act({ ref, do: "click" })).toEqual({
+      ok: false,
+      code: "stale_ref",
+      current_doc: 1,
+    });
+  });
+});
 
 describe("substrate fetch redirects", () => {
   function fakeEngine(finalUrl: string): Engine {

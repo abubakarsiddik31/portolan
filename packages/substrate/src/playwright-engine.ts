@@ -1,4 +1,4 @@
-import { type Browser, type CDPSession, chromium, type Page } from "playwright-core";
+import { type Browser, type CDPSession, chromium, type Frame, type Page } from "playwright-core";
 
 import {
   type Action,
@@ -550,14 +550,6 @@ export class PlaywrightEngine implements Engine {
   }
 
   /**
-   * Wait for the page to settle after an action.
-   *
-   * A click that submits a form starts a navigation asynchronously, so this
-   * first waits up to 250ms for a main-frame navigation, then for load and a
-   * short network-idle window. A long poll or animation must not block the
-   * caller; the timeouts are the contract.
-   */
-  /**
    * Run an action that may navigate, and wait for the new document.
    *
    * The navigation waiter is installed *before* the action: a click can start
@@ -569,19 +561,26 @@ export class PlaywrightEngine implements Engine {
    * and an op that needs a later state declares `await_state`.
    */
   private async settleAction(action: () => Promise<void>): Promise<void> {
-    const navigation = this.page
-      .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 2_000 })
-      .then(() => true)
-      .catch(() => false);
+    const navigated = new Promise<void>((resolve) => {
+      const onNavigated = (frame: Frame): void => {
+        if (frame === this.page.mainFrame()) {
+          this.page.off("framenavigated", onNavigated);
+          resolve();
+        }
+      };
+
+      // Install the listener before the action: a click can commit a
+      // navigation before a listener installed afterwards runs.
+      this.page.on("framenavigated", onNavigated);
+      setTimeout(() => {
+        this.page.off("framenavigated", onNavigated);
+        resolve();
+      }, 500);
+    });
 
     await action();
-
-    await Promise.race([
-      navigation,
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 300)),
-    ]);
-
-    await this.page.waitForLoadState("domcontentloaded", { timeout: 2_000 }).catch(() => {});
+    await navigated;
+    await this.page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => {});
   }
 
   private async contains(target: number, candidate: number): Promise<boolean> {

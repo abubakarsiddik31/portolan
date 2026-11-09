@@ -1,14 +1,14 @@
 # Client conformance
 
-Server: `packages/portolan-server/dist/mcp-stdio.js`
+Server: `packages/cli/dist/bin.js mcp`
 
 | Client | Status | Detail |
 |---|---|---|
-| claude-code | pass | sites=3, op=search, error=op_broken |
+| claude-code | pass | sites=3, op=search, ok=true |
 | codex-cli | fail | 402 Payment Required (deactivated workspace) |
-| gemini-cli | pass | sites=3, op=search, error=op_broken |
+| gemini-cli | pass | sites=3, op=search, ok=true |
 
 The suite asks each client to call `list_sites`, `open_site("store")`, and
-`call("search", {"query":"tee"})`, then return a JSON marker. The server
-uses the not-ready executor, so `search` is expected to return `op_broken`;
-the conformance is the MCP surface, not the op execution.
+`call("search", {"query":"tee"})`, then return a JSON marker. The server is
+`portolan mcp`, which launches Chromium and executes the op through the url
+tier, so `ok: true` means the client reached a real result, not just the surface.

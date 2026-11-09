@@ -105,12 +105,15 @@ Raw: [`perf.json`](../bench/results/perf.json), [`perf.md`](../bench/results/per
 
 | Client | Status | Detail |
 |---|---|---|
-| Claude Code | pass | `list_sites`, `open_site`, `call` round trip |
+| Claude Code | pass | `sites=3, op=search, ok=true` |
 | Gemini CLI | pass | same |
 | Codex CLI | fail | `402 Payment Required` (deactivated workspace) |
 
-The suite checks the MCP surface, not op execution: the stdio server has no
-browser factory in the conformance run, so `call` returns `op_broken`.
+The server is `portolan mcp`, which launches Chromium, so `ok=true` means the
+client reached a real `search` result through the `url` tier — not just the
+MCP surface. The fixture is the store app on `127.0.0.1:4100`; the model is the
+client's own, so this is a client-compatibility check, not a success-rate
+measurement.
 
 Raw: [`conformance.json`](../bench/results/conformance.json),
 [`conformance.md`](../bench/results/conformance.md).
@@ -172,7 +175,8 @@ runner. The model port is configured per role; see
   anti-bot, and dynamic content.
 - **The latency sample is one machine and ten runs.** It shows the tier
   overhead, not a production p50.
-- **Conformance is two clients, one of them with a surface-only call.**
+- **Conformance is two clients and one op on a local fixture.** It shows the
+  clients can drive the surface and reach a result; it is not a task sample.
 
 ## 7. What the next run must do
 

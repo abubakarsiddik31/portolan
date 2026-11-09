@@ -13,7 +13,7 @@ export type EgressPolicy = {
 export type BlockedRequest = {
   url: string;
   method: string;
-  reason: "not_allowed" | "denied";
+  reason: "not_allowed" | "denied" | "redirect";
   at: string;
 };
 
@@ -55,13 +55,13 @@ export class EgressGuard {
     return this.policy.allow.some((pattern) => matches(pattern, parsed));
   }
 
-  check(url: string, method = "GET"): void {
+  check(url: string, method = "GET", reason?: BlockedRequest["reason"]): void {
     if (this.allows(url)) return;
 
     const blocked: BlockedRequest = {
       url,
       method,
-      reason: this.denied(url) ? "denied" : "not_allowed",
+      reason: reason ?? (this.denied(url) ? "denied" : "not_allowed"),
       at: new Date().toISOString(),
     };
 

@@ -19,6 +19,8 @@ export type HttpResponse = {
   status: number;
   text: string;
   json: unknown;
+  /** The final URL after redirects, when the engine reports it. */
+  url?: string;
 };
 
 export type ActRequest = {
@@ -110,6 +112,7 @@ export class Substrate {
         headers: ${JSON.stringify(request.headers ?? {})},
         body: ${body},
         credentials: "same-origin",
+        redirect: "follow",
       });
       const text = await response.text();
       let json;
@@ -118,10 +121,19 @@ export class Substrate {
       } catch {
         json = undefined;
       }
-      return { status: response.status, text, json };
+      return { status: response.status, text, json, url: response.url };
     })()`;
 
-    return this.engine.evaluate<HttpResponse>(expression);
+    const response = await this.engine.evaluate<HttpResponse>(expression);
+
+    // A redirect may have landed outside the allowlist. The request already
+    // followed it, so this cannot undo the egress; it refuses to return the
+    // response and records the block. DNS rebinding is a separate gap.
+    if (response.url !== undefined) {
+      this.guard?.check(response.url, request.method, "redirect");
+    }
+
+    return response;
   }
 
   /** Navigate, then capture. The `goto` substrate verb. */

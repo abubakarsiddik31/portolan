@@ -44,7 +44,7 @@ a malicious map is equivalent to a malicious operator.
 | Threat | Mitigation | Where |
 |---|---|---|
 | Credential appears in a map, trace, log, or skill | Site-scoped credential store; audit/trace redaction by key; skill secret scan | `credentials.ts`, `redact.ts`, `skills/export.ts` |
-| Off-allowlist request leaves the page | Default-deny egress guard on `fetch` and `goto`; every block recorded | `substrate/policy.ts` |
+| Off-allowlist request leaves the page | Default-deny egress guard on `fetch` and `goto`; the final URL after a redirect is checked too; every block recorded | `substrate/policy.ts`, `substrate/substrate.ts` |
 | Page text becomes a tool call | Every page-derived MCP result is labeled `untrusted` with a notice; injection fixture asserts the scripted runner never calls a tool | `server/mcp.ts`, `bench/security` |
 | Irreversible write without consent | `confirm: true` required before dispatch | `runtime/write.ts` |
 | Retry double-writes | Idempotency key replays a completed result; a pending key is reconciled with `outcome_check`; a failed-after-dispatch write returns `unknown_outcome` and is never retried blindly | `runtime/write.ts` |
@@ -52,6 +52,7 @@ a malicious map is equivalent to a malicious operator.
 | A restart loses the write ledger, so a retry can double-write | **Fixed:** the ledger is a SQLite table; a `pending` record from a dead process is settled to `unknown` at startup | `server/write-ledger.ts`, `server/store.ts` |
 | `serve` and `mcp` had no substrate factory, so the fallback verbs and egress policies were unavailable outside tests | **Fixed:** `createServer` takes a `substrateFactory`; `serve` and `mcp` share one that launches Chrome, registers the engine, and loads `policies/<site>.json` | `server/server.ts`, `cli/browser.ts` |
 | `serve` had no authentication and could bind a public interface | **Fixed:** `authToken` adds a constant-time bearer check to every route except `/v1/health`; a non-loopback bind is refused without a token or `PORTOLAN_ALLOW_REMOTE=1` | `server/server.ts`, `server/host.ts` |
+| A redirect could land outside the allowlist | **Fixed:** `fetch` reports the final URL and the guard checks it, recording `reason: "redirect"` | `substrate/substrate.ts` |
 | Site name escapes the maps directory | **Fixed:** `MapStore` accepts only `[A-Za-z0-9][A-Za-z0-9._-]*` and rejects `..` | `server/maps.ts` |
 | Orphan browsers after a crash | Session TTL/cap/recovery; `reapOrphans` kills tagged Chromium | `server`, `substrate/reaper.ts` |
 | Session leak from a previous process | Startup recovery closes every open session | `server/server.ts` |
@@ -98,7 +99,7 @@ three failure classes, thrown errors, and the key-collision fix
 
 | Issue | Finding | Why it is not fixed here |
 |---|---|---|
-| [#74](https://github.com/abubakarsiddik31/portolan/issues/74) | The egress guard sees the request URL, not redirects or DNS rebinding | Needs the final response URL and address pinning |
+| [#88](https://github.com/abubakarsiddik31/portolan/issues/88) | The egress guard matches the hostname, not the resolved address (DNS rebinding) | Needs address pinning before the browser connects |
 | [#77](https://github.com/abubakarsiddik31/portolan/issues/77) | Redaction is key-based only; a secret in a free-text field survives | Needs value-shape detection or per-op field allowlists |
 | [#78](https://github.com/abubakarsiddik31/portolan/issues/78) | The Docker image runs Chromium with `--no-sandbox` | Needs a seccomp/userns setup or a trust statement |
 
@@ -114,6 +115,9 @@ three failure classes, thrown errors, and the key-collision fix
   Egress policy limits where it can go; it does not judge intent.
 - **A page can navigate itself.** `location` changes and form posts are not
   intercepted by `Substrate.fetch`/`goto`; only those verbs are guarded.
+- **A redirect is checked after it is followed.** The guard refuses to return
+  the response and records the block, but the request already reached the
+  redirect target. Blocking before the hop needs a browser request route.
 - **Local files are readable by the process.** A malicious map or a future
   upload feature is a file-read risk; `act` currently rejects uploads.
 - **The audit log is only as complete as the executor.** A write that never

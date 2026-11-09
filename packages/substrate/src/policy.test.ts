@@ -53,6 +53,15 @@ describe("EgressGuard", () => {
     expect(events).toHaveLength(1);
   });
 
+  it("records a caller-supplied reason, e.g. a redirect", () => {
+    const redirected = new EgressGuard({ site: "store", allow: ["api.example.com"] });
+
+    expect(() => redirected.check("https://other.test/", "GET", "redirect")).toThrow(
+      EgressBlockedError,
+    );
+    expect(redirected.blockedRequests()[0]?.reason).toBe("redirect");
+  });
+
   it("marks a denied host as denied, not merely unlisted", () => {
     const denied = new EgressGuard({
       site: "store",

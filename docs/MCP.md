@@ -11,7 +11,7 @@ Portolan speaks MCP over stdio or streamable HTTP. The tools are the same.
 | `view` | `{}` | URL, state, ranked affordances, rendered text, refs. |
 | `act` | `{ ref, do, value?, key? }` | The delta and effects of one semantic action. |
 | `read` | `{ ref? }` | Page text, or one ref's accessible text. |
-| `fallback_done` | `{ result? }` | The trace for the fallback scope. |
+| `fallback_done` | `{ scope_id, result? }` | The trace for the fallback scope. |
 
 `call` is the fast path: it runs the op through the cheapest verified tier
 (`url`, in-page `http`, `ui`). `view` / `act` / `read` are the fallback when no

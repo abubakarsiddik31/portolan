@@ -365,6 +365,61 @@ describe("mcp surface", () => {
     });
   });
 
+  it("navigates a blank page to the map entry before view", async () => {
+    const visited: string[] = [];
+    const refs = buildRefMap([SEARCH], 1);
+    const snapshot = {
+      doc: 1,
+      v: 0,
+      url: "http://127.0.0.1:4100/",
+      title: "",
+      nodes: [SEARCH],
+    };
+    const blank: FallbackSubstrate = {
+      view: async () => ({
+        snapshot: visited.length === 0 ? { ...snapshot, url: "about:blank", nodes: [] } : snapshot,
+        refs,
+      }),
+      state: () =>
+        visited.length === 0
+          ? undefined
+          : { snapshot: { ...snapshot, url: visited.at(-1) ?? snapshot.url }, refs },
+      act: async () => ({
+        ok: true,
+        doc: 1,
+        v: 1,
+        url: snapshot.url,
+        title: "",
+        effects: [],
+        delta: { navigation: false, entries: [] },
+      }),
+      read: async () => ({ text: "page text" }),
+      goto: async (url: string) => {
+        visited.push(url);
+      },
+    };
+
+    const extra = await connect({ substrateFactory: async () => blank });
+
+    try {
+      await extra.client.callTool({ name: "open_site", arguments: { site: "store" } });
+      await extra.client.callTool({
+        name: "fallback_begin",
+        arguments: { intent: "look around", effect: "read" },
+      });
+      const view = JSON.parse(
+        textOf(await extra.client.callTool({ name: "view", arguments: {} })),
+      ) as { url: string; affordances: Array<{ name: string }> };
+
+      expect(visited).toEqual(["http://127.0.0.1:4100/"]);
+      expect(view.url).toBe("http://127.0.0.1:4100/");
+      expect(view.affordances[0]?.name).toBe("Search products");
+    } finally {
+      await extra.client.close();
+      await extra.server.close();
+    }
+  });
+
   it("opens a scope and exposes view, act, read, and done", async () => {
     await call("open_site", { site: "store" });
 

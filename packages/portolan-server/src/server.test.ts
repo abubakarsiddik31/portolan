@@ -224,6 +224,32 @@ describe("server", () => {
     }
   });
 
+  it("requires a bearer token when one is configured", async () => {
+    const http = createServer({ store, authToken: "secret" });
+
+    expect((await http.inject({ method: "GET", url: "/v1/health" })).statusCode).toBe(200);
+
+    const missing = await http.inject({ method: "POST", url: "/v1/sessions" });
+    expect(missing.statusCode).toBe(401);
+    expect(missing.json()).toMatchObject({ ok: false, error: { code: "needs_auth" } });
+
+    const wrong = await http.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      headers: { authorization: "Bearer nope" },
+    });
+    expect(wrong.statusCode).toBe(401);
+
+    const right = await http.inject({
+      method: "POST",
+      url: "/v1/sessions",
+      headers: { authorization: "Bearer secret" },
+    });
+    expect(right.statusCode).toBe(201);
+
+    await http.close();
+  });
+
   it("serves view through a substrate factory over http", async () => {
     const node: SemanticNode = {
       nodeId: "button:Go",

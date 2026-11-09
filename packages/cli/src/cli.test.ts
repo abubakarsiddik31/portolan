@@ -236,6 +236,16 @@ describe("bench", () => {
 });
 
 describe("serve", () => {
+  it("refuses a public bind without a token", async () => {
+    await expect(
+      runServe({
+        config: { ...DEFAULT_CONFIG, database: ":memory:" },
+        host: "0.0.0.0",
+        authToken: "",
+      }),
+    ).rejects.toThrow(/refusing to bind/);
+  });
+
   it("starts the app and closes the store", async () => {
     const closed: string[] = [];
     const fake = {

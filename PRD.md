@@ -339,9 +339,7 @@ The schedule and task estimates are in
    must name them and record billed usage.
 3. **Map library ownership.** Human-recorded maps are the G1 fallback; how many
    are acceptable before the compiler is considered failed?
-4. **HTTP authentication.** `serve` has none (#75); a token or socket is needed
-   before a non-loopback bind.
-5. **Name clearance.** Trademark classes 9/42 (T7.06).
+4. **Name clearance.** Trademark classes 9/42 (T7.06).
 
 ---
 

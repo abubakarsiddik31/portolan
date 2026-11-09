@@ -3,13 +3,20 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { buildStoreApp } from "../fixtures/store/v1/app.js";
+
 const ROOT = join(import.meta.dirname, "../..");
-const SERVER = join(ROOT, "packages/portolan-server/dist/mcp-stdio.js");
+const SERVER = join(ROOT, "packages/cli/dist/bin.js");
 const MAPS = join(ROOT, "maps");
 const RESULTS = join(ROOT, "bench/results");
 
+// The store map's origin is http://127.0.0.1:4100; the server executes the
+// op against this fixture.
+const storeApp = await buildStoreApp();
+await storeApp.listen({ port: 4100, host: "127.0.0.1" });
+
 const PROMPT =
-  'Use the portolan MCP server. Call list_sites, then open_site with site "store", then call the "search" op with query "tee". Return only JSON: {"sites": <number>, "op": "search", "error": "<error code>"}.';
+  'Use the portolan MCP server. Call list_sites, then open_site with site "store", then call the "search" op with query "tee". Return only JSON: {"sites": <number>, "op": "search", "ok": <true or false>}.';
 
 type ClientResult = {
   status: "pass" | "fail";
@@ -66,9 +73,9 @@ function judge(output: string): { pass: boolean; detail: string } {
   }
 
   try {
-    const value = JSON.parse(match[0]) as { sites?: number; op?: string; error?: string };
-    if (value.sites === 3 && value.op === "search" && value.error === "op_broken") {
-      return { pass: true, detail: "sites=3, op=search, error=op_broken" };
+    const value = JSON.parse(match[0]) as { sites?: number; op?: string; ok?: boolean };
+    if (value.sites === 3 && value.op === "search" && value.ok === true) {
+      return { pass: true, detail: "sites=3, op=search, ok=true" };
     }
     return { pass: false, detail: `unexpected result: ${match[0]}` };
   } catch {
@@ -86,7 +93,7 @@ writeFileSync(
       mcpServers: {
         portolan: {
           command: "node",
-          args: [SERVER],
+          args: [SERVER, "mcp"],
           env: { MAPS_DIR: MAPS, DATABASE_PATH: ":memory:" },
         },
       },
@@ -128,7 +135,7 @@ const codex = await run(
     "-c",
     'mcp_servers.portolan.command="node"',
     "-c",
-    `mcp_servers.portolan.args=["${SERVER}"]`,
+    `mcp_servers.portolan.args=["${SERVER}","mcp"]`,
     "-c",
     `mcp_servers.portolan.env={MAPS_DIR="${MAPS}",DATABASE_PATH=":memory:"}`,
     PROMPT,
@@ -157,6 +164,7 @@ await run(
     "portolan",
     "node",
     SERVER,
+    "mcp",
     "-e",
     `MAPS_DIR=${MAPS}`,
     "-e",
@@ -179,7 +187,7 @@ const gemini = await run(
     "portolan",
   ],
   temp,
-  90_000,
+  180_000,
 );
 const geminiJudge = judge(gemini.output);
 clients["gemini-cli"] = {
@@ -190,7 +198,7 @@ clients["gemini-cli"] = {
 
 const record = {
   created_at: new Date().toISOString(),
-  server: "packages/portolan-server/dist/mcp-stdio.js",
+  server: "packages/cli/dist/bin.js mcp",
   prompt: PROMPT,
   clients,
 };
@@ -209,11 +217,12 @@ const lines = [
   ),
   "",
   'The suite asks each client to call `list_sites`, `open_site("store")`, and',
-  '`call("search", {"query":"tee"})`, then return a JSON marker. The server',
-  "uses the not-ready executor, so `search` is expected to return `op_broken`;",
-  "the conformance is the MCP surface, not the op execution.",
+  '`call("search", {"query":"tee"})`, then return a JSON marker. The server is',
+  "`portolan mcp`, which launches Chromium and executes the op through the url",
+  "tier, so `ok: true` means the client reached a real result, not just the surface.",
   "",
 ];
 
 writeFileSync(join(RESULTS, "conformance.md"), lines.join("\n"), "utf8");
+await storeApp.close();
 console.log(lines.join("\n"));

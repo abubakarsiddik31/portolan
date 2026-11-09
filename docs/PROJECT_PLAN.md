@@ -23,16 +23,18 @@
 
 ### Current focus (next three weeks)
 
-| Order | Task | Effort | Done |
-|---|---|---|---|
-| 1 | **T6.01** Score 3 candidate verticals | 4h | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
-| 2 | **T6.02** Run 8 discovery interviews (not 15) | 8h | Pain, volume, budget, and one workflow to test per interview |
-| 3 | **T6.03** Decide the vertical (ADR-006) | 2h | ADR merged; one vertical named |
-| 4 | **T6.05** Recruit 3 design partners | 8h | 3 signed; test accounts provisioned |
-| 5 | **T1.12** Hand-write oracle ops for 3–5 workflows | 6h | Every op passes its unit test on the real site |
-| 6 | **T1.13** Oracle MCP server | 3h | The runner calls the ops over MCP |
-| 7 | **T1.14** Run G0: `agent-browser` vs. ops, 2 providers, billed usage | 6h | G0 report in `bench/results/`; ADR-005 updated |
-| 8 | **T4.14** Write the G0 decision | 2h | ADR merged; pass → G1, fail → stop or narrow |
+| Order | Task | Status | Effort | Done |
+|---|---|---|---|---|
+| 1 | **T6.01** Score 3 candidate verticals | **Done** — [scorecard](./VERTICALS.md) | 4h | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
+| 2 | **T6.02** Run 8 discovery interviews (not 15) | Next | 8h | Pain, volume, budget, and one workflow to test per interview |
+| 3 | **T6.03** Decide the vertical (ADR-006) | Pending | 2h | ADR merged; one vertical named |
+| 4 | **T6.05** Recruit 3 design partners | Pending | 8h | 3 signed; test accounts provisioned |
+| 5 | **T1.12** Hand-write oracle ops for 3–5 workflows | Pending | 6h | Every op passes its unit test on the real site |
+| 6 | **T1.13** Oracle MCP server | Pending | 3h | The runner calls the ops over MCP |
+| 7 | **T1.14** Run G0: `agent-browser` vs. ops, 2 providers, billed usage | Pending | 6h | G0 report in `bench/results/`; ADR-005 updated |
+| 8 | **T4.14** Write the G0 decision | Pending | 2h | ADR merged; pass → G1, fail → stop or narrow |
+
+**T6.01 result:** procurement portals score highest (**87/100**) on G0 feasibility, write risk, buyer reachability, and lack of a standard API. Insurance eligibility scores lowest (61) because PHI and payer credentials make a three-week gate unrealistic. Interview procurement first, logistics second. Full scoring and sources: [docs/VERTICALS.md](./VERTICALS.md).
 
 **Target:** Mon 2026-11-30. No Phase 2–7 commit before this table is complete.
 

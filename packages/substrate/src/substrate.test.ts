@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { findChrome } from "./chrome.js";
+import type { Engine } from "./engine.js";
 import { PlaywrightEngine } from "./playwright-engine.js";
 import type { BlockedRequest } from "./policy.js";
 import type { RefMap } from "./refs.js";
@@ -53,6 +54,41 @@ function refFor(refs: RefMap, role: string, name: string): string {
   }
   throw new Error(`no ${role} named "${name}"`);
 }
+
+describe("substrate fetch redirects", () => {
+  function fakeEngine(finalUrl: string): Engine {
+    return {
+      navigate: async () => ({ url: finalUrl, title: "", status: null }),
+      snapshot: async () => ({ doc: 1, v: 0, url: finalUrl, title: "", nodes: [] }),
+      dispatch: async () => ({ ok: true, doc: 1, v: 0, url: finalUrl, title: "", effects: [] }),
+      evaluate: async () => ({ status: 200, text: "{}", json: {}, url: finalUrl }),
+      close: async () => undefined,
+    } as unknown as Engine;
+  }
+
+  it("refuses a response whose final url is off the allowlist", async () => {
+    const events: BlockedRequest[] = [];
+    const guarded = new Substrate(fakeEngine("https://evil.test/landing"), {
+      policy: { site: "store", allow: ["127.0.0.1"] },
+      onBlocked: (event) => events.push(event),
+    });
+
+    await expect(guarded.fetch({ method: "GET", url: "http://127.0.0.1/api" })).rejects.toThrow(
+      /egress blocked/,
+    );
+    expect(events[0]).toMatchObject({ reason: "redirect", url: "https://evil.test/landing" });
+  });
+
+  it("returns a response whose final url is on the allowlist", async () => {
+    const guarded = new Substrate(fakeEngine("http://127.0.0.1/api"), {
+      policy: { site: "store", allow: ["127.0.0.1"] },
+    });
+
+    await expect(
+      guarded.fetch({ method: "GET", url: "http://127.0.0.1/api" }),
+    ).resolves.toMatchObject({ status: 200, url: "http://127.0.0.1/api" });
+  });
+});
 
 describe.skipIf(!ENABLED)("substrate act", () => {
   let server: Server | undefined;

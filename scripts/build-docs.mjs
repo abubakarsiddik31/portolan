@@ -20,6 +20,7 @@ const PAGES = [
   { file: "docs/SECURITY.md", slug: "security", title: "Security" },
   { file: "docs/PACKAGING.md", slug: "packaging", title: "Packaging" },
   { file: "docs/LICENSING.md", slug: "licensing", title: "Licensing" },
+  { file: "docs/BENCHMARK.md", slug: "benchmark", title: "Benchmark" },
 ];
 
 const LINKS = new Map(
@@ -62,6 +63,10 @@ function rewriteLinks(html) {
 
     if (path.startsWith("../")) {
       return `href="${REPO}/blob/main/${path.replace(/^\.\.\//, "")}"`;
+    }
+
+    if (path.startsWith("./") && path.endsWith(".md")) {
+      return `href="${REPO}/blob/main/docs/${path.slice(2)}${hash === undefined ? "" : `#${hash}`}"`;
     }
 
     return match;

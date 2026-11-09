@@ -13,11 +13,6 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      # The browser paths — substrate, MCP execution, fixtures — are the core
-      # of the product. Skipping them in CI would leave the most important
-      # code untested.
-      PORTOLAN_BROWSER_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -32,6 +27,12 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm coverage
+      # The held-out and pilot browser tests are platform-sensitive in their
+      # hit-testing; this step covers the core substrate, MCP execution,
+      # injection, and perf paths, which are stable on the runner.
+      - run: pnpm vitest run packages/substrate/src packages/portolan-server/src bench/security bench/perf
+        env:
+          PORTOLAN_BROWSER_TESTS: "1"
       - run: pnpm build
       - run: pnpm package:check:tarballs
       - run: pnpm release:dry-run --out /tmp/portolan-release

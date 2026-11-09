@@ -13,8 +13,9 @@ Portolan speaks MCP over stdio or streamable HTTP. The tools are the same.
 | `read` | `{ ref? }` | Page text, or one ref's accessible text. |
 | `fallback_done` | `{ result? }` | The trace for the fallback scope. |
 
-`call` is the fast path. `view` / `act` / `read` are the fallback when no op
-fits; they run inside a fallback scope, which is the permission slip for the
+`call` is the fast path: it runs the op through the cheapest verified tier
+(`url`, in-page `http`, `ui`). `view` / `act` / `read` are the fallback when no
+op fits; they run inside a fallback scope, which is the permission slip for the
 agent to finish an intent by hand.
 
 ## Result shape

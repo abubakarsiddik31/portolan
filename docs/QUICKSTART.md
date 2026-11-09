@@ -80,10 +80,13 @@ node packages/cli/dist/bin.js doctor
 
 ## What works today
 
-- `open_site`, `view`, `act`, `read`, and the fallback scope work.
-- A named `call` returns `op_broken` because the MCP executor is still
-  `notReadyExecutor`. The runtime executes ops in tests and benchmarks; the
-  server does not wire a live executor yet.
+- `open_site`, `call`, `view`, `act`, and `read` work through `portolan mcp`.
+- `call` runs the op through the cheapest verified tier: `url`, in-page
+  `http`, then `ui`. A write goes through confirmation and idempotency.
+- `webmcp` is in the map format but has no executor yet; an op that only has
+  a `webmcp` impl returns `op_broken`.
+- `serve` wires the same browser factory, so the HTTP MCP surface executes
+  ops too.
 
 ## Where next
 

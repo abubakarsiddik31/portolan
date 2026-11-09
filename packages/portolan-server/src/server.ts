@@ -13,7 +13,7 @@ import Fastify, {
 import type { ZodError } from "zod";
 import { BrowserRegistry } from "./browsers.js";
 import type { CanaryScheduler } from "./canary.js";
-import { notReadyExecutor, type OpExecutor } from "./executor.js";
+import type { OpExecutor } from "./executor.js";
 import { mergeHealth } from "./health.js";
 import type { Logger } from "./log.js";
 import type { MapStore } from "./maps.js";
@@ -231,7 +231,7 @@ export function createServer(options: ServerOptions): FastifyInstance {
       const mcp = createMcpServer({
         maps: options.maps,
         sessions: options.store,
-        executor: options.executor ?? notReadyExecutor,
+        ...(options.executor !== undefined ? { executor: options.executor } : {}),
         ledger: options.ledger ?? options.store.writeLedger(),
         ...(options.substrateFactory !== undefined
           ? { substrateFactory: options.substrateFactory }

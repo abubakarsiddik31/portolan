@@ -62,7 +62,7 @@ function toDecision(
       return {
         thought: "Look at the affordances.",
         tool: "view",
-        arguments: {},
+        arguments: { format: "both" },
         answer: "",
       };
     case "read":

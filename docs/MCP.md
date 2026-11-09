@@ -8,7 +8,7 @@ Portolan speaks MCP over stdio or streamable HTTP. The tools are the same.
 |---|---|---|
 | `open_site` | `{ site }` | The compact map, a pinned version, and a session id. |
 | `call` | `{ op, params, confirm?, idempotency_key? }` | The op's typed result, or a typed error. |
-| `view` | `{}` | URL, state, ranked affordances, rendered text, refs. |
+| `view` | `{ format? }` | URL, state, and ranked affordances. `format` is `text` (default), `json`, or `both`. |
 | `act` | `{ ref, do, value?, key? }` | The delta and effects of one semantic action. |
 | `read` | `{ ref? }` | Page text, or one ref's accessible text. |
 | `fallback_done` | `{ scope_id, result? }` | The trace for the fallback scope. |
@@ -17,6 +17,11 @@ Portolan speaks MCP over stdio or streamable HTTP. The tools are the same.
 (`url`, in-page `http`, `ui`). `view` / `act` / `read` are the fallback when no
 op fits; they run inside a fallback scope, which is the permission slip for the
 agent to finish an intent by hand.
+
+`view` returns the compact text list by default: one line per affordance with
+its ref, role, name, and context. That is about 60% smaller than sending the
+same list twice as JSON. A client that needs structure asks for
+`format: "json"`; `format: "both"` keeps the old shape for compatibility.
 
 ## Result shape
 

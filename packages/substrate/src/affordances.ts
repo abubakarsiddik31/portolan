@@ -258,6 +258,7 @@ function weightOf(node: SemanticNode, ctx: string | undefined): number {
 function formatAffordance(affordance: Affordance): string {
   const ref = affordance.ref !== undefined ? `${affordance.ref} ` : "";
   const name = affordance.name.length > 0 ? JSON.stringify(affordance.name) : "(unnamed)";
+  const ordinal = affordance.ordinal > 0 ? ` #${affordance.ordinal + 1}` : "";
   const ctx = affordance.ctx !== undefined ? ` in ${affordance.ctx}` : "";
-  return `${ref}${affordance.role} ${name}${ctx}`;
+  return `${ref}${affordance.role} ${name}${ordinal}${ctx}`;
 }

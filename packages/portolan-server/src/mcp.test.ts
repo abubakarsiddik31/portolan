@@ -408,7 +408,7 @@ describe("mcp surface", () => {
         arguments: { intent: "look around", effect: "read" },
       });
       const view = JSON.parse(
-        textOf(await extra.client.callTool({ name: "view", arguments: {} })),
+        textOf(await extra.client.callTool({ name: "view", arguments: { format: "both" } })),
       ) as { url: string; affordances: Array<{ name: string }> };
 
       expect(visited).toEqual(["http://127.0.0.1:4100/"]);
@@ -418,6 +418,32 @@ describe("mcp surface", () => {
       await extra.client.close();
       await extra.server.close();
     }
+  });
+
+  it("returns text without the duplicate affordance array by default", async () => {
+    await call("open_site", { site: "store" });
+    await call("fallback_begin", { intent: "look", effect: "read" });
+
+    const view = (await call("view")) as {
+      text?: string;
+      affordances?: unknown[];
+    };
+
+    expect(view.text).toContain('textbox "Search products"');
+    expect(view.affordances).toBeUndefined();
+  });
+
+  it("returns structured affordances on request", async () => {
+    await call("open_site", { site: "store" });
+    await call("fallback_begin", { intent: "look", effect: "read" });
+
+    const view = (await call("view", { format: "json" })) as {
+      text?: string;
+      affordances?: Array<{ name: string }>;
+    };
+
+    expect(view.text).toBeUndefined();
+    expect(view.affordances?.[0]?.name).toBe("Search products");
   });
 
   it("opens a scope and exposes view, act, read, and done", async () => {
@@ -431,7 +457,7 @@ describe("mcp surface", () => {
     expect(scope.allowed).toEqual(["view", "act", "read"]);
     expect(scope.effect).toBe("write");
 
-    const view = (await call("view")) as {
+    const view = (await call("view", { format: "both" })) as {
       text: string;
       affordances: Array<{ ref?: string; name: string }>;
       untrusted: boolean;
@@ -560,7 +586,7 @@ describe("mcp surface", () => {
       ) as { scope_id: string };
 
       const view = JSON.parse(
-        textOf(await extra.client.callTool({ name: "view", arguments: {} })),
+        textOf(await extra.client.callTool({ name: "view", arguments: { format: "both" } })),
       ) as { affordances: Array<{ ref: string }> };
 
       await extra.client.callTool({

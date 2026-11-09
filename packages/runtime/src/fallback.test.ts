@@ -12,6 +12,16 @@ describe("FallbackScopes", () => {
     expect(scopes.active("s1")?.id).toBe(scope.id);
   });
 
+  it("keeps one active scope per session", () => {
+    const scopes = new FallbackScopes();
+    const first = scopes.begin({ sid: "s1", intent: "first" });
+    const second = scopes.begin({ sid: "s1", intent: "second" });
+
+    expect(scopes.active("s1")?.id).toBe(second.id);
+    expect(scopes.close(first.id)).toBeUndefined();
+    expect(scopes.close(second.id)?.intent).toBe("second");
+  });
+
   it("does not block writes for a read scope", () => {
     const scopes = new FallbackScopes();
     scopes.begin({ sid: "s1", intent: "read invoices", effect: "read" });

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { findChrome } from "./chrome.js";
 import type { Engine } from "./engine.js";
+import { EngineError } from "./engine.js";
 import { PlaywrightEngine } from "./playwright-engine.js";
 import type { BlockedRequest } from "./policy.js";
 import type { RefMap } from "./refs.js";
@@ -23,6 +24,8 @@ const HOME = `<!doctype html>
   <button id="go" onclick="document.getElementById('out').textContent = document.getElementById('q').value">Go</button>
   <button id="fetch" onclick="fetch('/api')">Fetch</button>
   <button id="post" onclick="fetch('/api/echo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q: 'tee' }) })">Post</button>
+  <button id="off" disabled>Disabled</button>
+  <input id="key" aria-label="Key input" onkeydown="if (event.key === 'Enter') document.getElementById('out').textContent = 'enter:' + this.value">
   <output id="out"></output>
   <a href="/done">Submit</a>
 </body>
@@ -54,6 +57,48 @@ function refFor(refs: RefMap, role: string, name: string): string {
   }
   throw new Error(`no ${role} named "${name}"`);
 }
+
+describe("substrate act", () => {
+  const node = {
+    nodeId: "n1",
+    role: "button",
+    name: "Go",
+    backendNodeId: 7,
+    ignored: false,
+    visible: true,
+    bounds: { x: 0, y: 0, width: 10, height: 10 },
+    properties: {},
+    childIds: [],
+  };
+
+  it("treats a vanished DOM node as a stale ref", async () => {
+    const engine = {
+      navigate: async () => ({ url: "http://127.0.0.1/", title: "", status: null }),
+      snapshot: async () => ({
+        doc: 1,
+        v: 0,
+        url: "http://127.0.0.1/",
+        title: "",
+        nodes: [node],
+      }),
+      dispatch: async () => {
+        throw new EngineError("not_found", "no DOM node with backend id 7");
+      },
+      evaluate: async () => ({ status: 200, text: "{}", json: {}, url: "http://127.0.0.1/" }),
+      close: async () => undefined,
+    } as unknown as Engine;
+
+    const substrate = new Substrate(engine);
+    const view = await substrate.view();
+    const ref = refFor(view.refs, "button", "Go");
+
+    expect(await substrate.act({ ref, do: "click" })).toEqual({
+      ok: false,
+      code: "stale_ref",
+      current_doc: 1,
+    });
+  });
+});
 
 describe("substrate fetch redirects", () => {
   function fakeEngine(finalUrl: string): Engine {
@@ -307,6 +352,35 @@ describe.skipIf(!ENABLED)("substrate act", () => {
       ok: false,
       code: "stale_ref",
     });
+  });
+
+  it("reports a disabled target instead of a blocker", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const off = refFor(view.refs, "button", "Disabled");
+
+    expect(await substrate.act({ ref: off, do: "click" })).toEqual({
+      ok: false,
+      code: "invalid_request",
+      message: 'button "Disabled" is disabled',
+    });
+  });
+
+  it("focuses the target before a key press", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const key = refFor(view.refs, "textbox", "Key input");
+
+    await substrate.act({ ref: key, do: "fill", value: "abc" });
+    await engine.evaluate(
+      "document.activeElement instanceof HTMLElement && document.activeElement.blur()",
+    );
+
+    expect((await substrate.act({ ref: key, do: "press", key: "Enter" })).ok).toBe(true);
+    const out = await engine.evaluate<string>("document.getElementById('out')?.textContent ?? ''");
+    expect(out).toBe("enter:abc");
   });
 
   it("reports the blocker when the target is covered", async () => {

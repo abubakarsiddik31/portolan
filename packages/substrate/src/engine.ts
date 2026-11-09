@@ -71,7 +71,7 @@ export type Effect = NetworkEffect | NavigationEffect | ValueEffect;
 export type Action =
   | { do: "click" | "check" | "uncheck"; backendNodeId: number }
   | { do: "fill" | "select"; backendNodeId: number; value: string }
-  | { do: "press"; key: string };
+  | { do: "press"; key: string; backendNodeId?: number };
 
 export type DispatchResult = {
   ok: true;
@@ -86,6 +86,7 @@ export type EngineErrorCode =
   | "navigation_failed"
   | "not_found"
   | "not_interactive"
+  | "disabled"
   | "evaluate_failed";
 
 export class EngineError extends Error {

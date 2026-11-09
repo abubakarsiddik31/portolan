@@ -24,6 +24,8 @@ const HOME = `<!doctype html>
   <button id="go" onclick="document.getElementById('out').textContent = document.getElementById('q').value">Go</button>
   <button id="fetch" onclick="fetch('/api')">Fetch</button>
   <button id="post" onclick="fetch('/api/echo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q: 'tee' }) })">Post</button>
+  <button id="off" disabled>Disabled</button>
+  <input id="key" aria-label="Key input" onkeydown="if (event.key === 'Enter') document.getElementById('out').textContent = 'enter:' + this.value">
   <output id="out"></output>
   <a href="/done">Submit</a>
 </body>
@@ -350,6 +352,35 @@ describe.skipIf(!ENABLED)("substrate act", () => {
       ok: false,
       code: "stale_ref",
     });
+  });
+
+  it("reports a disabled target instead of a blocker", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const off = refFor(view.refs, "button", "Disabled");
+
+    expect(await substrate.act({ ref: off, do: "click" })).toEqual({
+      ok: false,
+      code: "invalid_request",
+      message: 'button "Disabled" is disabled',
+    });
+  });
+
+  it("focuses the target before a key press", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const key = refFor(view.refs, "textbox", "Key input");
+
+    await substrate.act({ ref: key, do: "fill", value: "abc" });
+    await engine.evaluate(
+      "document.activeElement instanceof HTMLElement && document.activeElement.blur()",
+    );
+
+    expect((await substrate.act({ ref: key, do: "press", key: "Enter" })).ok).toBe(true);
+    const out = await engine.evaluate<string>("document.getElementById('out')?.textContent ?? ''");
+    expect(out).toBe("enter:abc");
   });
 
   it("reports the blocker when the target is covered", async () => {

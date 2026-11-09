@@ -222,6 +222,9 @@ export class PlaywrightEngine implements Engine {
         await this.settleAction(() => this.setChecked(action.backendNodeId, false));
         break;
       case "press":
+        if (action.backendNodeId !== undefined) {
+          await this.focus(action.backendNodeId);
+        }
         await this.settleAction(() => this.page.keyboard.press(action.key));
         break;
     }
@@ -452,6 +455,52 @@ export class PlaywrightEngine implements Engine {
     await Promise.all(pending);
   }
 
+  /** Focus a node before a key press. */
+  private async focus(backendNodeId: number): Promise<void> {
+    const objectId = await this.resolveObject(backendNodeId);
+    await this.assertEnabled(objectId, backendNodeId);
+
+    try {
+      await this.callOn(
+        objectId,
+        `function () {
+          if (typeof this.scrollIntoView === "function") {
+            this.scrollIntoView({ block: "center", inline: "center" });
+          }
+          if (typeof this.focus === "function") {
+            this.focus();
+          }
+        }`,
+        [],
+      );
+    } catch {
+      // A node without focus support still receives the key press.
+    }
+  }
+
+  /**
+   * A disabled control is not clickable.
+   *
+   * Tailwind's `disabled:pointer-events-none` makes the hit-test land on the
+   * element behind the button, so without this check a disabled button is
+   * reported as "covered" by an opaque node id. The caller needs to know the
+   * control is disabled, not that something covers it.
+   */
+  private async assertEnabled(objectId: string, backendNodeId: number): Promise<void> {
+    const disabled = await this.callOn<boolean>(
+      objectId,
+      `function () {
+        if ("disabled" in this && this.disabled === true) return true;
+        return this.getAttribute?.("aria-disabled") === "true";
+      }`,
+      [],
+    );
+
+    if (disabled) {
+      throw new EngineError("disabled", `node ${backendNodeId} is disabled`);
+    }
+  }
+
   private async click(backendNodeId: number): Promise<void> {
     const objectId = await this.resolveObject(backendNodeId);
 
@@ -489,6 +538,8 @@ export class PlaywrightEngine implements Engine {
     if (rect.width === 0 || rect.height === 0) {
       throw new EngineError("not_interactive", `node ${backendNodeId} has no layout box`);
     }
+
+    await this.assertEnabled(objectId, backendNodeId);
 
     const viewport = await this.evaluate<{
       width: number;

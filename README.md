@@ -16,12 +16,13 @@ Portolan is **open source** (Apache-2.0) and **agent-native with a human cockpit
 
 | | |
 |---|---|
-| Stage | Phase 5 complete: compiler, verifier, repair, MCP server, CLI, packaging, docs. Phase 6 (vertical and partners) is next. |
+| Stage | Phase 5 code complete: compiler, verifier, repair, MCP server, CLI, packaging, docs. **Focus: G0 on one vertical.** Phase 2–7 feature work is paused until G0 passes (ADR-009). |
+| Current focus | Choose the vertical, recruit 3 design partners, hand-write 3–5 ops, and measure `agent-browser` vs. those ops with a real model and billed usage. No new fallback, cockpit, or release work until G0. |
 | Date of analysis | 2026-11-09 |
 | Current plan | [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) (what and how) · [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) (when and who) |
-| First release | v0.1.0 public alpha, target **Tue 2027-03-02** |
+| First release | v0.1.0 public alpha, target **Tue 2027-03-02**, contingent on G0–G2 |
 | Gates | G0, G1, and G2 are **not passed**; the harness is scripted-only. See [ADR-005](./docs/DECISIONS.md) and [docs/G1-G2.md](./docs/G1-G2.md) |
-| Key decisions | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic), ADR-004 (name), ADR-007 (one session, two projections), ADR-008 (open source) in [docs/DECISIONS.md](./docs/DECISIONS.md) |
+| Key decisions | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic), ADR-004 (name), ADR-007 (one session, two projections), ADR-008 (open source), ADR-009 (G0 first) in [docs/DECISIONS.md](./docs/DECISIONS.md) |
 | License | Apache-2.0 (runtime, SDK, CLI, skills) · MIT (cockpit) · CC-BY-4.0 (map spec). See [docs/LICENSING.md](./docs/LICENSING.md) |
 
 ---

@@ -2,12 +2,39 @@
 
 | | |
 |---|---|
-| **Date** | 2026-11-08 |
+| **Date** | 2026-11-08 (revised 2026-11-09) |
 | **Goal** | Ship **Portolan v0.1.0**, a public alpha: an open runtime that serves verified site maps to any agent over MCP, with skills, a compiler that learns maps from runs, and published benchmark results. |
-| **Timeline** | 17 weeks: Mon 2026-11-09 → release Tue **2027-03-02**. Includes 2 holiday/buffer weeks and ~20% buffer inside phases. |
+| **Timeline** | 17 weeks: Mon 2026-11-09 → release Tue **2027-03-02**. Paused until G0; dates after 2026-11-30 move with the G0 result. Includes 2 holiday/buffer weeks and ~20% buffer inside phases. |
 | **Team (assumed)** | **AS**: Abubakar Siddik, founder-engineer, ~40 h/week, working with AI coding agents. **Counsel**: external, for license, ToS and trademark (~6 h total). **Partners**: 3 design partners from the chosen vertical. |
 | **Constraints** | Gates G0–G2 can stop the project. No hosted service, billing, or hibernation in v0.1. Provider-agnostic from day one (ADR-003). |
 | **Technical source of truth** | [`BUILD_PLAN.md`](./BUILD_PLAN.md) says *what* and *how*. This plan says *when*, *in what order*, and *who*. Where the two disagree on dates, this plan wins: BUILD_PLAN's "Day N" are ideal build days; the estimates here are realistic for one engineer. |
+
+---
+
+> ## Revision 2026-11-09 — G0 first
+>
+> The build ran ahead of G0. Phase 5 is complete, but no gate has been measured: every benchmark row is scripted, there is no oracle denominator, and the fallback path is at parity with `agent-browser` on observation tokens (ADR-002, ADR-005).
+>
+> **Until G0 passes on one vertical, the only scheduled work is the gate.** Choose the vertical, recruit three design partners, hand-write 3–5 ops, run `agent-browser` vs. those ops with a real model and billed usage, and write the G0 decision.
+>
+> **Paused until G0 passes:** Phase 2–5 feature work, Phase 6 map production, Phase 7 release prep, the cockpit, and any further fallback or browser work. The map layer is the product; the browser is the substrate.
+>
+> **Stop rule:** if hand-written ops do not give ≥3x fewer steps and ≥5x lower cost than `agent-browser`, stop or narrow to human-recorded maps. Do not start Phase 2–7.
+
+### Current focus (next three weeks)
+
+| Order | Task | Effort | Done |
+|---|---|---|---|
+| 1 | **T6.01** Score 3 candidate verticals | 4h | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
+| 2 | **T6.02** Run 8 discovery interviews (not 15) | 8h | Pain, volume, budget, and one workflow to test per interview |
+| 3 | **T6.03** Decide the vertical (ADR-006) | 2h | ADR merged; one vertical named |
+| 4 | **T6.05** Recruit 3 design partners | 8h | 3 signed; test accounts provisioned |
+| 5 | **T1.12** Hand-write oracle ops for 3–5 workflows | 6h | Every op passes its unit test on the real site |
+| 6 | **T1.13** Oracle MCP server | 3h | The runner calls the ops over MCP |
+| 7 | **T1.14** Run G0: `agent-browser` vs. ops, 2 providers, billed usage | 6h | G0 report in `bench/results/`; ADR-005 updated |
+| 8 | **T4.14** Write the G0 decision | 2h | ADR merged; pass → G1, fail → stop or narrow |
+
+**Target:** Mon 2026-11-30. No Phase 2–7 commit before this table is complete.
 
 ---
 
@@ -28,38 +55,52 @@
 | R9 | Benchmark report published with methods and raw data | T7.03 |
 | R10 | License chosen; trademark search done; npm scope and GitHub org secured | T7.05, T7.06 |
 
+**G0 is first in time, not last.** No release work (R1, R5, R7–R10) starts until G0 passes. R4 stays open until G0–G2 are measured (ADR-005).
+
 **Not in v0.1.0:** hosted runtime, billing, `freeze`/`hibernate`, SkillWeaver-style exploration, WebMCP tier, Lightpanda tier, human "record a workflow" UI, and the human cockpit. These are v0.2+ (§9). The cockpit is the first post-release workstream (ADR-007) and must not delay a gate.
 
 ---
 
 ## 2. Milestones
 
+**Active milestone: M1 only.** M2–M10 are paused until G0 passes. M6 (vertical) moves ahead of M2 because G0 needs a vertical.
+
 | # | Milestone | Target | Owner | Success criteria |
 |---|---|---|---|---|
 | M0 | Repo and tooling ready | Mon 2026-11-09 | AS | CI green; commit convention enforced (§8) |
-| M1 | **G0: perfect ops win** | Tue 2026-11-17 | AS | Hand-written ops vs `agent-browser`: steps ≤⅓, $ ≤⅕, success ≥ B−2 pts, on 2 providers |
+| M1 | **G0: perfect ops win** | Mon 2026-11-30 | AS | Hand-written ops vs `agent-browser`: steps ≤⅓, $ ≤⅕, success ≥ B−2 pts, on 2 providers |
 | M2 | Runtime runs maps | Fri 2026-12-11 | AS | Oracle maps run through the runtime with parity; write-safety tests pass; MCP works in Claude Code + Codex CLI |
 | M3 | Compiler produces verified maps | Fri 2027-01-08 | AS | Dev fixtures compile to verified maps from traces, no human edits |
 | M4 | **G1: compilation works** | Fri 2027-01-15 | AS | Held-out: ≥60% of oracle's $ win, yield ≥50%, break-even K ≤3, holds on 2 providers |
 | M5 | **G2: drift and safety** | Fri 2027-01-22 | AS | ≥80% auto-repair within 2 runs; 0 duplicate writes. ADR-005 written |
-| M6 | Vertical chosen, partners signed | Fri 2027-01-22 | AS | ADR-006; 3 pilot agreements |
+| M6 | Vertical chosen, partners signed | Fri 2026-11-27 | AS | ADR-006; 3 pilot agreements. Precedes M2. |
 | M7 | Release-hardened | Fri 2027-02-05 | AS | Security, packaging, CLI, observability tasks done |
 | M8 | 10 vertical maps live with partners | Fri 2027-02-19 | AS + Partners | R5 canaries started; pilots running |
 | M9 | Release candidate `v0.1.0-rc.1` | Wed 2027-02-24 | AS | R1, R2, R8 pass on clean machines |
 | M10 | **v0.1.0 released** | Tue 2027-03-02 | AS | All of §1 true |
 
-**Stop/branch points:** M1 fails → stop. M4 fails → narrow to human-recorded maps (§7.2). M5 fails → reads-only release or stop.
+**Stop/branch points:** M1 fails → stop or narrow; do not start Phase 2–7. M4 fails → narrow to human-recorded maps (§7.2). M5 fails → reads-only release or stop.
 
 ---
 
 ## 3. Calendar
 
+### 3.1 Current calendar — G0 vertical (active)
+
 | Week | Dates | Focus | Phase |
 |---|---|---|---|
-| W1 | Nov 9–13 | Tooling, fixtures, baselines, oracle ops | P1 |
-| W2 | Nov 16–20 | **G0** (Tue); protocol, map schema, server | P1 → P2 |
-| W3 | Nov 23–27 | Engine adapter, semantic capture, refs | P2 |
-| W4 | Nov 30–Dec 4 | `act`, state recognizer, router, UI tier | P2 |
+| W1 | Nov 9–13 | Vertical scorecard, interviews, hand-write the first ops | P6, P1 |
+| W2 | Nov 16–20 | Vertical decision (ADR-006), 3 partners, finish ops | P6, P1 |
+| W3 | Nov 23–27 | **G0 run**: `agent-browser` vs. ops, 2 providers, billed | P1 |
+| W4 | Nov 30–Dec 4 | G0 decision; if pass, start compiler/G1; if fail, stop or narrow | P1 → P4 |
+
+**W5 onward is paused until G0 passes.** The original calendar below is the post-G0 plan, not a schedule of current work.
+
+### 3.2 Post-G0 calendar (paused until G0 passes)
+
+| Week | Dates | Focus | Phase |
+|---|---|---|---|
+| W1–W4 | Nov 9–Dec 4 | **Superseded by 3.1 (G0 vertical)** | P0 |
 | W5 | Dec 7–11 | Extractors, url/http tiers, write safety → **M2** | P2 |
 | W6 | Dec 14–18 | Fallback scopes, trace recorder, segmenter | P3 |
 | W7 | Dec 21–25 | **Holiday / buffer** (light: discovery calls, reading) | — |
@@ -74,13 +115,30 @@
 | W16 | Feb 22–26 | **RC** (Wed), RC fixes, launch assets | P7 |
 | W17 | Mar 1–5 | **Release Tue Mar 2**; post-launch triage | P7 |
 
-Discovery interviews (T6.02) run ~2 h/week from W2 to W10, alongside engineering.
+Discovery interviews (T6.02) are compressed into W1–W2 of the current G0 calendar.
 
 ---
 
 ## 4. Work breakdown
 
 Effort is AS hours unless noted. "Done" is what a reviewer checks. Every task is one branch and one PR (§8). IDs are stable: use them in branch names, PR titles and issue titles.
+
+### Phase 0 — G0 vertical (current, ~39 h)
+
+**This is the only active phase.** It ends with a measured G0, not with more code.
+
+| ID | Task | Effort | Depends on | Done criteria |
+|---|---|---|---|---|
+| T6.01 | Score 3 candidate verticals (insurance eligibility, procurement portals, logistics carriers) | 4h | — | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
+| T6.02 | Run 8 discovery interviews (compressed from 15) | 8h | T6.01 | Notes with pain, volume, budget, and one workflow to test |
+| T6.03 | Decide the vertical (ADR-006) | 2h | T6.02 | One vertical named; ADR merged |
+| T6.05 | Recruit 3 design partners; sign pilot agreements | 8h | T6.03 | 3 signed; test accounts provisioned |
+| T1.12 | Hand-write oracle ops for 3–5 workflows on the chosen sites | 6h | T6.03 | Every op passes its unit test on the real site |
+| T1.13 | Build the oracle MCP server | 3h | T1.12 | The runner calls the ops over MCP |
+| T1.14 | Run G0: `agent-browser` vs. ops, 2 providers, billed usage | 6h | T1.13, T6.05 | G0 report in `bench/results/`; ADR-005 updated |
+| T4.14 | Write the G0 decision | 2h | T1.14 | ADR merged; pass → G1, fail → stop or narrow |
+
+**Phase 2–7 below are paused until G0 passes.** Their estimates and dates are the post-G0 plan.
 
 ### Phase 1 — Foundations and G0 (W1–W2, ~58 h)
 
@@ -194,6 +252,8 @@ Effort is AS hours unless noted. "Done" is what a reviewer checks. Every task is
 
 ### Phase 6 — Vertical and design partners (W2–W15, interleaved, ~93 h)
 
+**T6.01–T6.03 and T6.05 moved to Phase 0 (current).** The rows below are the post-G0 remainder; T6.02 is compressed to 8 interviews in Phase 0.
+
 | ID | Task | Effort | Depends on | Done criteria |
 |---|---|---|---|---|
 | T6.01 | Score 3 candidate verticals (insurance eligibility, procurement portals, logistics carriers) | 4h | — | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
@@ -223,11 +283,14 @@ Effort is AS hours unless noted. "Done" is what a reviewer checks. Every task is
 | T7.12 | Launch post, HN/X, partner quote | 4h | T7.11, T6.08 | Published |
 | T7.13 | Post-launch triage (first week) | 10h | T7.11 | Issues labeled; P0 bugs fixed within 48h |
 
-**Total:** ~560 h engineering + ~6 h counsel. At ~40 h/week over 15 working weeks that is ~93% utilization, with buffer tasks inside each phase and two holiday weeks as overflow.
+**Total:** ~560 h engineering + ~6 h counsel for the post-G0 plan, plus ~39 h for the current G0 phase. At ~40 h/week over 15 working weeks that is ~93% utilization, with buffer tasks inside each phase and two holiday weeks as overflow.
 
 ---
 
 ## 5. Dependencies and critical path
+
+**Current (G0):** `T6.01 → T6.02 → T6.03 → T6.05 → T1.12 → T1.13 → T1.14 (G0)`.
+**Post-G0:** the graph below.
 
 ```
 T1.01 ─┬─ T1.03 ─ T1.10 ─ T1.11 ─┐
@@ -259,7 +322,7 @@ T6.01 ─ T6.02 ─────────────────────�
 
 | Risk | Impact | Probability | Mitigation |
 |---|---|---|---|
-| G0 fails (perfect ops don't win by enough) | High | Medium | Learned on Nov 17 for ~58 h; stop or reframe before the runtime |
+| G0 fails (perfect ops don't win by enough) | High | Medium | Learned by Nov 30 for ~39 h; stop or reframe before more runtime work |
 | Compiler (T3.07–08) takes 2–3x estimate | High | High | 16h buffer in P3 + holiday weeks; fallback strategy: human-recorded maps (§7.2) |
 | WebArena setup eats days | Medium | Medium | Slip order: drop GitLab, keep shopping; never drop drift run |
 | Vertical sites forbid automation or need partner accounts | High | Medium | ToS review in T6.04; partners provide accounts; prefer partner-owned portals |
@@ -277,10 +340,11 @@ T6.01 ─ T6.02 ─────────────────────�
 
 | Date | Gate | If pass | If fail |
 |---|---|---|---|
-| Tue Nov 17 | G0 | Proceed to runtime | Stop; write ADR; reframe or close |
-| Fri Jan 15 | G1 | Proceed | §7.2 |
-| Fri Jan 22 | G2 | Release with writes | Release reads-only (writes behind a flag), or stop |
-| Fri Jan 22 | Vertical | Start partner maps | Extend interviews one week; release on fixtures + WebArena only |
+| Mon Nov 30 | **G0** | Proceed to compiler/G1; resume Phase 2–7 only after G0 | **Stop or narrow; do not start Phase 2–7** |
+| Post-G0 | G1 | Proceed | §7.2 |
+| Post-G0 | G2 | Release with writes | Release reads-only (writes behind a flag), or stop |
+
+**No Phase 2–7 work starts before the G0 row.** G1 and G2 dates move with the G0 result.
 
 ### 7.2 If G1 fails: narrowed release
 

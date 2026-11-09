@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Trace, TraceAct } from "./fallback.js";
-import { isSensitiveKey, redactRecord, redactTrace } from "./redact.js";
+import {
+  isCredentialValue,
+  isSensitiveKey,
+  redactRecord,
+  redactText,
+  redactTrace,
+} from "./redact.js";
 
 function act(overrides: Partial<TraceAct> = {}): TraceAct {
   return {
@@ -57,6 +63,51 @@ describe("redactRecord", () => {
       nested: { token: "[redacted]", note: "keep" },
       items: [{ secret: "[redacted]" }],
     });
+  });
+});
+
+describe("credential values", () => {
+  it("redacts common key formats even under an innocent field name", () => {
+    const values = [
+      "sk-abcdefghijklmnopqrstuvwxyz012345",
+      "sk-ant-abcdefghijklmnopqrstuvwxyz012345",
+      "ghp_abcdefghijklmnopqrstuvwxyz012345",
+      "github_pat_abcdefghijklmnopqrstuvwxyz012345",
+      "AKIAIOSFODNN7EXAMPLE",
+      "AIzaSyA1234567890abcdefghijklmnopqrstu",
+      "sk_live_abcdefghijklmnopqrstuvwxyz",
+      "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature123",
+      "123-45-6789",
+    ];
+
+    for (const value of values) {
+      expect(isCredentialValue(value), value).toBe(true);
+      expect(redactText(`prefix ${value} suffix`)).toContain("[redacted]");
+      expect(redactText(`prefix ${value} suffix`)).not.toContain(value);
+    }
+  });
+
+  it("redacts a Luhn-valid card number, with or without separators", () => {
+    expect(redactText("4242 4242 4242 4242")).toBe("[redacted]");
+    expect(redactText("4242-4242-4242-4242")).toBe("[redacted]");
+    expect(redactText("4242424242424242")).toBe("[redacted]");
+  });
+
+  it("leaves ordinary text and invalid numbers alone", () => {
+    expect(redactText("order 1234567890123 shipped")).toBe("order 1234567890123 shipped");
+    expect(redactText("4242 4242 4242 4241")).toBe("4242 4242 4242 4241");
+    expect(redactText("version 1.2.3")).toBe("version 1.2.3");
+  });
+
+  it("redacts a value inside a record and inside a read", () => {
+    expect(redactRecord({ note: "key sk-abcdefghijklmnopqrstuvwxyz012345" })).toEqual({
+      note: "key [redacted]",
+    });
+
+    const redacted = redactTrace(
+      trace([{ kind: "read", at: "t", text: "token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig" }]),
+    );
+    expect(redacted.entries[0]).toMatchObject({ text: "token: [redacted]" });
   });
 });
 

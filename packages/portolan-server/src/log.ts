@@ -1,4 +1,4 @@
-import { isSensitiveKey, REDACTED } from "@portolan/runtime";
+import { isSensitiveKey, REDACTED, redactText } from "@portolan/runtime";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -89,6 +89,8 @@ function redactValue(value: unknown): unknown {
   if (value !== null && typeof value === "object") {
     return redactFields(value as LogFields);
   }
+
+  if (typeof value === "string") return redactText(value);
 
   return value;
 }

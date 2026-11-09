@@ -54,9 +54,10 @@ A thrown error is treated as after-dispatch, not as a clean failure.
 
 ## Audit
 
-Every write is recorded in SQLite: op, effect, params (redacted by key), tier,
-idempotency key, before/after state, outcome, and the requests the executor
-reported. `GET /v1/sessions/:sid/audit` returns them.
+Every write is recorded in SQLite: op, effect, params (redacted by key and by
+known credential shape), tier, idempotency key, before/after state, outcome,
+and the requests the executor reported. `GET /v1/sessions/:sid/audit` returns
+them.
 
 ## What the server enforces
 

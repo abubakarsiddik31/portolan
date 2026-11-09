@@ -5,6 +5,9 @@
 **Status:** harness validation, **not** gate results. [ADR-005](./DECISIONS.md#adr-005--g1g2-are-not-passed-release-gate-stays-closed)
 keeps G0, G1, and G2 unpassed.
 
+> **Next run:** G0 on one vertical, with a real model and billed usage.
+> More scripted rows do not close a gate (ADR-005, ADR-009).
+
 This is the public-facing report. The detailed evidence is in
 [G1-G2.md](./G1-G2.md); the raw rows are in [`bench/results/`](../bench/results/).
 

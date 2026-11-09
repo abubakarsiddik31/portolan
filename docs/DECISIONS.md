@@ -449,6 +449,62 @@ Portolan's distribution depends on agents and clients adopting a protocol and a 
 
 ---
 
+## ADR-009 — G0 first: pause horizontal work until the vertical gate passes
+
+**Status:** Accepted, 2026-11-09
+**Deciders:** Abubakar Siddik
+**Related:** ADR-002, ADR-005; `docs/PROJECT_PLAN.md` Revision 2026-11-09
+
+### Context
+
+Phase 5 is complete: runtime, compiler, verifier, repair loop, MCP server, CLI, packaging, security review, docs, and a full test suite. But no gate has been measured. Every benchmark row is `provider: scripted`, there is no oracle denominator, and the drift sample is three ops (ADR-005).
+
+The fallback path is now at parity with `agent-browser` on observation tokens (378 vs. 428 on five real pages). That confirms the concern that produced ADR-002: token formatting is not a moat. The map path is different — a verified op was 51 tokens and one call vs. 289 tokens and seven calls — but that is a hand-written map on a fixture, not a vertical result.
+
+There is no chosen vertical and no design partner. More code does not create that evidence.
+
+### Decision
+
+1. **Freeze horizontal work.** No Phase 2–5 feature work, no Phase 6 map production, no Phase 7 release prep, no cockpit, no further fallback or browser optimization until G0 passes.
+2. **The only active work is the G0 vertical:** score three verticals, run eight interviews, choose one (ADR-006), recruit three design partners, hand-write 3–5 ops, and run `agent-browser` vs. those ops with a real model and billed usage.
+3. **G0 is measured, not asserted:** steps ≤⅓, cost ≤⅕, success within 2 points of the browser baseline, on two providers.
+4. **If G0 fails, stop or narrow.** Do not start Phase 2–7. The plan's branch points apply only after a measured result.
+5. **The browser is the substrate; the map is the product.** Keep the runtime, compiler, and write-safety layer. Do not compete with `agent-browser` on snapshots.
+
+### Rationale
+
+- **The gates are economic, not feature checks.** "The compiler works" and "the compiler wins" are different claims. The current rows can prove the first, not the second.
+- **Token parity is evidence, not a setback.** It closes the formatting argument and forces the real one: steps, typed results, and write safety.
+- **The codebase is already a harness.** The G0 experiment is cheap now; building more features first only increases the sunk cost.
+- **The opportunity cost is the risk.** A solo founder polishing horizontally is not finding a customer or a vertical.
+- **Write safety is the defensible wedge.** Declared effects, confirmation, idempotency, `unknown_outcome`, and an audit trail are things a browser tool does not provide.
+
+### Consequences
+
+- The 17-week schedule is paused. Dates after G0 move with the result.
+- No new fallback, snapshot, cockpit, hosted, or packaging work.
+- The next commits are measurement and vertical work, not features.
+- If G0 passes, resume the compiler and G1; if it fails, narrow to human-recorded maps or stop.
+- The public status says "gates unmeasured" until the G0 report exists.
+
+### Alternatives rejected
+
+| Alternative | Why rejected |
+|---|---|
+| **Keep building horizontally** | More code does not create gate evidence or a customer. |
+| **Run G1 before G0** | G1 compares compiled maps to an oracle win that G0 has not established. |
+| **Ship the current build as an alpha** | It would put unmeasured gate claims in front of users (ADR-005). |
+| **Wait for more evidence without a vertical** | The missing evidence is a vertical result; waiting does not produce it. |
+
+### Revisit triggers
+
+1. **G0 passes** → resume Phase 2–7, starting with the compiler/G1.
+2. **G0 fails** → stop or narrow to human-recorded maps.
+3. **No vertical with three partners within three weeks** → reassess the vertical thesis, not the code.
+4. **A competitor ships a state-model runtime with write safety and published drift numbers** → the vertical map library is the only remaining bet.
+
+---
+
 ## Related decisions (one-line rationale)
 
 | Decision | Why |

@@ -516,12 +516,12 @@ export class PlaywrightEngine implements Engine {
     let hit: { backendNodeId?: number };
 
     try {
-      // DOM.getNodeForLocation takes document coordinates; the mouse takes
-      // viewport coordinates. Without the scroll offset a scrolled page
-      // reports the node above the target as the blocker.
+      // The point is in viewport coordinates, the same space as the mouse.
+      // Adding the scroll offset lands on the element below the target on a
+      // scrolled page, which is how a book heading "covered" a search button.
       hit = (await this.cdp.send("DOM.getNodeForLocation", {
-        x: x + viewport.scrollX,
-        y: y + viewport.scrollY,
+        x,
+        y,
         includeUserAgentShadowDOM: false,
       })) as unknown as { backendNodeId?: number };
     } catch (error) {

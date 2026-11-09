@@ -339,13 +339,11 @@ The schedule and task estimates are in
    must name them and record billed usage.
 3. **Map library ownership.** Human-recorded maps are the G1 fallback; how many
    are acceptable before the compiler is considered failed?
-4. **Idempotency across restarts.** The ledger is in memory (#73); a persisted
-   ledger is a release requirement for writes.
-5. **HTTP authentication.** `serve` has none (#75); a token or socket is needed
+4. **HTTP authentication.** `serve` has none (#75); a token or socket is needed
    before a non-loopback bind.
-6. **Substrate factory in `serve`.** `mcp` now launches a browser; `serve`
+5. **Substrate factory in `serve`.** `mcp` now launches a browser; `serve`
    does not (#76).
-7. **Name clearance.** Trademark classes 9/42 (T7.06).
+6. **Name clearance.** Trademark classes 9/42 (T7.06).
 
 ---
 

@@ -2,6 +2,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { SessionRecord } from "@portolan/protocol";
 
+import type { WriteLedger } from "@portolan/runtime";
+
 import type { BrowserRegistry } from "./browsers.js";
 import type { OpExecutor } from "./executor.js";
 import { MapStore } from "./maps.js";
@@ -20,6 +22,8 @@ export type StdioServerOptions = {
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
   /** Browsers owned by sessions; closed with the server. */
   browsers?: BrowserRegistry;
+  /** Write ledger. Defaults to the session store's SQLite ledger. */
+  ledger?: WriteLedger;
 };
 
 export type StdioServerHandle = {
@@ -45,6 +49,7 @@ export async function startStdioServer(
   const server = createMcpServer({
     maps,
     sessions,
+    ledger: options.ledger ?? sessions.writeLedger(),
     ...(options.executor !== undefined ? { executor: options.executor } : {}),
     ...(options.substrateFactory !== undefined
       ? { substrateFactory: options.substrateFactory }

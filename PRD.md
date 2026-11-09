@@ -1,253 +1,292 @@
 # Portolan — Product Requirements Document
 
-> **Superseded in part by ADR-002 (2026-11-08).** The product is now a **site-map runtime**: agents call typed operations from a verified map of each site, instead of reading affordances step by step. This PRD's one-liner still holds. Its verbs (§6), architecture (§7), requirements (§8), metrics (§9) and gates (§10) describe what is now the **substrate** (`docs/SUBSTRATE.md`). The current plan, gates and metrics are in `docs/BUILD_PLAN.md`. A PRD v0.2 rewrite is pending.
-
 | | |
 |---|---|
 | **Product** | Portolan |
-| **Version** | 0.1 (draft for validation) |
-| **Date** | 2026-11-08 |
+| **Version** | 0.2 |
+| **Date** | 2026-11-09 |
 | **Owner** | Abubakar Siddik |
-| **Status** | Pre-build. Every quantitative claim below marked **[H]** is a hypothesis to be validated by the benchmark in §10. |
-| **One-liner** | A stateful browser that synthesizes a temporary API for any website and talks to agents in affordances, effects, and deltas — so a web task costs cents, not dollars. |
+| **Status** | Pre-release. Phase 5 (harden) is complete; the G0/G1/G2 gates are **not passed** (ADR-005). |
+| **Supersedes** | v0.1 (2026-11-08). What moved is recorded in Appendix C. |
+| **One-liner** | Portolan turns a website into a map an agent can call: verified, typed operations that replace click-by-click browsing. |
 
 ---
 
 ## 1. Problem
 
-Agents drive the web through interfaces built for humans. Three specific failures follow.
+Agents drive the web through interfaces built for humans. The cost is in the
+number of steps, not only in the size of each step.
 
 **1.1 Agents receive documents, not capabilities.**
-The dominant pattern is: serialize the DOM or a screenshot, hand it to the model, and hope it infers what is clickable. Raw HTML for a typical commerce page runs 50k–400k tokens. Screenshots cost ~1.5k tokens each and force multi-step visual reasoning. Neither is an interface; both are a Rorschach test.
+The dominant pattern is to serialize the DOM or a screenshot and ask the model
+what to do. Raw HTML for a commerce page runs 50k–400k tokens; a screenshot
+costs ~1.5k tokens and forces visual reasoning. Both describe the page; neither
+says what the site can do.
 
-**1.2 Context accumulates, so cost grows quadratically.**
-Naive agents re-send the entire conversation — system prompt, every prior snapshot, every prior action — on each step. A 30-step task at ~15k tokens per observation bills roughly 30 × 15k ≈ 450k input tokens **[H]**. Step 30 costs far more than step 1, and nothing about the task got harder.
+**1.2 Steps multiply cost and failure.**
+A ten-click checkout is ten model turns, ten observations, and ten chances to
+misread a label. Even a perfect per-step formatter leaves ten steps. The
+lever that survives cheaper tokens is replacing the sequence with a typed
+call.
 
-Published cost teardowns of `browser-use` tasks report that **~93% of per-task spend is input tokens**, not browser compute. The bottleneck is what we send to the model, not what we run.
+**1.3 Free tools already format the step.**
+`agent-browser` and Playwright MCP give an agent a compact view and a click.
+An affordance browser measured against them wins ~1.15x — not enough to be a
+product (ADR-002).
 
-**1.3 Browser compute is already priced as a commodity.**
-Hosted browsers sell for **$0.02–$0.10 per browser-hour** (Browser Use, Steel, Browserbase). A 10x cheaper engine therefore saves the customer roughly $0.018/hour — a rounding error against a $1–$4 model bill for the same task. Efficiency at the engine layer is necessary but has almost no willingness-to-pay.
+**1.4 A verified map compounds; a formatting layer does not.**
+A map of a site is reusable evidence: every agent that calls `search` benefits
+from the run that verified it, and a repair improves it for all of them. That
+is the asset.
 
-**The gap:** nobody sells a *cheap interaction model*. Everyone sells transport.
-
----
-
-## 2. Insight / Thesis
-
-> Move state out of the conversation and into the browser.
-
-Today the browser is a function: `observe() → dump`. Portolan makes the browser a **stateful actor**: the agent holds a session handle and a set of element references; the browser holds the page, history, DOM, and network. Steps become stateless. O(n²) collapses to O(n).
-
-Two primitives follow from that:
-
-- **Affordances over observables.** The agent asks "what can I do here?" and receives a ranked, typed, budgeted action list — not a document.
-- **Effects over pixels.** After an action, report structural consequences — *modal opened*, *navigated*, *3 requests pending* — so the agent decides correctly in one turn. Fewer steps beats smaller steps, because steps multiply everything.
-
-**Framing:** Portolan is a browser that **synthesizes a temporary API for any website at runtime, without the site's cooperation.** Chrome-in-a-trench-coat gives the agent a document. WebMCP gives it a real API that the site must build. Portolan occupies the space between.
+**The gap:** nobody sells a *map of what a site can do*, with the execution and
+write safety to use it.
 
 ---
 
-## 3. Goals & Non-Goals
+## 2. Thesis
+
+> Move the site's capabilities out of the conversation and into a verified map.
+
+Portolan serves each site as a **map**: named states, typed operations with
+`params` and `returns`, declared effects, and transitions. The agent calls an
+operation. The runtime executes it through the cheapest verified path.
+
+Three consequences:
+
+- **Steps, not tokens per step.** One `checkout(email)` replaces eight clicks.
+- **Typed data, not labels.** `search(query)` returns rows with ids and
+  prices, so the agent does not have to read a page to use the result.
+- **Writes become governable.** Declared effects, confirmation, idempotency,
+  and `unknown_outcome` are what let a platform team allow a purchase at all.
+
+**Positioning:** Portolan is not a browser for agents. It is an API layer for
+websites that happens to run on one.
+
+---
+
+## 3. Goals and non-goals
 
 ### Goals
 
-| ID | Goal | Measure |
+| ID | Goal | Gate or measure |
 |---|---|---|
-| G1 | Reduce tokens per observation by an order of magnitude | p50 ≤ 800 tokens per `affordances` call vs ~6–15k for an A11y snapshot **[H]** |
-| G2 | Cut cost per completed task 5x | ≥5x lower $/task vs `browser-use` baseline on the 20-task suite (§10) **[H]** |
-| G3 | Preserve full browser fidelity | ≥98% of benchmark tasks reachable without a manual fallback |
-| G4 | Make idle time free | Hibernation frees ≥95% of session RSS; wake ≤50ms p50 |
-| G5 | Make cost observable | Every response carries `{tokens, ms, mb}` |
-| G6 | Cut retries | ≤1.2 average actions per intended action on the benchmark **[H]** |
+| G0 | Hand-written ops beat the best free browser tool | ≥3x fewer steps and ≥5x cheaper than `agent-browser` on perfect ops |
+| G1 | Compiled maps keep most of the oracle's win | ≥60% of the oracle win, ≥50% compile yield, break-even at K≤3 calls |
+| G2 | Maps survive drift without duplicate writes | ≥80% auto-repair, zero duplicate writes |
+| — | Fast calls | p50 ≤500ms `ui`, ≤150ms `url`/`http` on fixtures |
+| — | Install anywhere | macOS and Linux, any MCP client |
+| — | Safe writes | confirmation, idempotency, `unknown_outcome`, audit |
 
-### Non-Goals (v1)
+**Gate status (ADR-005):** G0, G1, and G2 are **not passed**. The current
+artifacts are harness validations on a scripted provider, not gate results.
+v0.1.0 is not released on that evidence.
 
-- Writing a rendering engine. We rent engines; we own the interface.
-- A human-facing browser UI.
-- A search engine or a bulk crawl platform.
-- Beating Chromium on standards conformance.
+### Non-goals (v0.1)
+
+- A rendering engine. Portolan rents Chromium behind a substrate adapter.
+- A human browser UI; the cockpit is a later projection of the same session.
+- A search engine or a bulk crawler.
+- An LLM in the verified op hot path.
 - Consumer distribution.
 
 ---
 
 ## 4. Users
 
-**Primary — Agent platform engineers.** Teams running autonomous web workflows (support ops, procurement, research) who see a monthly bill and a flaky success rate. They own the pager. They will adopt a session model if it halves their bill.
+**Primary — agent platform engineers.** Teams running autonomous web
+workflows who own a bill and a pager. They adopt a session model when it cuts
+steps and makes writes governable.
 
-**Secondary — Vertical AI SaaS teams.** Building a product where web interaction is the bottleneck (insurance eligibility, invoice reconciliation, travel rebooking). They buy outcomes, not browsers.
+**Secondary — vertical AI SaaS teams.** Insurance eligibility, invoice
+reconciliation, procurement, travel rebooking: the web interaction is the
+bottleneck, and they buy outcomes.
 
-**Tertiary — OSS agent developers.** Adopt the protocol and the MCP server; become the distribution channel.
+**Tertiary — OSS agent developers.** Adopt the MCP server and the skill
+format; they are the distribution channel.
 
-**Anti-persona —** humans browsing; petabyte-scale scrapers; teams with <$500/month web-automation spend (they will never buy infrastructure).
+**Anti-persona.** Humans browsing; petabyte-scale scrapers; teams with
+<$500/month of web automation.
 
 ### Jobs to be done
 
-- "When my agent needs to complete a task on a site with no API, I want it to succeed in fewer steps and fewer dollars, so my unit economics work."
-- "When my agent fails halfway through a checkout, I want to resume exactly where it left off instead of restarting, so I stop paying twice."
-- "When finance asks why agent costs are what they are, I want a per-task meter, so I can defend or fix it."
+- "When my agent needs a site with no API, I want it to succeed in fewer
+  steps and fewer dollars, so my unit economics work."
+- "When my agent fails halfway through a checkout, I want to resume where it
+  left off instead of restarting, so I stop paying twice."
+- "When finance asks why agent costs are what they are, I want a per-task
+  meter I can defend."
 
 ---
 
-## 5. Competitive Position
+## 5. Competitive position
 
 | Alternative | What it gives you | Where it falls short |
 |---|---|---|
-| Chrome + CDP (Browserbase, Steel, Browser Use Cloud) | Real browser, any site | Document-shaped output; O(n²) context; priced per hour |
-| browser-use / Stagehand | Agent loop over a real browser | State lives in the conversation; no delta model; retries |
-| Lightpanda | 10x cheaper engine | Engine only; no interaction model |
-| Firecrawl / Exa / Jina | Excellent read/scrape | Read-only; no interaction, no session state |
-| WebMCP | Sites expose typed tools | Requires site cooperation; years from coverage |
-| Portolan | Typed affordances + effects + deltas + hibernation + engine-agnostic | New session model to adopt; JS fidelity bounded by engine |
+| Chrome + CDP clouds (Browserbase, Steel, Browser Use Cloud) | A real browser, any site | Document-shaped output; steps remain; priced per hour |
+| `agent-browser`, Playwright MCP, browser-use, Stagehand | An agent loop over a real browser | State and know-how live in the conversation; no map; retries |
+| Workflow recorders (WALT, workflow-use) | One recorded task | No shared state model; every task is a new recording |
+| Integuru/Parse-style network APIs | Fast private endpoints | Unsafe writes without the site's client logic; breaks silently |
+| WebMCP | Sites declare typed tools | Requires site cooperation; years from coverage |
+| **Portolan** | **A verified map per site, typed calls, tiered execution, write safety, drift repair** | **Compilation is a research risk; ToS exposure for private endpoints** |
 
-**Positioning statement:** For teams whose agents must *act* on the open web, Portolan is a stateful browser that exposes each site as a temporary, typed API, costing 5x less per completed task than document-based browsing — because it holds the page state so the agent doesn't have to.
-
-**Moat (honest):** thin at launch. The durable assets are (a) the protocol as a de facto interface, (b) an eval suite that proves cost-per-task, and (c) the affordance/effect model's quality bar. Not compute.
+**Moat (honest):** the state model, write safety, published verification and
+drift numbers, and one vertical's map library. Not the compilation technique;
+that space is crowded.
 
 ---
 
-## 6. Product: The Five Verbs
+## 6. Product surface
 
-The entire product surface. Everything else is implementation.
+The product is four surfaces over one session: MCP, the CLI, the map format,
+and generated skills.
 
-```jsonc
-// 1. Create a session
-POST /v1/sessions
-  { profile?: "default", viewport?: [1280,800], block?: ["media","ads"] }
-→ { sid: "s_7f3", ready: true }
+### 6.1 MCP (execution)
 
-// 2. Navigate
-POST /v1/s/{sid}/goto
-  { url: "https://example.com/product", budget: 800 }
-→ { v: 1, title: "…", url: "…", ready: true,
-    affordances: [{ ref:"e12", do:"click", label:"Add to cart", kind:"primary" }],
-    reading_ref: "m1", tokens: 412 }
+| Tool | Input | Result |
+|---|---|---|
+| `open_site` | `{ site }` | Compact map, pinned version, session |
+| `call` | `{ op, params, confirm?, idempotency_key? }` | Typed result or typed error |
+| `view` | `{}` | URL, state, ranked affordances, text, refs |
+| `act` | `{ ref, do, value?, key? }` | Delta and effects |
+| `read` | `{ ref? }` | Page or element text |
+| `fallback_done` | `{ result? }` | Trace for the fallback scope |
 
-// 3. Act — browser resolves, agent declares
-POST /v1/s/{sid}/act
-  { ref: "e12", do: "click" }
-→ { v: 2, ok: true,
-    effects: [{ type:"modal", label:"Confirm size" }],
-    delta:   [{ ref:"e51", do:"click", label:"Confirm", kind:"primary" }],
-    tokens: 61 }
+`call` is the fast path. `view` / `act` / `read` are the caller's fallback when
+no op fits; Portolan runs no second agent for a live call.
 
-// 4. Read — explicit, separate from acting
-GET /v1/s/{sid}/read?ref=m1&budget=1500
-→ { markdown: "…", truncated: false, tokens: 1204 }
+Every page-derived result is labeled `untrusted: true` with a notice. Page
+text is data, not instructions.
 
-// 5. Hibernate / wake
-POST /v1/s/{sid}/sleep            → { snapshot:"sn_9f2", freed_mb: 288 }
-POST /v1/sessions/wake { snapshot:"sn_9f2" } → { sid:"s_7f3", v:2, ready:true, ms:14 }
-```
+### 6.2 CLI
 
-### Design rules (P0, non-negotiable)
+`init`, `serve`, `mcp`, `compile`, `verify`, `export-skills`, `bench`,
+`doctor`. See [docs/CONFIG.md](./docs/CONFIG.md) and
+[docs/INSTALL.md](./docs/INSTALL.md).
 
-1. **Affordances are ranked and budgeted.** Interactive → visible → changed. Truncate to `budget`; report what was dropped (`omitted: 14`) rather than silently trimming.
-2. **Refs are stable.** `ref = hash(role, accessible_name, ordinal)` within a document version. A ref survives re-render; if it cannot, return `stale: true` and the new ref.
-3. **Deltas are the default return type** for every mutation. Full snapshots are opt-in.
-4. **Effects describe structure, not pixels.** `nav | modal | menu | validation | toast | download | dialog | network_pending`.
-5. **The browser owns timing.** `act` performs scroll-into-view, hit-test, quiescence wait, and one retry. Agents never sleep.
-6. **Errors are typed.** `stale_ref | not_interactive | blocked | needs_auth | captcha | timeout | engine_crash` — each with a suggested recovery.
-7. **Every response carries the meter:** `tokens`, `ms`, `mb`.
+### 6.3 Map format
+
+`maps/<site>/v<n>.json`: states, ops, effects, impls, entities, auth,
+`compiled_from`, `verified_at`. The field reference is
+[docs/spec/map-v0.md](./docs/spec/map-v0.md).
+
+### 6.4 Skills (knowledge)
+
+A generated `portolan-<site>` skill names the ops, mines recipes from traces,
+and links the schemas. Skills never execute and are never required. MCP
+enforces; skills guide.
 
 ---
 
 ## 7. Architecture
 
 ```
-agent ──JSON-RPC/HTTP──▶ portolan-server
-                          ├── session manager      create/fork/sleep/wake, snapshot store
-                          ├── semantic engine      affordance extraction, ref graph, ranking
-                          ├── delta engine         structural diff, effect classification
-                          ├── policy               egress allowlist, scoped creds, artifacts
-                          ├── escalation ladder    static fetch → DOM-only → full engine
-                          ├── meter                tokens / ms / mb per call
-                          └── engine adapter       CDP: chromium | lightpanda | webkit
+agent / MCP client
+        │  MCP (stdio or HTTP)
+        ▼
+portolan-server          sessions, write safety, audit, MCP surface
+        ├── runtime      runUrlOp / runHttpOp / runUiOp, router, extractors
+        ├── compiler     segment → parameterize → lift → verify → publish
+        ├── substrate    semantic capture, refs, actions, egress, reaper
+        ├── model        one ModelPort; offline compile and repair only
+        └── skills       recipe mining and skill export
 ```
 
-**Engine adapter is four methods:** `navigate`, `snapshot`, `dispatch_input`, `evaluate`. Anything that implements it is a Portolan engine. This is what keeps us from marrying Chromium and what lets us ride Lightpanda's cost curve down without a rewrite.
+**Execution tiers**, in preference order:
 
-**Escalation ladder:**
-
-| Tier | When | Cost |
+| Tier | Path | Writes |
 |---|---|---|
-| 0 — fetch + readability | Read-only intent, no JS needed | ~5ms, ~1k tokens |
-| 1 — DOM-only engine | JS required, no pixels needed | ~80ms |
-| 2 — full engine via CDP | Tier 1 returns empty/blocked, or interaction needs it | ~600ms |
+| `webmcp` | A tool the page declares | reserved |
+| `url` | Navigate a route template | read only |
+| `http` | The site's own request, inside the page | write with `outcome_check` |
+| `ui` | A semantic UI program | read or write |
+| `agent` | The caller's `view`/`act`/`read` fallback | scoped |
 
-Escalate on: empty semantic model after quiescence, challenge detected, or explicit `require: "full"`. Cache the tier decision per domain.
+**No LLM in the hot path.** A verified op call is deterministic. The model
+port is for offline compilation and repair, configured per role
+(ADR-003).
+
+**One session, two projections.** The agent sees the map and ops; a human
+cockpit can watch the same session later (ADR-007).
 
 ---
 
 ## 8. Requirements
 
-### P0 — the demo (weeks 1–4)
+### P0 — the product
 
 | ID | Requirement | Acceptance |
 |---|---|---|
-| R1 | Session lifecycle: create, goto, sleep, wake | Wake restores cookies, URL, DOM, and refs; ≤50ms p50 |
-| R2 | Affordance extraction with stable refs | ≥95% of interactive elements on the 20-task suite correctly identified |
-| R3 | `act` with resolution + effect detection | Click/type/select/scroll/key/upload; ≤1.2 actions per intent |
-| R4 | Delta engine | Post-action payload ≤15% of a full affordance snapshot |
-| R5 | `read` → markdown | Nav/ads/footers stripped; no duplicate content |
-| R6 | Token budget + omission reporting | Never exceeds `budget`; always reports what was dropped |
-| R7 | Cost meter | `{tokens, ms, mb}` on every response, reproducible |
-| R8 | Escalation ladder | Auto-selects tier; domain decision cached |
-| R9 | Profile persistence | Cookies/localStorage/session survive across sessions |
-| R10 | Artifacts by ref | Download/upload/PDF handled without entering the token path |
-| R11 | Ad/tracker blocking on by default | ≥30% median page-weight reduction |
+| R1 | Stateful session | Cookies, URL, refs, and map version survive a call |
+| R2 | Map model | Schema-validated states, ops, effects, impls |
+| R3 | `url` / `http` / `ui` execution | Each tier runs and validates returns |
+| R4 | Gates G0/G1/G2 | Passed and recorded in an ADR; **open** (ADR-005) |
+| R5 | Compiler | Traces → candidates → verify → publish |
+| R6 | Drift repair | Degraded op repaired without duplicate writes |
+| R7 | Write safety | Confirmation, idempotency, `unknown_outcome`, audit |
+| R8 | MCP surface | Portable tools plus native per-op tools |
+| R9 | Skills | Generated skill validates and carries `map_version` |
+| R10 | Untrusted labels | Page-derived results labeled; injection fixture |
+| R11 | Egress policy | Default deny; blocked requests logged |
+| R12 | Session lifecycle | TTL, cap, recovery, orphan reaper |
+| R13 | Credentials | Site-scoped; no secrets in maps, traces, logs, skills |
 
-### P1 — the product (weeks 5–10)
-
-| ID | Requirement |
-|---|---|
-| R12 | Fork from warm base — per-session marginal cost near zero |
-| R13 | Multi-document (tabs), back/forward without reload |
-| R14 | Typed error taxonomy with recovery hints |
-| R15 | MCP server wrapper (`portolan mcp`) |
-| R16 | Lightpanda adapter behind the same protocol |
-| R17 | Replayable audit log of every action and every byte observed |
-| R18 | Capability scoping: per-session egress allowlist, scoped credentials |
-
-### P2 — the platform
+### P1 — release readiness
 
 | ID | Requirement |
 |---|---|
-| R19 | Multi-agent shared session with isolation and handoff |
-| R20 | WebMCP passthrough (use site-declared tools when present) |
-| R21 | Cross-session semantic cache keyed by URL + state |
-| R22 | Vision fallback — pixels only when semantics fail |
-| R23 | Hosted cloud with concurrency tiers |
+| R14 | CLI and config documented with defaults |
+| R15 | npm packages and a Docker image with Chromium |
+| R16 | Changesets, provenance, GitHub release workflow |
+| R17 | Install snippets for five clients |
+| R18 | `doctor` diagnoses browser, config, providers, clients |
+| R19 | Threat model and write-path review |
+| R20 | Runtime coverage ≥80% lines |
+
+### P2 — later
+
+Multi-agent shared sessions, WebMCP passthrough, cross-session cache, vision
+fallback, hosted concurrency tiers, the cockpit.
 
 ---
 
 ## 9. Metrics
 
-**North star:** cost per **completed** task (cents). Not browser-hours. Not tokens. Completed tasks.
+**North star:** cost per **completed** task, with steps as the lever.
 
-| Layer | Metric | Target |
-|---|---|---|
-| Cost | $/completed task | ≥5x better than baseline **[H]** |
-| Cost | tokens/observation | p50 ≤800, p95 ≤2500 |
-| Efficiency | steps/task | ≤ baseline − 30% |
-| Quality | task success rate | ≥ baseline − 2pts (currently ~89% on WebVoyager) |
-| Speed | goto→ready p50 | ≤900ms |
-| Infra | session RSS, hibernated | ≤5% of live |
-| Reliability | actions per intent | ≤1.2 |
+| Layer | Metric | Target | Status |
+|---|---|---|---|
+| Steps | ops per intent vs `agent-browser` | ≥3x fewer | G0, unmeasured |
+| Cost | $/completed task | ≥5x lower | G0, unmeasured |
+| Compiler | share of the oracle win | ≥60% | G1, unmeasured |
+| Compiler | yield on held-out traces | ≥50% | G1, unmeasured |
+| Drift | auto-repaired ops | ≥80% | G2, unmeasured |
+| Drift | duplicate writes | zero | G2, scripted only |
+| Speed | p50 `ui` / `url` / `http` | ≤500 / ≤150 / ≤150ms | measured on fixtures |
+| Reliability | task success vs baseline | ≥ baseline − 2pts | unmeasured |
 
-**Guardrail:** any cost win that costs more than 2 points of success rate is not a win. Cheapness is a constraint, not the product.
+**Guardrail:** a cost win that costs more than 2 points of success rate is not
+a win.
 
 ---
 
-## 10. Launch Gates
+## 10. Gates
 
-Ship the demo only if all four hold:
+The definitions live in [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) and the
+current evidence in [docs/G1-G2.md](./docs/G1-G2.md).
 
-1. **20 real tasks** (not benchmarks): checkout, form fill, dashboard read, multi-page research, auth-gated flow. Each run against baseline (`browser-use` + Playwright) and Portolan.
-2. **≥5x reduction in $/completed task**, with the meter's arithmetic reproducible by hand.
-3. **Success rate ≥ baseline − 2pts.**
-4. **Three design partners** have run their own tasks through it and asked when they can have access.
+| Gate | Question | Pass |
+|---|---|---|
+| G0 | Do perfect ops beat the best free browser tool? | ≥3x fewer steps and ≥5x cheaper |
+| G1 | Do compiled maps keep the win? | ≥60% of oracle, ≥50% yield, K≤3 |
+| G2 | Does repair survive drift? | ≥80% repaired, zero duplicate writes |
 
-If the result is 1.5x, we have a feature incumbents ship in a quarter — and we stop.
+**Current state (ADR-005):** all three are **not passed**. The harness runs
+end to end, but every row is `provider: scripted`; there is no oracle
+denominator, no second provider, no real-model failure, and the drift sample
+is three ops. The next run must use arms A/B/C/D-oracle, two providers, N=3
+with billed usage, oracle rows, and a real drift run including the semantic
+filter and paginate failures and an idempotency-key retry.
 
 ---
 
@@ -255,76 +294,94 @@ If the result is 1.5x, we have a feature incumbents ship in a quarter — and we
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| **Token price deflation** erodes the savings pitch (~10x/year) | High | Sell on latency, accuracy, and step count too — not only $/token. Cost per task still falls slower than token price because steps dominate. |
-| **JS fidelity** — cheap engines break on SPAs | High | Escalation ladder; per-domain tier cache; never promise a single engine |
-| **Incumbent copies the delta model** | High | Protocol adoption + public cost benchmark; ship the eval suite as the moat |
-| **Stateful session is a harder integration** than a function call | Medium | Stateless compatibility mode (`session: "ephemeral"`) for the first call; MCP wrapper |
-| **Anti-bot divergence** on non-Chromium engines | Medium | Egress proxy, per-tier profile pinning; fall back to Tier 2 |
-| **Prompt injection** via page content | High | Treat all page text as untrusted; policy layer restricts egress and credentials; never let affordance labels carry instructions |
-| **Category revenue is small** (leader ≈ $3.6M) | High | Price per completed task, move up into vertical outcomes |
+| **Compilation is a research risk** (segmentation, parameterization) | High | G1; fallback to human-recorded maps if it misses |
+| **G0 fails** — perfect ops don't beat free tools | High | Stop or reframe before the runtime; that is the gate's purpose |
+| **Drift** breaks maps silently | High | Canaries, `outcome_check`, drift run, repair loop |
+| **Unsafe writes** | High | Effects, confirmation, idempotency, `unknown_outcome`, audit |
+| **Prompt injection** via page text | High | Untrusted labels, egress policy, server-enforced writes |
+| **ToS exposure** of private endpoints | High | Per-site review before a map ships (T6.04) |
+| **Anti-bot divergence** | Medium | Chromium-first substrate; profiles; fallback to `ui` |
+| **Cheaper tokens erode the cost pitch** | Medium | Sell steps, reliability, and write safety, not only $/token |
+| **Incumbent copies the map model** | Medium | Map library + published numbers + protocol adoption |
+| **Stateful integration is harder** | Medium | MCP carries it; `open_site` is one call |
 
 ---
 
-## 12. Business Model (sketch)
+## 12. Business model (sketch)
 
-- **Free:** OSS protocol + local `portolan-server`, unlimited, no support.
-- **Usage:** per completed task, with a published cost-per-task guarantee ("or we refund the delta").
-- **Platform:** concurrency tiers, profiles, audit log, capability scoping.
-- **Never** price per browser-hour. That is the commodity we are escaping.
+- **Free:** OSS runtime, CLI, MCP server, map spec; unlimited local use.
+- **Usage:** per completed task, with a published cost-per-task guarantee.
+- **Platform:** concurrency, profiles, audit retention, capability scoping.
+- **Never** price per browser-hour. That is the commodity the product escapes.
 
 ---
 
 ## 13. Phases
 
-| Phase | Dates | Deliverable | Gate |
-|---|---|---|---|
-| P0 — Instrument | Week 1 | Protocol skeleton + cost meter + 20-task harness | Meter reproducible |
-| P1 — Semantics | Week 2 | Affordances, refs, effects, budgets | ≥95% element coverage |
-| P2 — Deltas | Week 3 | Delta engine + hibernation | ≤15% delta payload; wake ≤50ms |
-| P3 — Ladder | Week 4 | Tier 0/1/2 escalation | 3 partners onboarded |
-| P4 — Engines | Weeks 5–6 | Lightpanda adapter, fork-from-warm | Same protocol, lower floor |
-
----
-
-## 14. Open Questions
-
-1. **Stateful vs stateless default.** Stateful wins the cost argument; stateless wins adoption. Do we default to stateful and offer ephemeral, or the reverse?
-2. **Protocol carrier.** HTTP/JSON, JSON-RPC over stdio, or MCP-first? MCP maximizes reach; HTTP maximizes performance.
-3. **Ref stability contract.** How much re-render churn can a ref survive before we require re-observation?
-4. **Do we open-source `portolan-server`?** Adoption vs. defensibility. Leaning open protocol, hosted runtime.
-5. **Vertical #1.** Which workflow do we use to prove outcomes — support ops, procurement, or insurance eligibility?
-6. **Name clearance.** "Portolan" conflicts with a wealth-management brand; verify trademark in class 9/42.
-
----
-
-## Appendix A — Protocol reference
-
-| Verb | Method | Returns |
+| Phase | Deliverable | State |
 |---|---|---|
-| `sessions.create` | POST `/v1/sessions` | `sid` |
-| `goto` | POST `/v1/s/{sid}/goto` | `v`, `affordances`, `reading_ref` |
-| `act` | POST `/v1/s/{sid}/act` | `v`, `effects`, `delta` |
-| `read` | GET `/v1/s/{sid}/read` | `markdown` |
-| `view` | GET `/v1/s/{sid}/view?since=v` | `delta` |
-| `back` / `forward` | POST `/v1/s/{sid}/history` | `v`, `affordances` |
-| `sleep` | POST `/v1/s/{sid}/sleep` | `snapshot` |
-| `wake` | POST `/v1/sessions/wake` | `sid`, `v` |
+| P1–P3 | Substrate, compiler, verifier, maps | done |
+| P4 | Benchmark harness, drift run, ADR-005 | done; gates unpassed |
+| P5 | Credentials, egress, injection, lifecycle, observability, CLI, config, packaging, release automation, install, latency, security, coverage | **done** |
+| P6 | Vertical choice, design partners, 10 maps | not started (ADR-006 pending) |
+| P7 | Docs site, benchmark report, PRD v0.2, licenses, release | in progress |
 
-### Action verbs
-`click`, `type`, `clear`, `select`, `check`, `scroll`, `key`, `hover`, `upload`, `download`, `wait_for`.
-
-### Effect types
-`nav`, `modal`, `menu`, `validation`, `toast`, `dialog`, `download`, `network_pending`, `dom_only`.
-
-### Error codes
-`stale_ref`, `not_interactive`, `blocked`, `needs_auth`, `captcha`, `timeout`, `engine_crash`, `budget_exceeded`.
+The schedule and task estimates are in
+[docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md).
 
 ---
+
+## 14. Open questions
+
+1. **Vertical #1 (ADR-006).** Insurance eligibility, procurement, or logistics?
+   The decision needs the discovery interviews.
+2. **Which provider pairs count for G1.** Two providers are required; the run
+   must name them and record billed usage.
+3. **Map library ownership.** Human-recorded maps are the G1 fallback; how many
+   are acceptable before the compiler is considered failed?
+4. **Idempotency across restarts.** The ledger is in memory (#73); a persisted
+   ledger is a release requirement for writes.
+5. **HTTP authentication.** `serve` has none (#75); a token or socket is needed
+   before a non-loopback bind.
+6. **Substrate factory in `serve`.** `mcp` now launches a browser; `serve`
+   does not (#76).
+7. **Name clearance.** Trademark classes 9/42 (T7.06).
+
+---
+
+## Appendix A — MCP and error reference
+
+Tool surface: `open_site`, `call`, `view`, `act`, `read`, `fallback_done`.
+
+Error codes: `invalid_request`, `invalid_params`, `precondition_failed`,
+`needs_auth`, `needs_confirmation`, `unknown_op`, `op_broken`,
+`unknown_outcome`, `blocked`, `timeout`, `stale_ref`, `not_interactive`,
+`map_not_found`, `session_not_found`, `internal`.
+
+Effects: `read`, `write`, `irreversible`.
+
+Post-checks: `url`, `state`, `exists`, `absent`, `text`.
 
 ## Appendix B — Naming
 
-**Portolan** (renamed from Facet on 2026-11-08, ADR-004) — portolan charts were medieval sea charts drawn from the logbooks of sailors who had already made the voyage, used to navigate by chart instead of by sight. That is the product: site maps compiled from the runs of agents that came before, so the next agent calls known routes instead of looking at screens.
+**Portolan** (renamed from Facet on 2026-11-08, ADR-004) — portolan charts were
+medieval sea charts drawn from the logbooks of sailors who had already made
+the voyage. The product: site maps compiled from the runs of agents that came
+before, so the next agent calls known routes instead of looking at screens.
 
-Facet was dropped because of Facets Cloud (an AI-agents + MCP platform for the same buyer), an existing FACET MCP server, a wealth-management brand, and crowded developer search results.
+Facet was dropped for collisions with Facets Cloud, an existing FACET MCP
+server, a wealth-management brand, and crowded search results.
 
-Rejected: Quay (Red Hat's registry), Tether (USDT), Pith (reads as "pithy"), Gantry (existing ML brand), Mullion (unspellable).
+## Appendix C — What changed from v0.1
+
+| v0.1 | v0.2 |
+|---|---|
+| "A stateful browser that synthesizes a temporary API" | A site-map runtime; the browser is the substrate (ADR-002) |
+| Five HTTP verbs (`goto`, `act`, `read`, `view`, `sleep`) | MCP tools (`open_site`, `call`, `view`, `act`, `read`) over a map |
+| Affordances, effects, deltas as the product | The fallback path; the product is typed ops |
+| Token-per-observation goals | Steps and cost-per-task; tokens are a secondary metric |
+| Launch gate: 5x cost, 20 tasks | G0, G1, G2 as defined in BUILD_PLAN; ADR-005 keeps them open |
+| Stateless compatibility as the adoption story | MCP is the integration; the session is server-side |
+| Open question: protocol carrier | Answered: MCP for execution, Skills for knowledge (ADR-003) |
+| Open question: open source? | Answered: Apache-2.0 runtime, MIT cockpit, CC-BY spec (ADR-008) |
+| No vertical | ADR-006 pending; Phase 6 owns it |

@@ -16,11 +16,11 @@ Portolan is **open source** (Apache-2.0) and **agent-native with a human cockpit
 
 | | |
 |---|---|
-| Stage | Phase 1: fixtures, task suite, model port and the oracle arm are built; G0 is next |
-| Date of analysis | 2026-11-08 |
+| Stage | Phase 5 complete: compiler, verifier, repair, MCP server, CLI, packaging, docs. Phase 6 (vertical and partners) is next. |
+| Date of analysis | 2026-11-09 |
 | Current plan | [docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md) (what and how) · [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) (when and who) |
 | First release | v0.1.0 public alpha, target **Tue 2027-03-02** |
-| First gate | G0: hand-written ops must beat the best free tool by ≥3x on steps and ≥5x on cost, or we stop |
+| Gates | G0, G1, and G2 are **not passed**; the harness is scripted-only. See [ADR-005](./docs/DECISIONS.md) and [docs/G1-G2.md](./docs/G1-G2.md) |
 | Key decisions | ADR-001 (stateful sessions), ADR-002 (site-map runtime), ADR-003 (provider-agnostic), ADR-004 (name), ADR-007 (one session, two projections), ADR-008 (open source) in [docs/DECISIONS.md](./docs/DECISIONS.md) |
 | License | Apache-2.0 (runtime, SDK, CLI, skills) · MIT (cockpit) · CC-BY-4.0 (map spec). See [docs/LICENSING.md](./docs/LICENSING.md) |
 
@@ -62,6 +62,7 @@ open_site("acme-store")
 | [docs/INSTALL.md](./docs/INSTALL.md) | MCP install snippets for Claude Code, Claude Desktop, Codex CLI, Cursor, Gemini CLI, and VS Code |
 | [docs/SECURITY.md](./docs/SECURITY.md) | Threat model, write-path review, and the open security findings |
 | [docs/spec/map-v0.md](./docs/spec/map-v0.md) | The site-map format: every field, the write rules, and validating examples |
+| [PRD.md](./PRD.md) | Product requirements v0.2, aligned with ADR-002–005 |
 | [docs/QUICKSTART.md](./docs/QUICKSTART.md) | From a clone to a working MCP call; the site also covers concepts, MCP, skills, and write safety (`pnpm docs:build`) |
 | [docs/ANALYSIS.md](./docs/ANALYSIS.md) | Market evidence, cost model, competitive landscape, reasoning trail (v1 → v4), falsification criteria |
 | [PRD.md](./PRD.md) | v0.1 requirements. Partly superseded by ADR-002; its verbs and architecture now describe the substrate. Rewrite pending. |

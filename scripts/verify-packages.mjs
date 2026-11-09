@@ -67,14 +67,21 @@ if (!existsSync(dockerfile)) {
 } else {
   const docker = readFileSync(dockerfile, "utf8");
   const checks = [
-    ["/usr/bin/chromium", "installs Chromium"],
     ["CHROME_PATH", "sets CHROME_PATH"],
+    ["PORTOLAN_CHROME_SANDBOX", "exposes the sandbox switch"],
     ["EXPOSE 4200", "exposes 4200"],
     ["ENTRYPOINT", "has an entrypoint"],
     ["pnpm --filter @portolan/cli deploy", "deploys the CLI"],
   ];
   for (const [needle, label] of checks) {
     if (!docker.includes(needle)) errors.push(`Dockerfile: does not ${label}`);
+  }
+
+  const wrapper = join(ROOT, "docker/chromium.sh");
+  if (!existsSync(wrapper)) {
+    errors.push("docker/chromium.sh: missing");
+  } else if (!readFileSync(wrapper, "utf8").includes("/usr/bin/chromium")) {
+    errors.push("docker/chromium.sh: does not exec Chromium");
   }
 }
 

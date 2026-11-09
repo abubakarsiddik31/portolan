@@ -25,14 +25,15 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends chromium ca-certificates fonts-liberation \
   && rm -rf /var/lib/apt/lists/*
 
-# Chromium inside a container needs --no-sandbox; the wrapper keeps that out
-# of the application code.
-RUN printf '#!/bin/sh\nexec /usr/bin/chromium --no-sandbox --disable-dev-shm-usage "$@"\n' \
-      > /usr/local/bin/chromium-portolan \
-  && chmod +x /usr/local/bin/chromium-portolan
+# The wrapper owns the sandbox flag. It defaults to --no-sandbox, which the
+# default Docker seccomp profile requires; PORTOLAN_CHROME_SANDBOX=1 drops it
+# for a host that permits user namespaces.
+COPY docker/chromium.sh /usr/local/bin/chromium-portolan
+RUN chmod +x /usr/local/bin/chromium-portolan
 
 ENV NODE_ENV=production
 ENV CHROME_PATH=/usr/local/bin/chromium-portolan
+ENV PORTOLAN_CHROME_SANDBOX=0
 
 COPY --from=build /out /app
 COPY LICENSE /app/LICENSE

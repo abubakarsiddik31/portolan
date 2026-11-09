@@ -62,6 +62,7 @@ open_site("acme-store")
 | [docs/INSTALL.md](./docs/INSTALL.md) | MCP install snippets for Claude Code, Claude Desktop, Codex CLI, Cursor, Gemini CLI, and VS Code |
 | [docs/SECURITY.md](./docs/SECURITY.md) | Threat model, write-path review, and the open security findings |
 | [docs/spec/map-v0.md](./docs/spec/map-v0.md) | The site-map format: every field, the write rules, and validating examples |
+| [docs/BENCHMARK.md](./docs/BENCHMARK.md) | Methods, the scripted evidence, the missing arms, and why the gates are still closed |
 | [PRD.md](./PRD.md) | Product requirements v0.2, aligned with ADR-002–005 |
 | [docs/QUICKSTART.md](./docs/QUICKSTART.md) | From a clone to a working MCP call; the site also covers concepts, MCP, skills, and write safety (`pnpm docs:build`) |
 | [docs/ANALYSIS.md](./docs/ANALYSIS.md) | Market evidence, cost model, competitive landscape, reasoning trail (v1 → v4), falsification criteria |

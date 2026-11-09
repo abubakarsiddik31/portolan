@@ -35,6 +35,22 @@ The final table shows the estimate and the interval:
 
 A `—` in `$/completed` means no run of any template in that arm completed.
 
+## Artifacts
+
+| File | What it is |
+|---|---|
+| `compiled-dev.md` | Compiler coverage and yield on the dev fixtures |
+| `pilot.jsonl`, `pilot.md` | N=1, 16 rows, arm C, scripted |
+| `n3.jsonl`, `n3.md`, `n3-final-table.md` | N=3, 48 rows, arm C, scripted |
+| `drift.json`, `drift.md` | v1 → v2 repair, scripted |
+| `conformance.json`, `conformance.md` | Claude Code, Codex CLI, Gemini CLI |
+| `freeze.json` | Held-out map versions and the frozen commit |
+| `perf.json`, `perf.md` | Op latency on the store fixture |
+
+The report that explains them is [docs/BENCHMARK.md](../../docs/BENCHMARK.md).
+Every row in these files is `provider: scripted`; none is a gate result
+(ADR-005).
+
 ## Raw results
 
 `appendResult` validates every row with `runResultSchema` before appending, and

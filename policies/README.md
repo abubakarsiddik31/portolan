@@ -37,10 +37,12 @@ await substrate.goto("https://shop.example.com/checkout");
 ## What is covered
 
 `Substrate.fetch` (the in-page `http` tier and fallback) and `Substrate.goto`
-(the `url` tier) are guarded. `fetch` also checks the URL a redirect landed on
-and refuses the response with `reason: "redirect"`. A page's own `location`
-navigation or a form submission is not intercepted by this guard; blocking
-those needs an engine request route, which is a separate layer.
+(the `url` tier) are guarded. The guard resolves an allowlisted hostname and
+refuses a private address (`reason: "private_address"`), which limits DNS
+rebinding. `fetch` also checks the URL a redirect landed on and refuses the
+response with `reason: "redirect"`. A page's own `location` navigation or a
+form submission is not intercepted by this guard; blocking those needs an
+engine request route, which is a separate layer.
 
 The dev and held-out fixtures run on `127.0.0.1`, so their example policies
 allow that host. A production policy should name the site's real hosts and

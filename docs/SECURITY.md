@@ -44,7 +44,7 @@ a malicious map is equivalent to a malicious operator.
 | Threat | Mitigation | Where |
 |---|---|---|
 | Credential appears in a map, trace, log, or skill | Site-scoped credential store; audit/trace redaction by key and value shape; skill secret scan | `credentials.ts`, `redact.ts`, `skills/export.ts` |
-| Off-allowlist request leaves the page | Default-deny egress guard on `fetch` and `goto`; the final URL after a redirect is checked too; every block recorded | `substrate/policy.ts`, `substrate/substrate.ts` |
+| Off-allowlist request leaves the page | Default-deny egress guard on `fetch` and `goto`; the final URL after a redirect and the resolved address are checked too; every block recorded | `substrate/policy.ts`, `substrate/substrate.ts` |
 | Page text becomes a tool call | Every page-derived MCP result is labeled `untrusted` with a notice; injection fixture asserts the scripted runner never calls a tool | `server/mcp.ts`, `bench/security` |
 | Irreversible write without consent | `confirm: true` required before dispatch | `runtime/write.ts` |
 | Retry double-writes | Idempotency key replays a completed result; a pending key is reconciled with `outcome_check`; a failed-after-dispatch write returns `unknown_outcome` and is never retried blindly | `runtime/write.ts` |
@@ -55,6 +55,7 @@ a malicious map is equivalent to a malicious operator.
 | A redirect could land outside the allowlist | **Fixed:** `fetch` reports the final URL and the guard checks it, recording `reason: "redirect"` | `substrate/substrate.ts` |
 | A credential in a free-text field survived key-based redaction | **Fixed:** values are also matched by shape — provider keys, GitHub/AWS/Google/Stripe tokens, JWTs, SSNs, and Luhn-valid card numbers | `runtime/redact.ts`, `server/log.ts` |
 | The Docker image ran Chromium with `--no-sandbox` unconditionally | **Documented and configurable:** the wrapper defaults to `--no-sandbox` and the image is trusted-sites only; `PORTOLAN_CHROME_SANDBOX=1` drops it for a host with a seccomp profile | `docker/chromium.sh`, `Dockerfile` |
+| A hostname could resolve to a private address (DNS rebinding) | **Fixed with a caveat:** the guard resolves an allowlisted name before the request and refuses a private, loopback, link-local, CGNAT, or reserved address | `substrate/policy.ts` |
 | Site name escapes the maps directory | **Fixed:** `MapStore` accepts only `[A-Za-z0-9][A-Za-z0-9._-]*` and rejects `..` | `server/maps.ts` |
 | Orphan browsers after a crash | Session TTL/cap/recovery; `reapOrphans` kills tagged Chromium | `server`, `substrate/reaper.ts` |
 | Session leak from a previous process | Startup recovery closes every open session | `server/server.ts` |
@@ -101,7 +102,6 @@ three failure classes, thrown errors, and the key-collision fix
 
 | Issue | Finding | Why it is not fixed here |
 |---|---|---|
-| [#88](https://github.com/abubakarsiddik31/portolan/issues/88) | The egress guard matches the hostname, not the resolved address (DNS rebinding) | Needs address pinning before the browser connects |
 
 ## Residual risks
 
@@ -118,6 +118,10 @@ three failure classes, thrown errors, and the key-collision fix
 - **A redirect is checked after it is followed.** The guard refuses to return
   the response and records the block, but the request already reached the
   redirect target. Blocking before the hop needs a browser request route.
+- **The rebinding check is a pre-flight lookup, not address pinning.** The
+  browser resolves the name again when it connects, so a name that changes
+  between the two lookups can still reach a private address. Pinning needs a
+  proxy or a request route that sees the resolved address.
 - **Local files are readable by the process.** A malicious map or a future
   upload feature is a file-read risk; `act` currently rejects uploads.
 - **The audit log is only as complete as the executor.** A write that never

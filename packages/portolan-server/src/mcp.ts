@@ -30,7 +30,7 @@ import {
 } from "@portolan/substrate";
 import { z } from "zod";
 
-import { notReadyExecutor, type OpAudit, type OpExecutor } from "./executor.js";
+import { type OpAudit, type OpExecutor, runtimeExecutor } from "./executor.js";
 import { type MapStore, renderMap } from "./maps.js";
 import type { SessionStore } from "./store.js";
 
@@ -56,6 +56,10 @@ export type McpDeps = {
 
 export type FallbackSubstrate = Pick<Substrate, "view" | "act" | "state" | "read">;
 
+function isExecutableSubstrate(value: FallbackSubstrate | undefined): value is Substrate {
+  return value !== undefined && "fetch" in value && "goto" in value;
+}
+
 export type CallInput = {
   op: string;
   params?: Record<string, unknown>;
@@ -72,7 +76,7 @@ export type CallInput = {
  */
 export function createMcpServer(deps: McpDeps): McpServer {
   const server = new McpServer({ name: "portolan", version: "0.0.1" });
-  const executor = deps.executor ?? notReadyExecutor;
+  const executor = deps.executor ?? runtimeExecutor();
   const ledger = deps.ledger ?? new MemoryWriteLedger();
   const scopes = deps.scopes ?? new FallbackScopes();
   const budget = deps.toolBudget ?? 30;
@@ -129,19 +133,22 @@ export function createMcpServer(deps: McpDeps): McpServer {
 
     let auditInfo: OpAudit | undefined;
 
-    const runExecutor = (
+    const runExecutor = async (
       target: OpDef,
       targetParams: Record<string, unknown>,
       confirm: boolean | undefined,
       idempotencyKey: string | undefined,
-    ) =>
-      executor({
+    ) => {
+      const substrate = await substrateFor();
+
+      return executor({
         session,
         map,
         op: target,
         params: targetParams,
         confirm,
         idempotencyKey,
+        ...(isExecutableSubstrate(substrate) ? { substrate } : {}),
         audit:
           target === opDef
             ? (info) => {
@@ -149,6 +156,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
               }
             : undefined,
       });
+    };
 
     if (opDef.effect === "read") {
       const envelope = await runExecutor(opDef, params, input.confirm, input.idempotency_key);
@@ -269,11 +277,18 @@ export function createMcpServer(deps: McpDeps): McpServer {
     return session;
   }
 
+  const substrates = new Map<string, Promise<FallbackSubstrate>>();
+
   async function substrateFor(): Promise<FallbackSubstrate | undefined> {
     const session = currentSession();
     if (session === undefined || deps.substrateFactory === undefined) return undefined;
 
-    return deps.substrateFactory(session);
+    const cached = substrates.get(session.sid);
+    if (cached !== undefined) return cached;
+
+    const created = Promise.resolve(deps.substrateFactory(session));
+    substrates.set(session.sid, created);
+    return created;
   }
 
   function activeScope(): FallbackScope | undefined {

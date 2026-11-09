@@ -155,9 +155,9 @@ skip the stdio config; the CLI commands and the server share the map store.
 
 ## Honest limits
 
-- **`call` returns `op_broken`.** The MCP server's op executor is still
-  `notReadyExecutor`; the `open_site` / `view` / `act` / `read` fallback works,
-  but a named op does not execute yet.
+- **`call` needs a browser.** The MCP server executes a named op through the
+  cheapest verified tier, which launches Chromium on first use. Without Chrome
+  (or `CHROME_PATH`), `call` returns `op_broken`.
 - **The snippets were validated, not run in each client.** The stdio command
   they invoke is covered by a test; the client-side config files were checked
   for shape, not exercised in Claude, Codex, Cursor, Gemini, or VS Code here.

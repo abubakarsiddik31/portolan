@@ -8,6 +8,8 @@ export type Affordance = {
   backendNodeId: number;
   role: string;
   name: string;
+  /** Zero-based position among affordances with the same role and name. */
+  ordinal: number;
   /** Nearest named ancestor or landmark, for disambiguation. */
   ctx?: string;
   bounds: Bounds;
@@ -126,6 +128,7 @@ export function rankAffordances(
       backendNodeId: node.backendNodeId as number,
       role: node.role,
       name: node.name,
+      ordinal: 0,
       bounds: node.bounds as Bounds,
       properties: node.properties,
       score: weightOf(node, ctx),
@@ -142,6 +145,16 @@ export function rankAffordances(
   candidates.sort((a, b) => b.affordance.score - a.affordance.score || a.index - b.index);
 
   const selected = candidates.slice(0, limit).map((candidate) => candidate.affordance);
+
+  // Duplicate names are common (six "Add application" buttons, several
+  // "Continue" links). An ordinal lets a caller name the one it means.
+  const seen = new Map<string, number>();
+  for (const affordance of selected) {
+    const key = `${affordance.role}\u0000${affordance.name}`;
+    const ordinal = seen.get(key) ?? 0;
+    affordance.ordinal = ordinal;
+    seen.set(key, ordinal + 1);
+  }
 
   return {
     affordances: selected,

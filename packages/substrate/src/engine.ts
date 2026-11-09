@@ -87,6 +87,8 @@ export type EngineErrorCode =
   | "not_found"
   | "not_interactive"
   | "disabled"
+  | "option_not_found"
+  | "file_input_not_found"
   | "evaluate_failed";
 
 export class EngineError extends Error {
@@ -119,6 +121,8 @@ export interface Engine {
   navigate(url: string): Promise<NavigateResult>;
   snapshot(): Promise<Snapshot>;
   dispatch(action: Action): Promise<DispatchResult>;
+  /** Set files on a file input, or on the nearest file input to a trigger. */
+  setFiles(backendNodeId: number, files: string[]): Promise<void>;
   evaluate<T>(expression: string): Promise<T>;
   close(): Promise<void>;
 }

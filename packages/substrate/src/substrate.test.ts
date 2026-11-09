@@ -1,4 +1,7 @@
+import { writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -26,7 +29,27 @@ const HOME = `<!doctype html>
   <button id="post" onclick="fetch('/api/echo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q: 'tee' }) })">Post</button>
   <button id="off" disabled>Disabled</button>
   <input id="key" aria-label="Key input" onkeydown="if (event.key === 'Enter') document.getElementById('out').textContent = 'enter:' + this.value">
+  <div role="combobox" aria-label="Color" id="combo">Red</div>
+  <div role="listbox" id="colors" hidden>
+    <div role="option">Red</div>
+    <div role="option">Blue</div>
+  </div>
+  <form>
+    <button type="button" id="pick">Pick file</button>
+    <input id="resume" type="file" aria-label="Resume file" hidden>
+  </form>
   <output id="out"></output>
+  <script>
+    document.getElementById("combo").addEventListener("click", () => {
+      document.getElementById("colors").hidden = false;
+    });
+    document.getElementById("colors").addEventListener("click", (event) => {
+      if (event.target.getAttribute("role") === "option") {
+        document.getElementById("combo").textContent = event.target.textContent;
+        document.getElementById("colors").hidden = true;
+      }
+    });
+  </script>
   <a href="/done">Submit</a>
 </body>
 </html>`;
@@ -97,6 +120,50 @@ describe("substrate act", () => {
       code: "stale_ref",
       current_doc: 1,
     });
+  });
+});
+
+describe("substrate read", () => {
+  it("captures the page instead of reusing a stale snapshot", async () => {
+    let name = "old";
+    const engine = {
+      navigate: async () => ({ url: "http://x/", title: "", status: null }),
+      snapshot: async () => ({
+        doc: 1,
+        v: 0,
+        url: "http://x/",
+        title: "",
+        nodes: [
+          {
+            nodeId: "t",
+            role: "StaticText",
+            name,
+            ignored: false,
+            visible: true,
+            bounds: { x: 0, y: 0, width: 10, height: 10 },
+            properties: {},
+            childIds: [],
+          },
+        ],
+      }),
+      dispatch: async () => ({
+        ok: true,
+        doc: 1,
+        v: 0,
+        url: "http://x/",
+        title: "",
+        effects: [],
+      }),
+      setFiles: async () => undefined,
+      evaluate: async () => ({ status: 200, text: "{}", json: {}, url: "http://x/" }),
+      close: async () => undefined,
+    } as unknown as Engine;
+
+    const substrate = new Substrate(engine);
+    await substrate.view();
+    name = "new";
+
+    expect((await substrate.read()).text).toBe("new");
   });
 });
 
@@ -383,6 +450,34 @@ describe.skipIf(!ENABLED)("substrate act", () => {
     expect(out).toBe("enter:abc");
   });
 
+  it("selects an option in a custom combobox", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const combo = refFor(view.refs, "combobox", "Color");
+
+    expect((await substrate.act({ ref: combo, do: "select", value: "Blue" })).ok).toBe(true);
+    const value = await engine.evaluate<string>(
+      "document.getElementById('combo')?.textContent ?? ''",
+    );
+    expect(value).toBe("Blue");
+  });
+
+  it("sets files through a choose-file button", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/`);
+    const view = await substrate.view();
+    const pick = refFor(view.refs, "button", "Pick file");
+    const file = join(tmpdir(), "portolan-upload.txt");
+    writeFileSync(file, "resume");
+
+    expect((await substrate.act({ ref: pick, do: "click", files: [file] })).ok).toBe(true);
+    const count = await engine.evaluate<number>(
+      "document.getElementById('resume')?.files?.length ?? 0",
+    );
+    expect(count).toBe(1);
+  });
+
   it("reports the blocker when the target is covered", async () => {
     const { engine, substrate } = current();
     await engine.navigate(`${baseUrl}/blocked`);
@@ -397,6 +492,8 @@ describe.skipIf(!ENABLED)("substrate act", () => {
     }
     expect(result.blocker_ref).toBeDefined();
     expect(result.blocker_ref).not.toBe(covered);
+    expect(result.blocker_tag).toBe("DIV");
+    expect(result.blocker_text).toContain("Accept cookies");
   });
 
   it("rejects a fill without a value", async () => {

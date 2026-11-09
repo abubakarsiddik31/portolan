@@ -59,6 +59,8 @@ export type ActResult =
       code: "not_interactive";
       blocker_ref?: string;
       blocker_backend_node_id?: number;
+      blocker_role?: string;
+      blocker_name?: string;
     }
   | { ok: false; code: "invalid_request"; message: string };
 
@@ -235,6 +237,8 @@ export class Substrate {
               code: "not_interactive",
               blocker_backend_node_id: blocker,
               blocker_ref: entry.ref,
+              blocker_role: entry.role,
+              blocker_name: entry.name,
             };
       }
 

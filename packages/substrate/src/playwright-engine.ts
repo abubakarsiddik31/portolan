@@ -207,8 +207,7 @@ export class PlaywrightEngine implements Engine {
 
     switch (action.do) {
       case "click":
-        await this.click(action.backendNodeId);
-        await this.settle();
+        await this.settleAction(() => this.click(action.backendNodeId));
         break;
       case "fill":
         await this.fill(action.backendNodeId, action.value);
@@ -217,16 +216,13 @@ export class PlaywrightEngine implements Engine {
         await this.select(action.backendNodeId, action.value);
         break;
       case "check":
-        await this.setChecked(action.backendNodeId, true);
-        await this.settle();
+        await this.settleAction(() => this.setChecked(action.backendNodeId, true));
         break;
       case "uncheck":
-        await this.setChecked(action.backendNodeId, false);
-        await this.settle();
+        await this.settleAction(() => this.setChecked(action.backendNodeId, false));
         break;
       case "press":
-        await this.page.keyboard.press(action.key);
-        await this.settle();
+        await this.settleAction(() => this.page.keyboard.press(action.key));
         break;
     }
 
@@ -554,14 +550,17 @@ export class PlaywrightEngine implements Engine {
   }
 
   /**
-   * Wait for the page to settle after an action.
+   * Run an action that may navigate, and wait for the new document.
    *
-   * A click that submits a form starts a navigation asynchronously, so this
-   * first waits up to 250ms for a main-frame navigation, then for load and a
-   * short network-idle window. A long poll or animation must not block the
-   * caller; the timeouts are the contract.
+   * The navigation waiter is installed *before* the action: a click can start
+   * and commit a navigation before a listener installed afterwards runs, and
+   * then the caller snapshots the old page. A non-navigating click (a modal,
+   * a menu) resolves after a short cap instead of the full timeout. We do not
+   * wait for networkidle: Playwright defines it as 500ms of quiet, which adds
+   * half a second to every click. `dispatch` awaits the requests it captured,
+   * and an op that needs a later state declares `await_state`.
    */
-  private async settle(): Promise<void> {
+  private async settleAction(action: () => Promise<void>): Promise<void> {
     const navigated = new Promise<void>((resolve) => {
       const onNavigated = (frame: Frame): void => {
         if (frame === this.page.mainFrame()) {
@@ -570,19 +569,18 @@ export class PlaywrightEngine implements Engine {
         }
       };
 
+      // Install the listener before the action: a click can commit a
+      // navigation before a listener installed afterwards runs.
       this.page.on("framenavigated", onNavigated);
       setTimeout(() => {
         this.page.off("framenavigated", onNavigated);
         resolve();
-      }, 250);
+      }, 500);
     });
 
+    await action();
     await navigated;
     await this.page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => {});
-    // Do not wait for networkidle here: Playwright defines it as 500ms of
-    // quiet, which adds half a second to every click even when the next
-    // state is already rendered. `dispatch` awaits the requests it captured,
-    // and an op that needs a later state declares `await_state`.
   }
 
   private async contains(target: number, candidate: number): Promise<boolean> {

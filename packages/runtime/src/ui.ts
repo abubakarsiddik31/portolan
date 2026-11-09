@@ -180,7 +180,11 @@ function fromAct(result: Extract<ActResult, { ok: false }>, index: number): UiRu
         ok: false,
         code: "op_broken",
         message: `step ${index}: target is covered`,
-        details: { blocker_ref: result.blocker_ref },
+        details: {
+          ...(result.blocker_ref !== undefined ? { blocker_ref: result.blocker_ref } : {}),
+          ...(result.blocker_role !== undefined ? { blocker_role: result.blocker_role } : {}),
+          ...(result.blocker_name !== undefined ? { blocker_name: result.blocker_name } : {}),
+        },
       };
     case "invalid_request":
       return {

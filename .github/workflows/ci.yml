@@ -23,9 +23,16 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: google-chrome --version || chromium --version
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm coverage
+      # The held-out and pilot browser tests are platform-sensitive in their
+      # hit-testing; this step covers the core substrate, MCP execution,
+      # injection, and perf paths, which are stable on the runner.
+      - run: pnpm vitest run packages/substrate/src packages/portolan-server/src bench/security bench/perf
+        env:
+          PORTOLAN_BROWSER_TESTS: "1"
       - run: pnpm build
       - run: pnpm package:check:tarballs
       - run: pnpm release:dry-run --out /tmp/portolan-release

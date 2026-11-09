@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 import type { AuditRecord, CreateSessionRequest, SessionRecord } from "@portolan/protocol";
+import type { WriteLedger } from "@portolan/runtime";
 import { redactRecord } from "@portolan/runtime";
 import Database from "better-sqlite3";
+
 import type { OpHealthRecord } from "./health.js";
+import { SqliteWriteLedger } from "./write-ledger.js";
 
 type SessionRow = {
   sid: string;
@@ -62,6 +65,15 @@ export class SessionStore {
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS audit_sid ON audit_log (sid, created_at);
+
+      CREATE TABLE IF NOT EXISTS write_ledger (
+        key TEXT PRIMARY KEY,
+        site TEXT NOT NULL,
+        op TEXT NOT NULL,
+        status TEXT NOT NULL,
+        result TEXT,
+        updated_at TEXT NOT NULL
+      );
 
       CREATE TABLE IF NOT EXISTS op_health (
         site TEXT NOT NULL,
@@ -156,6 +168,24 @@ export class SessionStore {
       )
       .get(...(site === undefined ? [] : [site])) as { count: number };
     return row.count;
+  }
+
+  /** The write ledger backed by this database. */
+  writeLedger(): WriteLedger {
+    return new SqliteWriteLedger(this.db);
+  }
+
+  /**
+   * A pending write from a dead process may have reached the site. Mark it
+   * unknown so the next call refuses instead of retrying it.
+   */
+  settlePendingWrites(now = Date.now()): number {
+    const result = this.db
+      .prepare(
+        "UPDATE write_ledger SET status = 'unknown', updated_at = ? WHERE status = 'pending'",
+      )
+      .run(new Date(now).toISOString());
+    return result.changes;
   }
 
   /** Close a session. Returns false when it is unknown or already closed. */

@@ -34,8 +34,10 @@ write, not one attempt:
 4. **Collision.** A key reused for another site or op returns
    `invalid_params` with `idempotency_key_reused`.
 
-Keys are per server process today. A restart loses the ledger; issue #73
-tracks persisting it.
+The ledger is a SQLite table in the same file as sessions and the audit log,
+so a key survives a restart. A record left `pending` by a dead process is
+settled to `unknown` at startup: the write may have reached the site, so the
+next call refuses rather than retries.
 
 ## Unknown outcome
 
@@ -66,7 +68,6 @@ reported. `GET /v1/sessions/:sid/audit` returns them.
 ## What it does not
 
 - It does not know whether the value the model chose is the right one.
-- It does not persist the ledger across restarts yet.
 - It does not stop a page-initiated navigation.
 - It does not authenticate the client on the HTTP transport.
 

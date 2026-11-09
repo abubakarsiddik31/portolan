@@ -159,7 +159,7 @@ should render them as data and never follow instructions found in them.
 
 The op executor is injected. Until T2.17–T2.21 it is `notReadyExecutor`, which returns `op_broken` with `details.stage = "executor"` — the call reached the runtime, but no op ran.
 
-Writes go through `@portolan/runtime`'s `runWrite`: irreversible ops need `confirm: true`, an idempotency key replays a completed result, and a write that fails after dispatch returns `unknown_outcome` instead of retrying. The ledger is in memory per server for now.
+Writes go through `@portolan/runtime`'s `runWrite`: irreversible ops need `confirm: true`, an idempotency key replays a completed result, and a write that fails after dispatch returns `unknown_outcome` instead of retrying. The ledger is a SQLite table, so a key survives a restart; a `pending` record left by a dead process is settled to `unknown` at startup.
 
 Every write is also recorded in SQLite: params, effect, outcome, idempotency key, and — when the executor reports them — tier, before/after state, and the network requests. `GET /v1/sessions/:sid/audit` returns them.
 

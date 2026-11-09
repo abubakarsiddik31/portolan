@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { ErrorCode, ResultEnvelope } from "@portolan/protocol";
 import { createSessionRequestSchema } from "@portolan/protocol";
+import type { WriteLedger } from "@portolan/runtime";
 import Fastify, {
   type FastifyError,
   type FastifyInstance,
@@ -10,7 +11,6 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import type { ZodError } from "zod";
-
 import { BrowserRegistry } from "./browsers.js";
 import type { CanaryScheduler } from "./canary.js";
 import { notReadyExecutor, type OpExecutor } from "./executor.js";
@@ -40,6 +40,8 @@ export type ServerOptions = {
   browsers?: BrowserRegistry;
   /** Structured lifecycle events. */
   log?: Logger;
+  /** Write ledger. Defaults to the store's SQLite ledger. */
+  ledger?: WriteLedger;
 };
 
 /**
@@ -60,6 +62,9 @@ export function createServer(options: ServerOptions): FastifyInstance {
     // from that process can be resumed safely.
     const recovered = options.store.closeAllOpen();
     if (recovered > 0) options.log?.info("session.recovered", { count: recovered });
+
+    const settled = options.store.settlePendingWrites();
+    if (settled > 0) options.log?.warn("write.pending_settled", { count: settled });
   }
 
   const sweep = setInterval(() => {
@@ -210,6 +215,7 @@ export function createServer(options: ServerOptions): FastifyInstance {
         maps: options.maps,
         sessions: options.store,
         executor: options.executor ?? notReadyExecutor,
+        ledger: options.ledger ?? options.store.writeLedger(),
       });
 
       await mcp.connect(created);

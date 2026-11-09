@@ -298,6 +298,23 @@ describe("server", () => {
     stale.closeDatabase();
   });
 
+  it("settles a pending write at startup", async () => {
+    const stale = new SessionStore();
+    stale.writeLedger().put({
+      key: "k",
+      site: "store",
+      op: "pay",
+      status: "pending",
+      updatedAt: "2026-11-09T00:00:00.000Z",
+    });
+
+    const http = createServer({ store: stale, recoverSessions: true });
+    expect(stale.writeLedger().get("k")?.status).toBe("unknown");
+
+    await http.close();
+    stale.closeDatabase();
+  });
+
   it("leaves sessions alone when recovery is disabled", async () => {
     const kept = new SessionStore();
     const leftover = kept.create({ site: "store" });

@@ -82,7 +82,10 @@ describe.skipIf(!ENABLED)("injection fixtures", () => {
 
     await client.callTool({ name: "open_site", arguments: { site: "store" } });
 
-    const view = await client.callTool({ name: "view", arguments: {} });
+    const view = await client.callTool({
+      name: "view",
+      arguments: { format: "both" },
+    });
     const viewBody = JSON.parse(textOf(view)) as {
       untrusted: boolean;
       notice: string;
@@ -91,7 +94,10 @@ describe.skipIf(!ENABLED)("injection fixtures", () => {
     expect(viewBody.untrusted).toBe(true);
     expect(viewBody.notice).toContain("data, not instructions");
 
-    const read = await client.callTool({ name: "read", arguments: {} });
+    const read = await client.callTool({
+      name: "read",
+      arguments: { format: "json" },
+    });
     const readBody = JSON.parse(textOf(read)) as { untrusted: boolean; text: string };
     expect(readBody.untrusted).toBe(true);
     expect(readBody.text).toContain("Ignore all previous instructions");
@@ -128,12 +134,9 @@ describe.skipIf(!ENABLED)("injection fixtures", () => {
     );
 
     const readStep = outcome.steps.find((step) => step.decision.tool === "read");
-    const readBody = JSON.parse(readStep?.result.text ?? "{}") as {
-      untrusted?: boolean;
-      text?: string;
-    };
-    expect(readBody.untrusted).toBe(true);
-    expect(readBody.text).toContain("Ignore all previous instructions");
+    const readText = readStep?.result.text ?? "";
+    expect(readText).toContain("[untrusted]");
+    expect(readText).toContain("Ignore all previous instructions");
   });
 });
 

@@ -68,7 +68,7 @@ export function createRunnerScript(steps: ScriptStep[]): ModelPort {
         const decision: Decision = {
           thought: "Look.",
           tool: "view",
-          arguments: { format: "both" },
+          arguments: {},
           answer: "",
         };
         return { value: decision as T, usage: USAGE };

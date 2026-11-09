@@ -122,6 +122,26 @@ describe("renderAffordances", () => {
     expect(rendered.text).toContain('button "Go" in form');
   });
 
+  it("renders every affordance when no budget is given", () => {
+    const nodes = Array.from({ length: 80 }, (_, index) =>
+      node({
+        nodeId: `b${index}`,
+        role: "button",
+        name: `Button ${index}`,
+        backendNodeId: 300 + index,
+        bounds: rect(),
+      }),
+    );
+
+    const { affordances, omitted } = rankAffordances(nodes);
+    const rendered = renderAffordances(affordances);
+
+    expect(affordances).toHaveLength(80);
+    expect(omitted).toBe(0);
+    expect(rendered.included).toBe(80);
+    expect(rendered.omitted).toBe(0);
+  });
+
   it("stops at the budget and reports the rest", () => {
     const rendered = renderAffordances(affordances, { tokenBudget: 5 });
 

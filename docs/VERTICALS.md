@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Date** | 2026-11-09 |
-| **Task** | T6.01 — score three candidate verticals |
+| **Date** | 2026-11-09 (revised 2026-11-15) |
+| **Task** | T6.01 — score candidate verticals. Three scored 2026-11-09; QA automation added as candidate D on 2026-11-15 at the founder's direction. |
 | **Status** | Complete. Input to T6.02 (interviews) and T6.03 (ADR-006) |
 | **Decision rule** | Score, then interview. This document ranks candidates; it does **not** choose one. |
 
@@ -105,21 +105,59 @@ Each dimension is scored 1–5 and weighted. Weights encode the G0-first constra
 
 **Verdict.** Strong second. The write risk and volume are excellent, but the industry's API/EDI rails reduce the marginal value of a UI map, and test access is harder than procurement.
 
-## 6. Comparison
+## 6. Candidate D — QA automation (added 2026-11-15)
 
-| | Insurance eligibility | Procurement portals | Logistics carriers |
+**Why added.** The founder restated the ladder on 2026-11-15: the end goal is a browser runtime where an agent does what a human does, without the human UI; the **initial product goal is a QA automation tool**. This candidate scores that product, not a market the runtime merely sells into.
+
+**The workflow.** A QA lead or test-automation agency keeps an end-to-end regression pack for a product: login, search, cart, checkout, admin CRUD. The pack re-runs on every release; every UI change breaks selectors and flows; most of the cost is maintenance, not writing new tests.
+
+**Evidence**
+
+- Test automation is a proven, paid category: BrowserStack, mabl, Testim, testRigor, and Functionize all sell maintenance reduction ("self-healing" locators and flows) as the headline feature, and QA agencies sell the same labor as a retainer. [high]
+- Maintenance is the stated #1 cost of UI test automation — selectors and flows break on every UI change; the entire self-healing category exists because of it. That is the map + drift-repair thesis under a different name. [high]
+- Test automation software market estimates vary widely by scope ($15B–$40B, double-digit CAGR). [low — conflicting vendor reports]
+- The G0 comparison is at its clearest here: the baseline — an LLM agent clicking through the flow on every run — costs dollars per run inside CI; a verified op costs cents and returns typed evidence. Runs repeat daily, so the cost story compounds. [medium]
+- The runtime already contains the product: the compiler's verifier (fresh session, ≥3 param sets, outcome checks) **is** a regression runner, and G2's drift auto-repair is the self-healing feature. Almost no new machinery is needed to demo it. [high]
+
+**Scores**
+
+| Dimension | Score | Why |
+|---|---|---|
+| G0 feasibility | **5** | No PHI, no anti-bot gauntlet: partners hand over staging sites and seeded test accounts freely, and the measured workflow stops at assertions, so nothing binding is at risk. Easiest recruitment of the four. |
+| Repeat volume | **4** | The pack runs every release and in CI daily. |
+| Write risk | **2** | Writes are test-data writes on staging; a duplicate costs a flaky run, not money. The write-safety wedge is weak here; the pitch is self-healing regression instead. |
+| Buyer reachability | **5** | QA leads and test-automation agencies are public, vocal (Ministry of Testing, r/QualityAssurance), and already buy tools. |
+| Budget | **4** | Existing line items: test-automation SaaS, BrowserStack-class infrastructure, agency retainers. |
+| Map value | **4** | Every site is its own interface with no API for "your flows." The human-maintained Playwright/Cypress script is the substitute the map replaces, and drift repair compounds per site. |
+| **Weighted** | **80 / 100** | |
+
+**Verdict.** The best feasibility and reachability of the four and the cheapest G0 to run — and the weakest write-safety story. It scores below procurement only because the rubric weights governed writes, which ADR-002 makes the product's wedge. The strategic trade is explicit: picking QA scopes the company as a QA tool (proves the engine fastest, but competes in a crowded self-healing category); picking procurement keeps the agent-operations thesis. G0 measures the same thing either way — ops vs. `agent-browser` steps and dollars.
+
+**G0 workflows to hand-write (QA)** — candidates for T1.12 if D wins. Measure on partner staging sites; test accounts only.
+
+| # | Op | Kind | Baseline (`agent-browser`) |
 |---|---|---|---|
-| Weighted score | 61 | **87** | 81 |
-| G0 feasible by 2026-11-30 | No (PHI, BAA) | **Yes** | Maybe |
-| Portals per customer | ~12 | Dozens | Dozens |
-| Standard API already exists | 270/271 | **No** | EDI + TMS |
-| Write is binding | Prior auth | **Bid submission** | Tender / appointment |
-| 3 partners in 2 weeks | Unlikely | **Likely** | Possible |
-| Main risk | Compliance | Low ACV | API substitution |
+| 1 | `login(user_ref)` | state | Navigate to sign-in, fill, submit, verify landing state |
+| 2 | `search_catalog(query)` | read | Open search, set filters, page results, read rows |
+| 3 | `add_to_cart(sku, qty)` | write (test env) | Open PDP, configure, add, verify cart line |
+| 4 | `checkout(payment_profile)` | write (test env) | Fill multi-step form through confirmation |
+| 5 | `run_regression(ops, param_sets)` | test | Replay each op with outcome checks; emit pass/fail + evidence |
 
-## 7. Recommendation for T6.02
+## 7. Comparison
 
-**Interview procurement first, logistics second, insurance only if the first two fail.**
+| | Insurance eligibility | Procurement portals | Logistics carriers | QA automation |
+|---|---|---|---|---|
+| Weighted score | 61 | **87** | 81 | 80 |
+| G0 feasible by 2026-11-30 | No (PHI, BAA) | **Yes** | Maybe | **Yes** (staging sites) |
+| Sites/portals per customer | ~12 portals | Dozens | Dozens | 1–5 products |
+| Standard API already exists | 270/271 | **No** | EDI + TMS | No — but human-maintained scripts are the norm |
+| Write is binding | Prior auth | **Bid submission** | Tender / appointment | No — test data only |
+| 3 partners in 2 weeks | Unlikely | **Likely** | Possible | **Very likely** |
+| Main risk | Compliance | Low ACV | API substitution | Weak write wedge; crowded self-healing category |
+
+## 8. Recommendation for T6.02
+
+**Interview procurement first, QA automation second (founder-added 2026-11-15), logistics third, insurance only if the first two fail.**
 
 The reasoning is the gate, not the market:
 
@@ -127,10 +165,11 @@ The reasoning is the gate, not the market:
 2. **It has the strongest write-safety story.** A duplicate or late bid submission is a concrete, expensive failure — exactly the scenario `unknown_outcome`, idempotency, and confirmation exist for.
 3. **It has the weakest API substitute.** Insurance has 270/271; logistics has EDI. Procurement has no standard submission API, so the map is the integration.
 4. **Buyers are reachable.** SMB contractors and bid consultants can be recruited without a compliance review.
+5. **QA automation is the cheapest gate to run and the easiest to recruit.** Staging sites and seeded accounts remove every access risk, and the runtime's verifier demos the product as-is. What T6.02 must test for it: do QA teams pay for maintenance reduction, and does the founder want the company scoped as a QA tool, or is QA the proof layer for the agent-operations thesis?
 
-The known weakness is **ACV**. SMB contractors are price-sensitive. T6.02 must test whether a bid consultancy — which manages many clients and already charges for this work — is the real buyer, not the single contractor.
+The known weakness is **ACV**. SMB contractors are price-sensitive. T6.02 must test whether a bid consultancy — which manages many clients and already charges for this work — is the real buyer, not the single contractor. For QA automation the known weakness is the **wedge**: staging writes are cheap, so the sale rides on self-healing regression (G2's drift story), not write safety.
 
-## 8. G0 workflows to hand-write (procurement)
+## 9. G0 workflows to hand-write (procurement)
 
 These are candidates for T1.12. Measure to **draft**; gate submission behind explicit confirmation and do not auto-submit in the benchmark.
 
@@ -143,7 +182,7 @@ These are candidates for T1.12. Measure to **draft**; gate submission behind exp
 | 5 | `draft_bid(opportunity_id, answers)` | write (draft) | Open response form, fill every field, save draft |
 | 6 | `submit_bid(...)` | write (gated) | Final submit with confirmation — **not** measured in G0 |
 
-## 9. Questions T6.02 must answer
+## 10. Questions T6.02 must answer
 
 Per interview, capture pain, volume, budget, and **one workflow to test**:
 
@@ -156,14 +195,15 @@ Per interview, capture pain, volume, budget, and **one workflow to test**:
 7. Who signs off on a new tool, and what is the budget line?
 8. If one workflow were automated next month, which one?
 
-## 10. What would change this recommendation
+## 11. What would change this recommendation
 
 - **Interviews reveal procurement ACV is too low to support a business** → shift to logistics, where ops budgets are larger.
 - **Procurement portals turn out to forbid automation broadly** → G0 feasibility drops; re-score.
 - **A partner offers payer-portal access with a BAA already in place** → insurance becomes feasible and its 5 on budget dominates.
 - **Logistics partners offer test accounts and the workflow is facility appointments** (not EDI-covered) → logistics map value rises from 3 to 4–5.
+- **The founder's 2026-11-15 steer toward QA automation as the initial product** is already reflected as candidate D. If two or more QA interviews show budget for maintenance reduction, T6.03 may pick D even though it scores below procurement on this rubric: the rubric weights governed writes, and QA's wedge is drift repair, not write safety. Choosing D should carry an explicit ADR note that the write-safety wedge is deferred, not abandoned.
 
-## 11. Sources
+## 12. Sources
 
 Accessed 2026-11-09. Confidence labels above reflect source type, not just recency.
 
@@ -177,3 +217,5 @@ Accessed 2026-11-09. Confidence labels above reflect source type, not just recen
 - FreightPulse, *Accelerating Carrier Onboarding with API-Driven Validation* — FMCSA/SAFER, FMC, fuel surcharge portals. https://freightpulsehq.com/blog/accelerating-carrier-onboarding-with-api-driven-validation-a-practical-guide-for-3pl-providers-using-freightpulse
 - Haulia, *Automated Freight Appointment Scheduling* — facility-specific appointment channels. https://www.haulia.ai/use-cases/appointment-scheduling
 - WiseGuy / VerifiedMarketReports, *Freight Broker Software Market* — $2.51B (2024) vs. $5.1B. (Conflicting; treat as a range.)
+
+Candidate D evidence is category knowledge (vendor positioning of the self-healing test tools; market-size ranges unpublished here), not fetched on 2026-11-15. Verify with a sourced pass before ADR-006 if D is chosen.

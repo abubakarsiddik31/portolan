@@ -10,7 +10,6 @@
  * Credentials are read from the environment and never printed.
  */
 
-import { globSync } from "node:fs";
 import { join } from "node:path";
 import {
   type Affordance,
@@ -26,8 +25,6 @@ const BASE = "https://careerkor.com";
 
 function chromePath(): string {
   if (process.env.CHROME_PATH !== undefined) return process.env.CHROME_PATH;
-  const hits = globSync(join(import.meta.dirname, "../../../node_modules/.pnpm", "x-none"));
-  if (hits.length > 0) return hits[0];
   throw new Error("set CHROME_PATH");
 }
 

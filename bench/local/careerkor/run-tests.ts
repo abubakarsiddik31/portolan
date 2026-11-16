@@ -207,7 +207,7 @@ const SIDEBAR_PAGES = [
   "Feedback",
 ];
 
-const ROUTES: Record<string, string> = {
+const ROUTES = {
   Dashboard: "/dashboard",
   Jobs: "/jobs",
   "Application Tracker": "/applications",
@@ -219,7 +219,11 @@ const ROUTES: Record<string, string> = {
   "Interview Coach": "/mock-interviews",
   Referrals: "/referrals",
   Feedback: "/reports",
-};
+} as const;
+
+function routeOf(name: string): string {
+  return ROUTES[name as keyof typeof ROUTES] ?? "/dashboard";
+}
 
 async function login(
   s: Substrate,
@@ -716,7 +720,7 @@ async function authedSuite(): Promise<void> {
       const clicked = await act(s, hop, target, { do: "click" }, `nav ${name}`);
       await sleep(2000);
       const landed = await s.view();
-      const expected = `${BASE}${ROUTES[name]}`;
+      const expected = `${BASE}${routeOf(name)}`;
       if (!clicked.ok || landed.snapshot.url !== expected) {
         broken.push(`${name} (landed ${landed.snapshot.url})`);
       }

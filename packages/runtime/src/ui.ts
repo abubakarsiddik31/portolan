@@ -179,8 +179,9 @@ function fromAct(result: Extract<ActResult, { ok: false }>, index: number): UiRu
       return {
         ok: false,
         code: "op_broken",
-        message: `step ${index}: target is covered`,
+        message: `step ${index}: ${result.reason ?? "target is covered"}`,
         details: {
+          ...(result.reason !== undefined ? { reason: result.reason } : {}),
           ...(result.blocker_ref !== undefined ? { blocker_ref: result.blocker_ref } : {}),
           ...(result.blocker_role !== undefined ? { blocker_role: result.blocker_role } : {}),
           ...(result.blocker_name !== undefined ? { blocker_name: result.blocker_name } : {}),

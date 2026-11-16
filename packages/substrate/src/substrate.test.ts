@@ -24,6 +24,8 @@ const HOME = `<!doctype html>
   <h1>Substrate test</h1>
   <label for="q">Search</label>
   <input id="q" name="q">
+  <label for="frozen">Frozen</label>
+  <input id="frozen" name="frozen" disabled>
   <button id="go" onclick="document.getElementById('out').textContent = document.getElementById('q').value">Go</button>
   <button id="fetch" onclick="fetch('/api')">Fetch</button>
   <button id="post" onclick="fetch('/api/echo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q: 'tee' }) })">Post</button>
@@ -154,6 +156,36 @@ describe("substrate act", () => {
       ok: false,
       code: "stale_ref",
       current_doc: 1,
+    });
+  });
+
+  it("carries the engine's reason when nothing blocks the action", async () => {
+    const engine = {
+      navigate: async () => ({ url: "http://127.0.0.1/", title: "", status: null }),
+      snapshot: async () => ({
+        doc: 1,
+        v: 0,
+        url: "http://127.0.0.1/",
+        title: "",
+        nodes: [node],
+      }),
+      dispatch: async () => {
+        throw new EngineError("not_interactive", "node 7 is not focusable", {
+          details: { reason: "not_focusable" },
+        });
+      },
+      evaluate: async () => ({ status: 200, text: "{}", json: {}, url: "http://127.0.0.1/" }),
+      close: async () => undefined,
+    } as unknown as Engine;
+
+    const substrate = new Substrate(engine, { settleBudgetMs: 50 });
+    const view = await substrate.view();
+    const ref = refFor(view.refs, "button", "Go");
+
+    expect(await substrate.act({ ref, do: "fill", value: "x" })).toEqual({
+      ok: false,
+      code: "not_interactive",
+      reason: "not_focusable",
     });
   });
 });
@@ -574,6 +606,20 @@ describe.skipIf(!ENABLED)("substrate act", () => {
     await substrate.act({ ref: key, do: "fill", value: "abc" });
 
     expect((await substrate.read(key)).text).toBe("abc");
+  });
+
+  it("reports a typed not_focusable failure for a disabled fill", async () => {
+    const { substrate } = current();
+    await substrate.goto(`${baseUrl}/`);
+    const view = await substrate.state();
+    if (view === undefined) throw new Error("no view");
+    const frozen = refFor(view.refs, "textbox", "Frozen");
+
+    expect(await substrate.act({ ref: frozen, do: "fill", value: "x" })).toEqual({
+      ok: false,
+      code: "not_interactive",
+      reason: "not_focusable",
+    });
   });
 
   it("captures a download", async () => {

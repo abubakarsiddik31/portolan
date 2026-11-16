@@ -15,7 +15,7 @@ maps/<site>/v<n>.json
 
 A map is versioned. A session pins one version, so a publish never changes the
 meaning of a call in flight. The full field reference is
-[map spec v0](./spec/map-v0.md).
+[map spec v0](/reference/map-format).
 
 ## State
 

@@ -2,14 +2,14 @@
 
 **Date:** 2026-11-09
 **Frozen evidence commit:** `98d8af4cd800f7720da76ab7ea6acf3b933fab03`
-**Status:** harness validation, **not** gate results. [ADR-005](./DECISIONS.md#adr-005--g1g2-are-not-passed-release-gate-stays-closed)
+**Status:** harness validation, **not** gate results. [ADR-005](https://github.com/abubakarsiddik31/portolan/blob/main/docs/DECISIONS.md#adr-005--g1g2-are-not-passed-release-gate-stays-closed)
 keeps G0, G1, and G2 unpassed.
 
 > **Next run:** G0 on one vertical, with a real model and billed usage.
 > More scripted rows do not close a gate (ADR-005, ADR-009).
 
 This is the public-facing report. The detailed evidence is in
-[G1-G2.md](./G1-G2.md); the raw rows are in [`bench/results/`](../bench/results/).
+[G1-G2.md](https://github.com/abubakarsiddik31/portolan/blob/main/docs/G1-G2.md); the raw rows are in [`bench/results/`](https://github.com/abubakarsiddik31/portolan/tree/main/bench/results).
 
 ## 1. The question
 
@@ -43,7 +43,7 @@ working. The missing store API ops were never exercised; `open_checkout` is a
 static route and does not lift. The portal's `export_csv` needs download
 capture.
 
-Raw: [`compiled-dev.md`](../bench/results/compiled-dev.md).
+Raw: [`compiled-dev.md`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/compiled-dev.md).
 
 ### 2.2 Held-out maps
 
@@ -56,7 +56,7 @@ The seed maps author states and signatures; the compiler fills impls from
 fallback traces and verifies them on three fresh sessions. The freeze record
 carries the base commit and the model.
 
-Raw: [`freeze.json`](../bench/results/freeze.json), [`maps/heldout/`](../maps/heldout/).
+Raw: [`freeze.json`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/freeze.json), [`maps/heldout/`](https://github.com/abubakarsiddik31/portolan/tree/main/maps/heldout).
 
 ### 2.3 N=3, Arm C, scripted model
 
@@ -70,8 +70,8 @@ The 100% and $0 are by construction: the scripted model is deterministic and
 makes no billed calls. The number validates the harness, maps, backend, and
 result schema. It says nothing about a model's success rate.
 
-Raw: [`n3.jsonl`](../bench/results/n3.jsonl), [`n3.md`](../bench/results/n3.md),
-[`n3-final-table.md`](../bench/results/n3-final-table.md).
+Raw: [`n3.jsonl`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/n3.jsonl), [`n3.md`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/n3.md),
+[`n3-final-table.md`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/n3-final-table.md).
 
 ### 2.4 Drift, scripted model
 
@@ -90,7 +90,7 @@ idempotency key is retried, so a duplicate write is not possible in this run.
 The semantic filter and paginate failures from the v2 fixtures are not in the
 sample.
 
-Raw: [`drift.json`](../bench/results/drift.json), [`drift.md`](../bench/results/drift.md).
+Raw: [`drift.json`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/drift.json), [`drift.md`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/drift.md).
 
 ### 2.5 Latency on the store fixture
 
@@ -102,7 +102,7 @@ Raw: [`drift.json`](../bench/results/drift.json), [`drift.md`](../bench/results/
 | get_product_api | http | 1.8ms | 2.1ms | 150ms |
 | add_to_cart | ui | 25.4ms | 27.1ms | 500ms |
 
-Raw: [`perf.json`](../bench/results/perf.json), [`perf.md`](../bench/results/perf.md).
+Raw: [`perf.json`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/perf.json), [`perf.md`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/perf.md).
 
 ### 2.6 Client conformance
 
@@ -118,8 +118,8 @@ MCP surface. The fixture is the store app on `127.0.0.1:4100`; the model is the
 client's own, so this is a client-compatibility check, not a success-rate
 measurement.
 
-Raw: [`conformance.json`](../bench/results/conformance.json),
-[`conformance.md`](../bench/results/conformance.md).
+Raw: [`conformance.json`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/conformance.json),
+[`conformance.md`](https://github.com/abubakarsiddik31/portolan/blob/main/bench/results/conformance.md).
 
 ## 3. What is missing
 
@@ -165,7 +165,7 @@ pnpm --filter @portolan/bench perf         # latency
 A real run needs `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` (or an
 OpenAI-compatible endpoint) and the same commands with a provider-backed
 runner. The model port is configured per role; see
-[`packages/model/src/config.ts`](../packages/model/src/config.ts).
+[`packages/model/src/config.ts`](https://github.com/abubakarsiddik31/portolan/blob/main/packages/model/src/config.ts).
 
 ## 6. Threats to validity
 

@@ -2,23 +2,33 @@
 
 > Chart the web once. Every agent sails it.
 
-Portolan turns a website into a map an agent can call: named states and typed operations such as search(query), add_to_cart(product_id, size), executed through the cheapest verified path, with write safety.
+Portolan turns a website into a map an agent can call: named states and typed
+operations such as search(query), add_to_cart(product_id, size), executed
+through the cheapest verified path, with write safety (declared effects,
+confirmation for irreversible writes, unknown_outcome never retried).
 
-## Docs
+Docs: https://abubakarsiddik31.github.io/portolan/
+Source: https://github.com/abubakarsiddik31/portolan
 
-- /docs/QUICKSTART
-- /docs/CONCEPTS
-- /docs/MCP
-- /docs/SKILLS
-- /docs/WRITE-SAFETY
-- /docs/INSTALL
-- /docs/CONFIG
-- /docs/spec/map-v0 (Map format v0)
-- /docs/SECURITY
-- /docs/PACKAGING
-- /docs/LICENSING
-- /docs/BENCHMARK
+## Guide
+- What is Portolan: https://abubakarsiddik31.github.io/portolan/guide/what-is-portolan
+- Quickstart: https://abubakarsiddik31.github.io/portolan/guide/quickstart
+- Connect your agent: https://abubakarsiddik31.github.io/portolan/guide/clients
+- Concepts: https://abubakarsiddik31.github.io/portolan/guide/concepts
+- Using maps: https://abubakarsiddik31.github.io/portolan/guide/using-maps
+- Write safety: https://abubakarsiddik31.github.io/portolan/guide/write-safety
+- Skills: https://abubakarsiddik31.github.io/portolan/guide/skills
+- Build a map: https://abubakarsiddik31.github.io/portolan/guide/compiling-maps
 
-## Source
+## Reference
+- MCP tools: https://abubakarsiddik31.github.io/portolan/reference/mcp-tools
+- CLI: https://abubakarsiddik31.github.io/portolan/reference/cli
+- Configuration: https://abubakarsiddik31.github.io/portolan/reference/configuration
+- Map format v0: https://abubakarsiddik31.github.io/portolan/reference/map-format
 
-https://github.com/abubakarsiddik31/portolan
+## Project
+- Vision: https://abubakarsiddik31.github.io/portolan/project/vision
+- Architecture: https://abubakarsiddik31.github.io/portolan/project/architecture
+- Security: https://abubakarsiddik31.github.io/portolan/project/security
+- Benchmark: https://abubakarsiddik31.github.io/portolan/project/benchmark
+- Licensing: https://abubakarsiddik31.github.io/portolan/project/licensing

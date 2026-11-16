@@ -7,12 +7,25 @@ Portolan turns a website into a map an agent can call: named states and typed op
 Docs site: https://abubakarsiddik31.github.io/portolan/
 Source: https://github.com/abubakarsiddik31/portolan
 
-## Key docs
-- docs/QUICKSTART.md
-- docs/CONCEPTS.md
-- docs/MCP.md
-- docs/SKILLS.md
-- docs/WRITE-SAFETY.md
-- docs/INSTALL.md
-- docs/CONFIG.md
-- docs/spec/map-v0.md
+## Guide
+- https://abubakarsiddik31.github.io/portolan/guide/what-is-portolan
+- https://abubakarsiddik31.github.io/portolan/guide/quickstart
+- https://abubakarsiddik31.github.io/portolan/guide/clients
+- https://abubakarsiddik31.github.io/portolan/guide/concepts
+- https://abubakarsiddik31.github.io/portolan/guide/using-maps
+- https://abubakarsiddik31.github.io/portolan/guide/write-safety
+- https://abubakarsiddik31.github.io/portolan/guide/skills
+- https://abubakarsiddik31.github.io/portolan/guide/compiling-maps
+
+## Reference
+- https://abubakarsiddik31.github.io/portolan/reference/mcp-tools
+- https://abubakarsiddik31.github.io/portolan/reference/cli
+- https://abubakarsiddik31.github.io/portolan/reference/configuration
+- https://abubakarsiddik31.github.io/portolan/reference/map-format
+
+## Project
+- https://abubakarsiddik31.github.io/portolan/project/vision
+- https://abubakarsiddik31.github.io/portolan/project/architecture
+- https://abubakarsiddik31.github.io/portolan/project/security
+- https://abubakarsiddik31.github.io/portolan/project/benchmark
+- https://abubakarsiddik31.github.io/portolan/project/licensing

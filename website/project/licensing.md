@@ -5,9 +5,9 @@ decision.
 
 | Artifact | License | File |
 |---|---|---|
-| Runtime, compiler, substrate, server, CLI, skills exporter | Apache-2.0 | [LICENSE](../LICENSE) |
-| Cockpit (the human view of a session, not built yet) | MIT | [LICENSE-MIT](../LICENSE-MIT) |
-| Map format spec and the JSON Schema as published documentation | CC-BY-4.0 | [LICENSE-CC-BY-4.0](../LICENSE-CC-BY-4.0) |
+| Runtime, compiler, substrate, server, CLI, skills exporter | Apache-2.0 | [LICENSE](https://github.com/abubakarsiddik31/portolan/blob/main/LICENSE) |
+| Cockpit (the human view of a session, not built yet) | MIT | [LICENSE-MIT](https://github.com/abubakarsiddik31/portolan/blob/main/LICENSE-MIT) |
+| Map format spec and the JSON Schema as published documentation | CC-BY-4.0 | [LICENSE-CC-BY-4.0](https://github.com/abubakarsiddik31/portolan/blob/main/LICENSE-CC-BY-4.0) |
 
 The split is deliberate:
 
@@ -45,7 +45,7 @@ dependency that moves from dev to production must be checked.
 ## Contributing
 
 By contributing code you agree it is licensed under Apache-2.0. There is no
-separate CLA. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+separate CLA. See [CONTRIBUTING.md](https://github.com/abubakarsiddik31/portolan/blob/main/CONTRIBUTING.md).
 
 ## Not covered here
 

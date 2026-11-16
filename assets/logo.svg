@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Portolan">
+  <rect x="2" y="2" width="92" height="92" rx="24" fill="#0E3B33"/>
+  <g fill="none" stroke="#E7C987" stroke-width="1.6" opacity="0.45">
+    <circle cx="48" cy="48" r="31"/>
+    <circle cx="48" cy="48" r="19"/>
+    <path d="M48 9v78M9 48h78"/>
+    <path d="M20.5 20.5l55 55M75.5 20.5l-55 55" opacity="0.6"/>
+  </g>
+  <g stroke="#0E3B33" stroke-width="1.4">
+    <path d="M48 14l6.5 27.5L82 48l-27.5 6.5L48 82l-6.5-27.5L14 48l27.5-6.5z" fill="#F4E3B2"/>
+    <path d="M48 14l6.5 27.5L82 48 48 48z" fill="#E7C987"/>
+  </g>
+  <circle cx="48" cy="48" r="4.2" fill="#0E3B33" stroke="#F4E3B2" stroke-width="1.6"/>
+</svg>

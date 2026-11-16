@@ -72,4 +72,4 @@ them.
 - It does not stop a page-initiated navigation.
 - It does not authenticate the client on the HTTP transport.
 
-See [Security](./SECURITY.md) for the full threat model.
+See [Security](/project/security) for the full threat model.

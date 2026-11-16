@@ -63,7 +63,7 @@ Portolan grows in layers. Each layer uses the one below it, and none of them req
 | Layer | What it gives | Built from | Status |
 |---|---|---|---|
 | **Read / search** | URL → markdown, site search, web discovery | Tier 0 fetch, Readability, an external search API | v0.2 |
-| **Browse** | Unknown site: affordances, refs, `act`, `read` | The substrate (`SUBSTRATE.md`) | v0.1 fallback |
+| **Browse** | Unknown site: affordances, refs, `act`, `read` | The substrate (`/project/architecture`) | v0.1 fallback |
 | **Operate** | Typed ops, writes, confirmations, drift repair | Maps, tiers, verifier, compiler | v0.1 core |
 | **Research** | Multi-source synthesis with citations | The caller's model over read/search | v0.2 skill |
 | **Cockpit** | Live view, timeline, inspector, takeover, audit | The event log | v0.2 |

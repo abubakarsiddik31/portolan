@@ -87,5 +87,5 @@ shutdown. A restart closes sessions left by a dead process.
 
 ## Setup
 
-See [Install](./INSTALL.md) for a snippet per client, and
-[Quickstart](./QUICKSTART.md) for the source-checkout path.
+See [Install](/guide/clients) for a snippet per client, and
+[Quickstart](/guide/quickstart) for the source-checkout path.

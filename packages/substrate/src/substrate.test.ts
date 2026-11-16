@@ -70,6 +70,40 @@ const BLOCKED = `<!doctype html>
 </body>
 </html>`;
 
+/**
+ * Hydrates late: the title swaps and a fetched record renders well after
+ * domcontentloaded. `goto` must not return before both.
+ */
+const LATE = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Loading</title></head>
+<body>
+  <h1>Late hydration</h1>
+  <div id="record"></div>
+  <script>
+    setTimeout(() => {
+      document.title = "Ready";
+      fetch("/api/late")
+        .then((r) => r.json())
+        .then((data) => {
+          document.getElementById("record").textContent = data.name;
+        });
+    }, 600);
+  </script>
+</body>
+</html>`;
+
+/** A button that fetches and re-renders without navigating. */
+const SPA = `<!doctype html>
+<html lang="en">
+<head><title>SPA</title></head>
+<body>
+  <h1>SPA</h1>
+  <button id="load" onclick="fetch('/api/data').then((r) => r.json()).then((data) => { document.getElementById('row').textContent = data.name; })">Load</button>
+  <div id="row"></div>
+</body>
+</html>`;
+
 function chromePath(): string {
   if (CHROME === undefined) throw new Error("Chrome is required");
   return CHROME;
@@ -250,6 +284,26 @@ describe.skipIf(!ENABLED)("substrate act", () => {
         response.end(BLOCKED);
         return;
       }
+      if (url === "/late") {
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        response.end(LATE);
+        return;
+      }
+      if (url === "/spa") {
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        response.end(SPA);
+        return;
+      }
+      if (url === "/api/late") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end('{"name":"settled record"}');
+        return;
+      }
+      if (url === "/api/data") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end('{"name":"fetched row"}');
+        return;
+      }
       if (url === "/api") {
         response.writeHead(200, { "content-type": "application/json" });
         response.end('{"ok":true}');
@@ -309,6 +363,30 @@ describe.skipIf(!ENABLED)("substrate act", () => {
     await expect(
       engine.evaluate<string>("document.getElementById('out').textContent"),
     ).resolves.toBe("tee");
+  });
+
+  it("goto settles a late-hydrating page", async () => {
+    const { substrate } = current();
+    const view = await substrate.goto(`${baseUrl}/late`);
+
+    expect(view.snapshot.title).toBe("Ready");
+    const text = await substrate.read();
+    expect(text.text).toContain("settled record");
+  });
+
+  it("act settles a fetch-and-rerender click", async () => {
+    const { engine, substrate } = current();
+    await engine.navigate(`${baseUrl}/spa`);
+    const view = await substrate.view();
+    const load = refFor(view.refs, "button", "Load");
+
+    const result = await substrate.act({ ref: load, do: "click" });
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) throw new Error("expected a successful act");
+    expect(result.effects.some((effect) => effect.kind === "network")).toBe(true);
+    const text = await substrate.read();
+    expect(text.text).toContain("fetched row");
   });
 
   it("reports a value effect and a small delta for a fill", async () => {

@@ -103,7 +103,7 @@ export async function runUiOp(input: UiRunInput): Promise<UiRunResult> {
         };
       }
 
-      const result = await substrate.act({ ref, do: step.do, value });
+      const result = await substrate.act({ ref, do: step.do, value }, { settle: false });
       if (!result.ok) return fromAct(result, index);
 
       effects.push(...result.effects);
@@ -111,7 +111,7 @@ export async function runUiOp(input: UiRunInput): Promise<UiRunResult> {
       continue;
     }
 
-    const result = await substrate.act({ ref, do: step.do });
+    const result = await substrate.act({ ref, do: step.do }, { settle: false });
     if (!result.ok) return fromAct(result, index);
 
     effects.push(...result.effects);

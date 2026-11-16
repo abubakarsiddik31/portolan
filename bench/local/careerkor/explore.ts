@@ -10,7 +10,6 @@
  * Credentials are read from the environment and never printed.
  */
 
-import { join } from "node:path";
 import {
   type Affordance,
   estimateTokens,

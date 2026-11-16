@@ -144,5 +144,7 @@ export interface Engine {
   /** The current value of a form control, or undefined when it has none. */
   readValue(backendNodeId: number): Promise<string | undefined>;
   evaluate<T>(expression: string): Promise<T>;
+  /** A PNG of the viewport, when the engine can capture one. */
+  screenshot?(): Promise<Uint8Array>;
   close(): Promise<void>;
 }

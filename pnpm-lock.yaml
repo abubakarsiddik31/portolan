@@ -105,6 +105,9 @@ importers:
       '@portolan/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@portolan/qa':
+        specifier: workspace:*
+        version: link:../qa
       '@portolan/runtime':
         specifier: workspace:*
         version: link:../runtime
@@ -197,6 +200,31 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/qa:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(zod@4.6.7)
+      '@portolan/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@portolan/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@portolan/substrate':
+        specifier: workspace:*
+        version: link:../substrate
+      better-sqlite3:
+        specifier: 13.0.3
+        version: 13.0.3
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: 9.6.0
+        version: 9.6.0
 
   packages/runtime:
     dependencies:

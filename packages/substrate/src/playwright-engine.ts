@@ -294,6 +294,10 @@ export class PlaywrightEngine implements Engine {
     }
   }
 
+  async screenshot(): Promise<Uint8Array> {
+    return this.page.screenshot({ type: "png" });
+  }
+
   async close(): Promise<void> {
     try {
       await this.browser.close();

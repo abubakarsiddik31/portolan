@@ -67,6 +67,7 @@ open_site("acme-store")
 | [PRD.md](./PRD.md) | Product requirements v0.2, aligned with ADR-002–005 |
 | [docs/QUICKSTART.md](./docs/QUICKSTART.md) | From a clone to a working MCP call; the site also covers concepts, MCP, skills, and write safety (`pnpm docs:build`) |
 | [docs/ANALYSIS.md](./docs/ANALYSIS.md) | Market evidence, cost model, competitive landscape, reasoning trail (v1 → v4), falsification criteria |
+| [docs/QA.md](./docs/QA.md) | Local, agent-first QA: cases as files, runs and trust in SQLite, MCP/CLI surface, M1/M2 plan |
 | [PRD.md](./PRD.md) | v0.1 requirements. Partly superseded by ADR-002; its verbs and architecture now describe the substrate. Rewrite pending. |
 | [docs/archive/BUILD_PLAN_v1.md](./docs/archive/BUILD_PLAN_v1.md) | The v1 plan (affordance browser) and its adversarial review, written under the old name Facet, kept for the record |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Setup, commit and branch rules, PR process, code standards |

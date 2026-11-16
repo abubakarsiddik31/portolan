@@ -1,14 +1,35 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/protocol" },
-    { "path": "packages/model" },
-    { "path": "packages/substrate" },
-    { "path": "packages/compiler" },
-    { "path": "packages/runtime" },
-    { "path": "packages/cli" },
-    { "path": "packages/portolan-server" },
-    { "path": "bench" },
-    { "path": "packages/skills" }
+    {
+      "path": "packages/protocol"
+    },
+    {
+      "path": "packages/model"
+    },
+    {
+      "path": "packages/substrate"
+    },
+    {
+      "path": "packages/compiler"
+    },
+    {
+      "path": "packages/runtime"
+    },
+    {
+      "path": "packages/cli"
+    },
+    {
+      "path": "packages/portolan-server"
+    },
+    {
+      "path": "bench"
+    },
+    {
+      "path": "packages/skills"
+    },
+    {
+      "path": "packages/qa"
+    }
   ]
 }

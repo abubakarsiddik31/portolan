@@ -44,6 +44,22 @@ const NODES: SemanticNode[] = [
 ];
 
 describe("rankAffordances", () => {
+  it("ranks a form-scoped submit above a same-named button elsewhere", () => {
+    const nodes: SemanticNode[] = [
+      node({ nodeId: "1", role: "RootWebArea", name: "Page", childIds: ["2", "5"] }),
+      node({ nodeId: "2", role: "main", childIds: ["3"], bounds: rect() }),
+      node({ nodeId: "3", role: "button", name: "Sign In", backendNodeId: 201, bounds: rect() }),
+      node({ nodeId: "5", role: "form", childIds: ["6", "7"], bounds: rect() }),
+      node({ nodeId: "6", role: "textbox", name: "Email", backendNodeId: 202, bounds: rect() }),
+      node({ nodeId: "7", role: "button", name: "Login", backendNodeId: 203, bounds: rect() }),
+    ];
+
+    const { affordances } = rankAffordances(nodes);
+
+    expect(affordances[0]?.name).toBe("Login");
+    expect(affordances[0]?.score).toBeGreaterThan(affordances[1]?.score ?? 0);
+  });
+
   it("keeps only visible, actionable, measurable nodes", () => {
     const { affordances } = rankAffordances(NODES);
 

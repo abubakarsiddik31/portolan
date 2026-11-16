@@ -250,10 +250,29 @@ function contextFor(
   return landmark;
 }
 
+/**
+ * A form's own submit outranks a same-named button elsewhere on the page.
+ *
+ * The careerkor run ranked the header "Sign In" button above the sign-in
+ * form's "Login" submit; acting on the wrong one re-navigated instead of
+ * submitting. When a submit-verb button sits inside a form or search
+ * landmark, it is the form's primary action, so it ranks as one.
+ */
+const SUBMIT_VERBS =
+  /^(log ?in|sign ?in|signin|submit|save|continue|create|search|checkout|apply|send|next|done)[!.,]?$/i;
+
 function weightOf(node: SemanticNode, ctx: string | undefined): number {
   let weight = ROLE_WEIGHT[node.role] ?? 1;
   if (node.name.length > 0) weight += 3;
   if (ctx !== undefined) weight += 1;
+  if (
+    node.role === "button" &&
+    ctx !== undefined &&
+    /\bform\b|^search\b/.test(ctx) &&
+    SUBMIT_VERBS.test(node.name)
+  ) {
+    weight += 3;
+  }
   return weight;
 }
 

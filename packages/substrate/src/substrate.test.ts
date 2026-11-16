@@ -159,6 +159,86 @@ describe("substrate act", () => {
     });
   });
 
+  it("recovers a ref that reappears in a fresh capture", async () => {
+    const docs = [
+      // The map the caller's ref was built from.
+      { doc: 1, nodes: [node] },
+      // An external navigation the substrate never went through.
+      { doc: 2, nodes: [{ ...node, nodeId: "n2", name: "Other" }] },
+      // The element is back.
+      { doc: 3, nodes: [node] },
+    ];
+    let call = 0;
+    const engine = {
+      navigate: async () => ({ url: "http://127.0.0.1/", title: "", status: null }),
+      snapshot: async () => {
+        const current = docs[Math.min(call, docs.length - 1)];
+        call += 1;
+        return { ...current, v: 0, url: "http://127.0.0.1/", title: "" };
+      },
+      dispatch: async () => ({
+        ok: true,
+        doc: 3,
+        v: 1,
+        url: "http://127.0.0.1/",
+        title: "",
+        effects: [],
+      }),
+      evaluate: async () => ({ status: 200, text: "{}", json: {}, url: "http://127.0.0.1/" }),
+      close: async () => undefined,
+    } as unknown as Engine;
+
+    const substrate = new Substrate(engine, { settleBudgetMs: 50 });
+    const first = await substrate.view();
+    await substrate.view();
+    const stale = refFor(first.refs, "button", "Go");
+
+    expect(await substrate.act({ ref: stale, do: "click" })).toMatchObject({ ok: true });
+  });
+
+  it("gives up after one recovery capture", async () => {
+    const docs = [
+      // The map the caller's ref was built from.
+      { doc: 1, nodes: [node] },
+      // An external navigation moved the element away.
+      { doc: 2, nodes: [{ ...node, nodeId: "n2", name: "Other" }] },
+      // It stays gone through the recovery capture.
+      { doc: 3, nodes: [{ ...node, nodeId: "n3", name: "Other" }] },
+      { doc: 4, nodes: [{ ...node, nodeId: "n4", name: "Other" }] },
+    ];
+    let call = 0;
+    const engine = {
+      navigate: async () => ({ url: "http://127.0.0.1/", title: "", status: null }),
+      snapshot: async () => {
+        const current = docs[Math.min(call, docs.length - 1)];
+        call += 1;
+        return { ...current, v: 0, url: "http://127.0.0.1/", title: "" };
+      },
+      dispatch: async () => ({
+        ok: true,
+        doc: 99,
+        v: 1,
+        url: "http://127.0.0.1/",
+        title: "",
+        effects: [],
+      }),
+      evaluate: async () => ({ status: 200, text: "{}", json: {}, url: "http://127.0.0.1/" }),
+      close: async () => undefined,
+    } as unknown as Engine;
+
+    const substrate = new Substrate(engine, { settleBudgetMs: 50 });
+    const first = await substrate.view();
+    await substrate.view();
+    const stale = refFor(first.refs, "button", "Go");
+
+    const result = await substrate.act({ ref: stale, do: "click" });
+
+    expect(result).toMatchObject({ ok: false, code: "stale_ref" });
+    if (!result.ok && result.code === "stale_ref") {
+      expect(result.current_doc).toBeGreaterThan(2);
+    }
+  });
+
   it("carries the engine's reason when nothing blocks the action", async () => {
     const engine = {
       navigate: async () => ({ url: "http://127.0.0.1/", title: "", status: null }),

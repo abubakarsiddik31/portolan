@@ -61,7 +61,7 @@ export async function runUrlOp(input: UrlRunInput): Promise<UrlRunResult> {
   }
 
   const url = route.startsWith("http") ? route : new URL(route, base).toString();
-  const view = await substrate.goto(url);
+  const view = await substrate.goto(url, { settle: false });
 
   for (const check of op.post) {
     const failure = checkPost(check, map, view);

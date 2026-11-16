@@ -89,7 +89,7 @@ describe("runUrlOp", () => {
     });
 
     expect(result).toMatchObject({ ok: true, result: { title: "Widget" } });
-    expect(goto).toHaveBeenCalledWith("http://x/item/a%20b");
+    expect(goto).toHaveBeenCalledWith("http://x/item/a%20b", { settle: false });
   });
 
   it("refuses a write op", async () => {

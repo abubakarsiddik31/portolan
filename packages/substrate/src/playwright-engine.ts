@@ -21,13 +21,6 @@ export type PlaywrightEngineOptions = {
   executablePath: string;
   headless?: boolean;
   timeoutMs?: number;
-  /**
-   * How long `navigate` and `dispatch` may wait for the page to go quiet
-   * after the DOM is ready (see the quiescence contract on {@link Engine}).
-   * Default 8000 ms. The settle returns early as soon as the page is stable,
-   * so a quiet page pays only one or two poll cycles.
-   */
-  settleBudgetMs?: number;
   /** Extra Chromium flags, e.g. --no-sandbox in a container. */
   launchArgs?: string[];
   /**
@@ -125,7 +118,6 @@ export class PlaywrightEngine implements Engine {
   private networkSeq = 0;
   private readonly requestCaptures = new Map<string, Promise<void>>();
   private readonly responseCaptures = new Map<string, Promise<void>>();
-  private lastNetworkAt = 0;
   private downloadStarted = false;
   private downloadPromise: Promise<DownloadInfo | undefined> | undefined;
   private lastDownload: DownloadInfo | undefined;
@@ -136,7 +128,6 @@ export class PlaywrightEngine implements Engine {
     private readonly page: Page,
     private readonly cdp: CDPSession,
     timeoutMs: number,
-    private readonly settleBudgetMs: number,
   ) {
     this.timeoutMs = timeoutMs;
   }
@@ -158,13 +149,7 @@ export class PlaywrightEngine implements Engine {
     const cdp = await context.newCDPSession(page);
     const downloadDir = await mkdtemp(join(tmpdir(), "portolan-download-"));
 
-    const engine = new PlaywrightEngine(
-      browser,
-      page,
-      cdp,
-      options.timeoutMs ?? 30_000,
-      options.settleBudgetMs ?? 8_000,
-    );
+    const engine = new PlaywrightEngine(browser, page, cdp, options.timeoutMs ?? 30_000);
 
     page.on("framenavigated", (frame) => {
       if (frame === page.mainFrame()) engine.doc += 1;
@@ -204,11 +189,6 @@ export class PlaywrightEngine implements Engine {
         waitUntil: "domcontentloaded",
         timeout: this.timeoutMs,
       });
-
-      // Quiescence contract: SPA hydration, late titles, and data fetches all
-      // happen after domcontentloaded. Wait for the page to go quiet before
-      // the caller takes its snapshot.
-      await this.waitForSettle(this.settleBudgetMs);
 
       return {
         url: this.page.url(),
@@ -278,21 +258,6 @@ export class PlaywrightEngine implements Engine {
 
     await this.finishNetwork(networkMark);
 
-    // Quiescence contract. A full settle when the action navigated; a short
-    // one when it fetched data (an SPA re-render is usually right behind a
-    // request); nothing on a quiet action, so a click that only toggles a
-    // menu keeps today's latency.
-    const navigated = this.doc !== beforeDoc || this.page.url() !== beforeUrl;
-    const fetchedData = this.networkOrder.some((requestId) => {
-      const seq = this.networkSeqOf.get(requestId);
-      return seq !== undefined && seq >= networkMark;
-    });
-    if (navigated) {
-      await this.waitForSettle(this.settleBudgetMs);
-    } else if (fetchedData) {
-      await this.waitForSettle(Math.min(this.settleBudgetMs, 2_000));
-    }
-
     this.v += 1;
     const effects = this.effectsSince(networkMark, action, beforeUrl, beforeDoc);
     // A site often fetches a PDF and then clicks a blob link, so the download
@@ -334,59 +299,6 @@ export class PlaywrightEngine implements Engine {
       await this.browser.close();
     } catch {
       // Closing an already-closed browser is a no-op.
-    }
-  }
-
-  /**
-   * Wait until the page stops changing, or the budget runs out.
-   *
-   * The signal is a cheap content fingerprint (url, title, text length,
-   * element count) that must hold unchanged for 750 ms, and the network must
-   * have been quiet for 500 ms — either one catches a page that looks settled
-   * while a fetch in flight is about to re-render it. A fingerprint that has
-   * been stable for 1.5 s settles regardless: analytics beacons keep the
-   * network busy forever, but content that never changes is settled. Budget
-   * exhaustion is not an error; the caller snapshots whatever is on the page
-   * at that moment, which is exactly the pre-settle behavior.
-   */
-  private async waitForSettle(budgetMs: number): Promise<void> {
-    const QUIET_MS = 500;
-    const MIN_STABLE_MS = 750;
-    const STABLE_OVERRIDE_MS = 1_500;
-    const deadline = Date.now() + budgetMs;
-    let last = "";
-    let stableSince: number | undefined;
-
-    while (Date.now() < deadline) {
-      let current: string;
-      try {
-        current = await this.evaluate<string>(
-          `(() => {
-            const body = document.body;
-            return JSON.stringify([
-              location.href,
-              document.title,
-              body ? body.innerText.length : 0,
-              body ? body.getElementsByTagName("*").length : 0,
-            ]);
-          })()`,
-        );
-      } catch {
-        // The page can be mid-navigation or crashed; treat as unsettled.
-        current = "";
-      }
-
-      const now = Date.now();
-      if (current.length > 0 && current === last) {
-        stableSince ??= now;
-        const stable = now - stableSince;
-        const quiet = now - this.lastNetworkAt >= QUIET_MS;
-        if ((stable >= MIN_STABLE_MS && quiet) || stable >= STABLE_OVERRIDE_MS) return;
-      } else {
-        stableSince = undefined;
-        last = current;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }
 
@@ -489,7 +401,6 @@ export class PlaywrightEngine implements Engine {
     this.networkOrder.push(event.requestId);
     this.networkSeqOf.set(event.requestId, this.networkSeq);
     this.networkSeq += 1;
-    this.lastNetworkAt = Date.now();
 
     if (this.networkOrder.length > 500) {
       const oldest = this.networkOrder.shift();
@@ -506,7 +417,6 @@ export class PlaywrightEngine implements Engine {
 
     effect.status = event.response.status;
     if (event.response.mimeType !== undefined) effect.mime_type = event.response.mimeType;
-    this.lastNetworkAt = Date.now();
   }
 
   /**
@@ -541,7 +451,6 @@ export class PlaywrightEngine implements Engine {
    * returning effects.
    */
   private captureBody(event: LoadingFinishedEvent): void {
-    this.lastNetworkAt = Date.now();
     const effect = this.network.get(event.requestId);
     if (effect === undefined || !isJsonMime(effect.mime_type)) return;
 

@@ -32,6 +32,15 @@ export type ActRequest = {
   files?: string[];
 };
 
+export type CallOptions = {
+  /**
+   * Skip the quiescence settle for this one call and capture immediately.
+   * Tier ops hold a p50 budget and navigate per call, so they opt out;
+   * agent-facing verbs settle by default.
+   */
+  settle?: boolean;
+};
+
 export type DeltaEntry = {
   kind: "added" | "removed" | "changed";
   ref?: string;
@@ -86,11 +95,19 @@ export type SubstrateOptions = {
   onBlocked?: (event: BlockedRequest) => void;
   /** Hostname resolver for the rebinding check; injectable for tests. */
   resolve?: Resolver;
+  /**
+   * How long `goto` and `act` wait for the page to go quiet before the
+   * capture they return (see the quiescence contract on {@link Substrate}).
+   * Default 8000 ms; `0` disables settling entirely. The settle returns
+   * early once the document is stable, so a quiet page pays little.
+   */
+  settleBudgetMs?: number;
 };
 
 export class Substrate {
   private readonly registry = new RefRegistry();
   private readonly guard: EgressGuard | undefined;
+  private readonly settleBudgetMs: number;
   private current: RefMap | undefined;
   private last: Snapshot | undefined;
 
@@ -102,6 +119,54 @@ export class Substrate {
       options.policy === undefined
         ? undefined
         : new EgressGuard(options.policy, options.onBlocked, options.resolve);
+    this.settleBudgetMs = options.settleBudgetMs ?? 8_000;
+  }
+
+  /**
+   * Quiescence contract. `goto` and `act` capture the document only after
+   * the page has gone quiet: an SPA that hydrates late, or an action whose
+   * fetch re-renders, is settled first, so the view the caller receives is
+   * current. The engine's `navigate` and `dispatch` deliberately resolve
+   * early — tier ops navigate per call and hold a p50 budget, so settling
+   * belongs to the agent verbs, not the engine.
+   *
+   * The settle signal is capture stability: consecutive snapshots must agree
+   * on url, title, and node names for 750 ms, or the budget runs out.
+   * Exhaustion is not an error; the caller receives whatever is on the page,
+   * which is the pre-contract behavior.
+   */
+  private async settle(): Promise<SubstrateView> {
+    const MIN_STABLE_MS = 750;
+    const deadline = Date.now() + this.settleBudgetMs;
+    let view = await this.view();
+    if (this.settleBudgetMs <= 0) return view;
+
+    let last = "";
+    let stableSince: number | undefined;
+
+    while (Date.now() < deadline) {
+      const fingerprint = JSON.stringify([
+        view.snapshot.url,
+        view.snapshot.title,
+        view.snapshot.nodes
+          .map((node) => `${node.role}:${node.name}`)
+          .join("|")
+          .slice(0, 4000),
+      ]);
+
+      if (fingerprint === last) {
+        stableSince ??= Date.now();
+        if (Date.now() - stableSince >= MIN_STABLE_MS) return view;
+      } else {
+        stableSince = undefined;
+        last = fingerprint;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      view = await this.view();
+    }
+
+    return view;
   }
 
   async view(): Promise<SubstrateView> {
@@ -153,11 +218,11 @@ export class Substrate {
     return response;
   }
 
-  /** Navigate, then capture. The `goto` substrate verb. */
-  async goto(url: string): Promise<SubstrateView> {
+  /** Navigate, let the page go quiet, then capture. The `goto` verb. */
+  async goto(url: string, options: CallOptions = {}): Promise<SubstrateView> {
     await this.guard?.checkResolved(url, "GET");
     await this.engine.navigate(url);
-    return this.view();
+    return options.settle === false ? this.view() : this.settle();
   }
 
   /** The last captured document and refs, without taking a new snapshot. */
@@ -196,7 +261,7 @@ export class Substrate {
     return { text: node?.name ?? "" };
   }
 
-  async act(request: ActRequest): Promise<ActResult> {
+  async act(request: ActRequest, options: CallOptions = {}): Promise<ActResult> {
     const before = this.last;
     const beforeRefs = this.current;
 
@@ -256,10 +321,36 @@ export class Substrate {
     try {
       const result = await this.engine.dispatch(action);
 
-      const snapshot = await this.engine.snapshot();
-      const refs = this.registry.build(snapshot.nodes, snapshot.doc);
-      this.current = refs;
-      this.last = snapshot;
+      if (options.settle === false) {
+        // Tier path: capture immediately, engine values are authoritative.
+        const snapshot = await this.engine.snapshot();
+        const refs = this.registry.build(snapshot.nodes, snapshot.doc);
+        this.current = refs;
+        this.last = snapshot;
+
+        const delta =
+          before !== undefined && beforeRefs !== undefined
+            ? diff(before, beforeRefs, snapshot, refs)
+            : { navigation: false, entries: [] };
+
+        return {
+          ok: true,
+          doc: result.doc,
+          v: result.v,
+          url: result.url,
+          title: result.title,
+          effects: result.effects,
+          delta,
+          ...(result.download !== undefined ? { download: result.download } : {}),
+        };
+      }
+
+      // Quiescence: the settled view is also the delta baseline, and its doc
+      // epoch is authoritative — a dispatch that navigated may still be
+      // hydrating when the engine resolves.
+      const settled = await this.settle();
+      const snapshot = settled.snapshot;
+      const refs = settled.refs;
 
       const delta =
         before !== undefined && beforeRefs !== undefined
@@ -268,10 +359,10 @@ export class Substrate {
 
       return {
         ok: true,
-        doc: result.doc,
-        v: result.v,
-        url: result.url,
-        title: result.title,
+        doc: snapshot.doc,
+        v: snapshot.v,
+        url: snapshot.url,
+        title: snapshot.title,
         effects: result.effects,
         delta,
         ...(result.download !== undefined ? { download: result.download } : {}),

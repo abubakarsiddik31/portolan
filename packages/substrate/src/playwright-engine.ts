@@ -576,7 +576,9 @@ export class PlaywrightEngine implements Engine {
     );
 
     if (rect.width === 0 || rect.height === 0) {
-      throw new EngineError("not_interactive", `node ${backendNodeId} has no layout box`);
+      throw new EngineError("not_interactive", `node ${backendNodeId} has no layout box`, {
+        details: { reason: "no_layout_box" },
+      });
     }
 
     await this.assertEnabled(objectId, backendNodeId);
@@ -598,7 +600,9 @@ export class PlaywrightEngine implements Engine {
     const bottom = Math.min(viewport.height, rect.y + rect.height);
 
     if (right <= left || bottom <= top) {
-      throw new EngineError("not_interactive", `node ${backendNodeId} is outside the viewport`);
+      throw new EngineError("not_interactive", `node ${backendNodeId} is outside the viewport`, {
+        details: { reason: "outside_viewport" },
+      });
     }
 
     const x = Math.round((left + right) / 2);
@@ -619,7 +623,7 @@ export class PlaywrightEngine implements Engine {
       throw new EngineError(
         "not_interactive",
         `hit-test failed at ${x},${y}: ${error instanceof Error ? error.message : String(error)}`,
-        { cause: error, details: { x, y } },
+        { cause: error, details: { x, y, reason: "hit_test_failed" } },
       );
     }
 
@@ -885,8 +889,16 @@ export class PlaywrightEngine implements Engine {
       [],
     );
 
-    await this.cdp.send("DOM.focus", { backendNodeId });
-    await this.page.keyboard.insertText(value);
+    await this.cdp.send("DOM.focus", { backendNodeId }).catch(() => {
+      throw new EngineError("not_interactive", `node ${backendNodeId} is not focusable`, {
+        details: { reason: "not_focusable" },
+      });
+    });
+    await this.page.keyboard.insertText(value).catch(() => {
+      throw new EngineError("not_interactive", `node ${backendNodeId} did not accept text`, {
+        details: { reason: "not_focusable" },
+      });
+    });
   }
 
   private async select(backendNodeId: number, value: string): Promise<void> {

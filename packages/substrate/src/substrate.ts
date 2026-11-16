@@ -69,6 +69,8 @@ export type ActResult =
   | {
       ok: false;
       code: "not_interactive";
+      /** Why the action could not run, when no blocker was found. */
+      reason?: string;
       blocker_ref?: string;
       blocker_backend_node_id?: number;
       blocker_role?: string;
@@ -403,7 +405,12 @@ export class Substrate {
         const blocker = error.details.blockerBackendNodeId;
 
         if (typeof blocker !== "number") {
-          return { ok: false, code: "not_interactive" };
+          // No occluder: the engine said why it refused (unfocusable target,
+          // no layout box, outside the viewport). Carry the reason through
+          // so the caller can retry or report meaningfully.
+          return typeof error.details.reason === "string"
+            ? { ok: false, code: "not_interactive", reason: error.details.reason }
+            : { ok: false, code: "not_interactive" };
         }
 
         const entry = this.current?.byBackend.get(blocker);

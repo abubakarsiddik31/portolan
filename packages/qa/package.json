@@ -1,6 +1,6 @@
 {
   "name": "@portolan/qa",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Local, agent-first QA: test cases, runs, evidence, and repair.",
   "license": "Apache-2.0",
   "type": "module",

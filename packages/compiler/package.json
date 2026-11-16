@@ -1,6 +1,6 @@
 {
   "name": "@portolan/compiler",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Trace-to-map compiler and verifier for Portolan.",
   "license": "Apache-2.0",
   "type": "module",

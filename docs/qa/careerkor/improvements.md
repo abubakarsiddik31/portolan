@@ -58,6 +58,8 @@ Budget default ~10 s, configurable; `settle: false` escape hatch for tests that 
 
 **Change.** If candidate D wins T6.03, extract a shared runner: test cases as data (id, feature, steps, expected), execution engine (settle, retry, readback, evidence), results renderer. CareerKor becomes the first customer instance; the same runner is the compiler's verifier (T3.12) with a different front door. Authoring guide = T1.12's done-criteria language.
 
+**Status 2026-11-16.** The bench-level harness is landed (`bench/qa/harness.ts`): settle-aware navigation, retry acts, readback fills, case runner, markdown renderer — unit-tested on a mocked engine. Product packaging in `packages/` stays gated on ADR-006; migrating the careerkor runner onto the harness needs a live verification run.
+
 ## CareerKor-side fixes (their backlog, not Portolan's)
 
 1. Empty `<title>` on `/dashboard`, `/profile`, `/reports` (confirmed; TC-NAV-03).

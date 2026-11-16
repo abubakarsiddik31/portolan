@@ -24,6 +24,7 @@ function processFile(file) {
 
 function walk(dir) {
   for (const name of readdirSync(dir)) {
+    if (name === 'node_modules' || name === '.vitepress' || name === '.git' || name === 'dist') continue;
     const p = join(dir, name);
     const st = statSync(p);
     if (st.isDirectory()) walk(p);

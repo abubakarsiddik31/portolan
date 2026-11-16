@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { findChrome } from "./chrome.js";
 import type { Engine } from "./engine.js";
@@ -353,6 +353,10 @@ describe("substrate fetch redirects", () => {
 });
 
 describe.skipIf(!ENABLED)("substrate act", () => {
+  // Settled acts hold ~750 ms each; the default 5 s test timeout is too
+  // tight on CI runners.
+  vi.setConfig({ testTimeout: 20_000 });
+
   let server: Server | undefined;
   let baseUrl = "";
   let engine: PlaywrightEngine | undefined;

@@ -26,6 +26,8 @@ const HOME = `<!doctype html>
   <input id="q" name="q">
   <label for="frozen">Frozen</label>
   <input id="frozen" name="frozen" disabled>
+  <label for="vanish">Vanishing</label>
+  <input id="vanish" aria-label="Vanishing" oninput="this.value=''">
   <button id="go" onclick="document.getElementById('out').textContent = document.getElementById('q').value">Go</button>
   <button id="fetch" onclick="fetch('/api')">Fetch</button>
   <button id="post" onclick="fetch('/api/echo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q: 'tee' }) })">Post</button>
@@ -186,6 +188,73 @@ describe("substrate act", () => {
       ok: false,
       code: "not_interactive",
       reason: "not_focusable",
+    });
+  });
+
+  it("reports fill_lost when a verified fill never takes", async () => {
+    const engine = {
+      navigate: async () => ({ url: "http://127.0.0.1/", title: "", status: null }),
+      snapshot: async () => ({
+        doc: 1,
+        v: 0,
+        url: "http://127.0.0.1/",
+        title: "",
+        nodes: [node],
+      }),
+      dispatch: async () => ({
+        ok: true,
+        doc: 1,
+        v: 1,
+        url: "http://127.0.0.1/",
+        title: "",
+        effects: [],
+      }),
+      readValue: async () => "",
+      evaluate: async () => ({ status: 200, text: "{}", json: {}, url: "http://127.0.0.1/" }),
+      close: async () => undefined,
+    } as unknown as Engine;
+
+    const substrate = new Substrate(engine, { settleBudgetMs: 50 });
+    const view = await substrate.view();
+    const ref = refFor(view.refs, "button", "Go");
+
+    const result = await substrate.act({ ref, do: "fill", value: "tee", verify: true });
+
+    expect(result).toMatchObject({ ok: false, code: "fill_lost" });
+    if (!result.ok && result.code === "fill_lost") {
+      expect(result.message).toContain('button "Go"');
+    }
+  });
+
+  it("keeps a verified fill that reads back equal", async () => {
+    const engine = {
+      navigate: async () => ({ url: "http://127.0.0.1/", title: "", status: null }),
+      snapshot: async () => ({
+        doc: 1,
+        v: 0,
+        url: "http://127.0.0.1/",
+        title: "",
+        nodes: [node],
+      }),
+      dispatch: async () => ({
+        ok: true,
+        doc: 1,
+        v: 1,
+        url: "http://127.0.0.1/",
+        title: "",
+        effects: [],
+      }),
+      readValue: async () => "tee",
+      evaluate: async () => ({ status: 200, text: "{}", json: {}, url: "http://127.0.0.1/" }),
+      close: async () => undefined,
+    } as unknown as Engine;
+
+    const substrate = new Substrate(engine, { settleBudgetMs: 50 });
+    const view = await substrate.view();
+    const ref = refFor(view.refs, "button", "Go");
+
+    expect(await substrate.act({ ref, do: "fill", value: "tee", verify: true })).toMatchObject({
+      ok: true,
     });
   });
 });
@@ -619,6 +688,35 @@ describe.skipIf(!ENABLED)("substrate act", () => {
       ok: false,
       code: "not_interactive",
       reason: "not_focusable",
+    });
+  });
+
+  it("verify catches a self-clearing input", async () => {
+    const { substrate } = current();
+    await substrate.goto(`${baseUrl}/`);
+    const view = await substrate.state();
+    if (view === undefined) throw new Error("no view");
+    const vanish = refFor(view.refs, "textbox", "Vanishing");
+
+    expect(
+      await substrate.act({ ref: vanish, do: "fill", value: "x", verify: true }),
+    ).toMatchObject({
+      ok: false,
+      code: "fill_lost",
+    });
+  });
+
+  it("verify passes when the value reads back equal", async () => {
+    const { substrate } = current();
+    await substrate.goto(`${baseUrl}/`);
+    const view = await substrate.state();
+    if (view === undefined) throw new Error("no view");
+    const search = refFor(view.refs, "textbox", "Search");
+
+    expect(
+      await substrate.act({ ref: search, do: "fill", value: "tee", verify: true }),
+    ).toMatchObject({
+      ok: true,
     });
   });
 

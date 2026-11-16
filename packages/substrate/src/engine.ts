@@ -124,10 +124,21 @@ export class EngineError extends Error {
  *
  * `snapshot` returns the accessibility tree merged with layout: role, name,
  * document bounds, and visibility. Ranking and refs are the next layer.
+ *
+ * **Quiescence contract.** `navigate` and `dispatch` resolve only after the
+ * page has gone quiet: a navigation is committed and the DOM has stopped
+ * changing within an implementation budget. An SPA that hydrates late, or a
+ * click that triggers a data fetch and a re-render, is settled before these
+ * return, so a snapshot taken right after them is current. Budget
+ * exhaustion is not an error; the method resolves with whatever is on the
+ * page at that moment, which is the pre-contract behavior. An action that
+ * changes only local state (a menu toggle) may still resolve immediately.
  */
 export interface Engine {
+  /** Navigate and wait for the page to go quiet. */
   navigate(url: string): Promise<NavigateResult>;
   snapshot(): Promise<Snapshot>;
+  /** Dispatch an action and wait for the page to go quiet. */
   dispatch(action: Action): Promise<DispatchResult>;
   /** Set files on a file input, or on the nearest file input to a trigger. */
   setFiles(backendNodeId: number, files: string[]): Promise<void>;

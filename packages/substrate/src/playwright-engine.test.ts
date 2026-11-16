@@ -25,6 +25,44 @@ const PAGE = `<!doctype html>
 </body>
 </html>`;
 
+/**
+ * A page that hydrates late: the title swaps and a fetched record renders
+ * well after domcontentloaded. `navigate` must not resolve before both.
+ */
+const LATE = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Loading</title></head>
+<body>
+  <h1>Late hydration</h1>
+  <div id="record"></div>
+  <script>
+    setTimeout(() => {
+      document.title = "Ready";
+      fetch("/api/late")
+        .then((r) => r.json())
+        .then((data) => {
+          document.getElementById("record").textContent = data.name;
+        });
+    }, 600);
+  </script>
+</body>
+</html>`;
+
+/**
+ * A button that fetches and re-renders without navigating — the dispatch
+ * path's short settle. The rendered value must be present and the fetch
+ * must be reported as an effect.
+ */
+const SPA = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>SPA</title></head>
+<body>
+  <h1>SPA</h1>
+  <button id="load" onclick="fetch('/api/data').then((r) => r.json()).then((data) => { document.getElementById('row').textContent = data.name; })">Load</button>
+  <div id="row"></div>
+</body>
+</html>`;
+
 const CHROME = findChrome();
 
 /**
@@ -69,6 +107,26 @@ describe.skipIf(!ENABLED)("playwright engine", () => {
         response.end(PAGE);
         return;
       }
+      if (request.url === "/late") {
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        response.end(LATE);
+        return;
+      }
+      if (request.url === "/spa") {
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        response.end(SPA);
+        return;
+      }
+      if (request.url === "/api/late") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ name: "settled record" }));
+        return;
+      }
+      if (request.url === "/api/data") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ name: "fetched row" }));
+        return;
+      }
       response.writeHead(404).end();
     });
     server = started;
@@ -102,6 +160,31 @@ describe.skipIf(!ENABLED)("playwright engine", () => {
     expect(result.url).toBe(baseUrl);
     expect(result.title).toBe("Engine test");
     expect(result.status).toBe(200);
+  });
+
+  it("settles a late-hydrating page before navigate resolves", async () => {
+    const result = await current().navigate(`${baseUrl}late`);
+
+    expect(result.title).toBe("Ready");
+    await expect(
+      current().evaluate<string>("document.getElementById('record').textContent"),
+    ).resolves.toBe("settled record");
+  });
+
+  it("settles a fetch-and-rerender click before dispatch resolves", async () => {
+    const running = current();
+    await running.navigate(`${baseUrl}spa`);
+    const snapshot = await running.snapshot();
+
+    const result = await running.dispatch({
+      do: "click",
+      backendNodeId: target(snapshot, "button", "Load"),
+    });
+
+    expect(result.effects.some((effect) => effect.kind === "network")).toBe(true);
+    await expect(
+      running.evaluate<string>("document.getElementById('row').textContent"),
+    ).resolves.toBe("fetched row");
   });
 
   it("snapshots the accessibility tree", async () => {

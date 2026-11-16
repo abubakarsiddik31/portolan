@@ -197,5 +197,11 @@ function fromAct(result: Extract<ActResult, { ok: false }>, index: number): UiRu
         code: "invalid_params",
         message: `step ${index}: ${result.message}`,
       };
+    case "fill_lost":
+      return {
+        ok: false,
+        code: "op_broken",
+        message: `step ${index}: ${result.message}`,
+      };
   }
 }

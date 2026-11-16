@@ -30,6 +30,14 @@ export type ActRequest = {
   key?: string;
   /** Set these files on the target, or the nearest file input. */
   files?: string[];
+  /**
+   * Verify a fill by reading the control's value back after the dispatch.
+   * On a mismatch the substrate clicks to re-anchor the node and refills
+   * once; a second mismatch returns `fill_lost`. Opt-in because sites that
+   * reformat values (phones, cards) legitimately differ from the typed
+   * text. Fills only; `select` verifies nothing today.
+   */
+  verify?: boolean;
 };
 
 export type CallOptions = {
@@ -66,6 +74,12 @@ export type ActResult =
       download?: { path: string; filename: string };
     }
   | { ok: false; code: "stale_ref"; current_doc: number; new_ref?: string }
+  | {
+      ok: false;
+      code: "fill_lost";
+      /** The value did not take after a click-to-focus refill. */
+      message: string;
+    }
   | {
       ok: false;
       code: "not_interactive";
@@ -322,6 +336,34 @@ export class Substrate {
 
     try {
       const result = await this.engine.dispatch(action);
+
+      // Verified fill: the worst failure a fill can have is reporting
+      // success while the value silently never took. Read it back; on a
+      // mismatch, click to re-anchor the node (SPA re-renders replace the
+      // element under the ref) and refill once before giving up.
+      if (action.do === "fill" && request.verify === true) {
+        const fillValue: string = request.value ?? "";
+        const entry = resolution.entry;
+        const stuck = await this.engine.readValue(entry.backendNodeId);
+        if (stuck !== fillValue) {
+          await this.engine.dispatch({ do: "click", backendNodeId: entry.backendNodeId });
+          await this.engine.dispatch({
+            do: "fill",
+            backendNodeId: entry.backendNodeId,
+            value: fillValue,
+          });
+          const again = await this.engine.readValue(entry.backendNodeId);
+          if (again !== fillValue) {
+            return {
+              ok: false,
+              code: "fill_lost",
+              message: `fill on ${entry.role} "${entry.name}" did not stick (read back ${
+                again === undefined ? "nothing" : `${again.length} chars`
+              })`,
+            };
+          }
+        }
+      }
 
       if (options.settle === false) {
         // Tier path: capture immediately, engine values are authoritative.

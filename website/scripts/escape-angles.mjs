@@ -1,13 +1,16 @@
-import { readdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.argv[2] || "docs";
 
 function escapeInline(text) {
-  return text.split(/(`[^`]*`)/).map((part, i) => {
-    if (i % 2 === 1) return part;
-    return part.replace(/<(?=[A-Za-z])/g, "&lt;");
-  }).join("");
+  return text
+    .split(/(`[^`]*`)/)
+    .map((part, i) => {
+      if (i % 2 === 1) return part;
+      return part.replace(/<(?=[A-Za-z])/g, "&lt;");
+    })
+    .join("");
 }
 
 function processFile(file) {
@@ -15,7 +18,10 @@ function processFile(file) {
   const lines = src.split("\n");
   let inFence = false;
   const out = lines.map((line) => {
-    if (/^```/.test(line.trim())) { inFence = !inFence; return line; }
+    if (/^```/.test(line.trim())) {
+      inFence = !inFence;
+      return line;
+    }
     if (inFence) return line;
     return escapeInline(line);
   });
@@ -24,7 +30,8 @@ function processFile(file) {
 
 function walk(dir) {
   for (const name of readdirSync(dir)) {
-    if (name === 'node_modules' || name === '.vitepress' || name === '.git' || name === 'dist') continue;
+    if (name === "node_modules" || name === ".vitepress" || name === ".git" || name === "dist")
+      continue;
     const p = join(dir, name);
     const st = statSync(p);
     if (st.isDirectory()) walk(p);

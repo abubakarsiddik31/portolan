@@ -4,6 +4,7 @@ import { runCompile } from "./commands/compile.js";
 import { runExportSkills } from "./commands/export-skills.js";
 import { runInit } from "./commands/init.js";
 import { runMcp } from "./commands/mcp.js";
+import { runQa } from "./commands/qa.js";
 import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
 import { loadConfig } from "./config.js";
@@ -19,6 +20,7 @@ Commands:
   verify                 verify a map's ops on a fresh session
   export-skills          export a portolan-<site> skill from a map
   bench [suite]          run a benchmark suite from the source checkout
+  qa <command>           local, agent-first QA (see: portolan qa --help)
   doctor [--json]        diagnose the browser, config, providers, and clients
 
 Common options:
@@ -145,6 +147,10 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           }
         }
         return result.ok ? 0 : 1;
+      }
+
+      case "qa": {
+        return runQa(rest, { out, err });
       }
 
       case "export-skills": {

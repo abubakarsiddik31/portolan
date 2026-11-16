@@ -9,6 +9,9 @@ const ROOT = join(import.meta.dirname, "..");
 const SCRIPT = join(ROOT, "scripts/release-dry-run.mjs");
 const CONFIG = join(ROOT, ".changeset/config.json");
 const BUILT = existsSync(join(ROOT, "packages/protocol/dist"));
+const PACKAGE_COUNT = readdirSync(join(ROOT, "packages")).filter((name) =>
+  existsSync(join(ROOT, "packages", name, "package.json")),
+).length;
 const dirs: string[] = [];
 
 function tempDir(): string {
@@ -59,7 +62,7 @@ describe("release dry run", () => {
 
     expect(notes).toContain("Initial public alpha");
     expect(notes).toContain("@portolan/cli");
-    expect(plan.releases).toHaveLength(8);
+    expect(plan.releases).toHaveLength(PACKAGE_COUNT);
     expect(plan.releases.find((release) => release.name === "@portolan/cli")?.nextVersion).toBe(
       "0.1.0",
     );
@@ -72,7 +75,7 @@ describe("release dry run", () => {
       execFileSync(process.execPath, [SCRIPT, "--out", out], { encoding: "utf8" });
 
       const tarballs = readdirSync(out).filter((file) => file.endsWith(".tgz"));
-      expect(tarballs).toHaveLength(8);
+      expect(tarballs).toHaveLength(PACKAGE_COUNT);
     },
     120_000,
   );

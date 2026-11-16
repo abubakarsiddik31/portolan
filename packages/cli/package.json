@@ -44,7 +44,8 @@
     "@portolan/runtime": "workspace:*",
     "@portolan/server": "workspace:*",
     "@portolan/skills": "workspace:*",
-    "@portolan/substrate": "workspace:*"
+    "@portolan/substrate": "workspace:*",
+    "@portolan/qa": "workspace:*"
   },
   "devDependencies": {
     "fastify": "5.12.8",

@@ -256,6 +256,11 @@ export class Substrate {
   }
 
   /** Read the page, or one ref's accessible text. */
+  /** A PNG of the current viewport, when the engine supports it. */
+  async screenshot(): Promise<Uint8Array | undefined> {
+    return this.engine.screenshot?.();
+  }
+
   async read(ref?: string): Promise<{ text: string }> {
     // A no-ref read means "the page as it is now". Reusing the last snapshot
     // returns the page from before a `call` navigation, or before a data

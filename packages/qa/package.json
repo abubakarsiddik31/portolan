@@ -1,0 +1,52 @@
+{
+  "name": "@portolan/qa",
+  "version": "0.0.0",
+  "description": "Local, agent-first QA: test cases, runs, evidence, and repair.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "portolan-qa": "./dist/mcp-stdio.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abubakarsiddik31/portolan.git",
+    "directory": "packages/qa"
+  },
+  "homepage": "https://github.com/abubakarsiddik31/portolan#readme",
+  "bugs": {
+    "url": "https://github.com/abubakarsiddik31/portolan/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "mcp": "node dist/mcp-stdio.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@portolan/protocol": "workspace:*",
+    "@portolan/runtime": "workspace:*",
+    "@portolan/substrate": "workspace:*",
+    "better-sqlite3": "13.0.3",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0"
+  }
+}

@@ -505,6 +505,122 @@ There is no chosen vertical and no design partner. More code does not create tha
 
 ---
 
+## ADR-010 — QA is a local, agent-first tool on the map runtime
+
+**Status:** Proposed spike, 2026-11-16. The branch may be reviewed, but the
+product is activated only when ADR-006 selects the QA vertical. Until then it
+is evidence for the decision, not a release.
+**Deciders:** Abubakar Siddik
+**Related:** ADR-002, ADR-003, ADR-009; [QA.md](./QA.md); [VERTICALS.md](./VERTICALS.md) candidate D; [qa/careerkor/improvements.md](./qa/careerkor/improvements.md) item 6
+
+### Context
+
+The QA vertical scored 80/100 and has the best G0 feasibility of the four
+candidates: staging sites and seeded accounts are easy to get, and the measured
+workflow stops at assertions, so nothing binding is at risk. The live-fire run
+also proved the substrate works on a real app and that the runner already has
+the product shape (`bench/local/careerkor/run-tests.ts`).
+
+The founder's direction is narrower than a test-management product: developers
+install this locally, plug it into their coding harness, and the agent drives
+it to generate, run, and update tests. The primary user is the agent; the
+human reviews a diff and a summary.
+
+ADR-009 freezes horizontal work until G0 passes. Building a QA product now
+appears to contradict that freeze. It does not have to: the QA tool is the G0
+vertical, not horizontal feature work, and it is the cheapest way to produce the
+missing evidence.
+
+### Decision
+
+1. **QA is a vertical on the map runtime, not a separate project.** The runner,
+   verifier, and drift repair are shared machinery; a new repository would
+   duplicate them.
+2. **The product is a local, agent-first tool**: an MCP server, a CLI, and a
+   skill. No web UI, no hosting, no scheduling, no accounts, no TMS clone.
+3. **Specs are repo files; history is a local SQLite database.** Cases and
+   suites are canonical files (one case per file) so agent edits are small
+   diffs. Runs, results, evidence, flakes, drift, and coverage live in SQLite.
+   The database indexes specs and stores history; it never becomes a second
+   editable copy of a case.
+4. **No LLM in the run path.** The caller's agent generates and repairs; the
+   runner replays deterministically. Generation may consume a trace, but the
+   core does not call a model.
+5. **Trust is server-enforced.** A case is `verified` only after N fresh-context
+   passes. `qa_run` refuses unverified cases unless the caller explicitly opts
+   in. Editing a verified case returns it to `draft`.
+6. **Integrate, do not rebuild, test management.** Export JUnit and provide
+   adapters for existing tools after a design partner asks.
+7. **ADR-009 is narrowed, not abandoned.** Only the QA vertical proceeds until
+   G0; no cockpit, release, or horizontal work.
+8. **Choosing QA defers the write-safety wedge, explicitly.** Candidate D scores
+   2/5 on write risk. QA sells self-healing regression and typed evidence, not
+   governed writes. If QA wins ADR-006, record that deferral there; do not
+   claim the write-safety wedge while selling QA.
+
+### Rationale
+
+- **The agent is the user.** A UI would add surface without adding capability;
+  typed tool results, artifacts in git, and a skill are what an agent needs.
+- **The map thesis gets a funnel.** A verified case is a map op plus
+  assertions, so local QA users generate the first maps for their own app.
+- **The database is justified by history, not by specs.** Run history, evidence
+  indexes, flake statistics, and coverage are relational and grow; case specs
+  are better as reviewable files.
+- **The hard part already exists.** The substrate, verifier, traces, and repair
+  loop are built; the new work is the case schema, runner, store, and surfaces.
+- **Trust must be database-derived.** A file-authored `verified` is a claim,
+  not a proof. Only a `qa verify` record in the local DB can promote a case,
+  so an agent cannot edit a badge into a pass.
+
+### Consequences
+
+**Positive**
+- The QA vertical becomes measurable with the existing engine.
+- Local adoption does not require hosting, procurement, or a compliance review.
+- One artifact family keeps cases, maps, and evidence coherent.
+
+**Negative**
+- Two storage kinds (files and SQLite) add a sync invariant that must be
+  enforced and tested.
+- The coding-harness integration matrix (MCP config, skills directory) is real
+  maintenance.
+- The category is crowded; differentiation must be measured, not asserted.
+
+**Mitigations**
+- `spec_sha` plus `qa sync` plus a `qa doctor` drift check make the sync
+  invariant observable.
+- `qa init` detects the harness; the CLI is the fallback for clients without
+  MCP.
+- The benchmark and drift numbers remain the differentiator, not the feature
+  list.
+
+### Alternatives rejected
+
+| Alternative | Why rejected |
+|---|---|
+| **New project/repository** | Duplicates the substrate, verifier, and repair loop; splits the artifact family; does not produce G0 evidence faster. |
+| **Add QA to the existing MCP server only** | Bloats the tool list the coding agent pays for; QA needs its own config, store, and lifecycle. The CLI and package boundary keep it separable. |
+| **Full test-management product (TestRail clone)** | Crowded commodity; no moat; scope creep against ADR-009. |
+| **Cases only in SQLite** | Agents edit files; a DB-only spec is opaque in review and conflicts with the repo-native workflow. |
+| **Cases only in git, no database** | Run history, evidence, flakes, and coverage become file sprawl; the founder asked for a real local database. |
+| **File-authored `verified` status** | An agent can write the badge without ever running the test; trust is a DB record instead. |
+| **Revision history in SQLite** | A second spec copy duplicates git; revisions stay in `git log`. |
+| **LLM in the run path** | Non-deterministic, costly per run, and contradicts ADR-003. |
+
+### Revisit triggers
+
+1. **G0 fails with QA as the vertical** → stop or re-scope; do not pivot to a
+   TMS.
+2. **Spec/DB drift causes a wrong run** → move specs into the DB with an
+   explicit export, or drop the index and query files directly.
+3. **Harness integration is the dominant support cost** → ship a single
+   `portolan qa mcp` installer and drop per-client detection.
+4. **A design partner pays for hosted runs, scheduling, or a UI** → that is a
+   new product decision, not this ADR.
+
+---
+
 ## Related decisions (one-line rationale)
 
 | Decision | Why |

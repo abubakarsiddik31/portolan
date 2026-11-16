@@ -1,0 +1,24 @@
+# Portolan
+
+> Chart the web once. Every agent sails it.
+
+Portolan turns a website into a map an agent can call: named states and typed operations such as search(query), add_to_cart(product_id, size), executed through the cheapest verified path, with write safety.
+
+## Docs
+
+- /docs/QUICKSTART
+- /docs/CONCEPTS
+- /docs/MCP
+- /docs/SKILLS
+- /docs/WRITE-SAFETY
+- /docs/INSTALL
+- /docs/CONFIG
+- /docs/spec/map-v0 (Map format v0)
+- /docs/SECURITY
+- /docs/PACKAGING
+- /docs/LICENSING
+- /docs/BENCHMARK
+
+## Source
+
+https://github.com/abubakarsiddik31/portolan

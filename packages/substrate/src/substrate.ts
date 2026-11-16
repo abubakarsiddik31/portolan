@@ -47,6 +47,14 @@ export type CallOptions = {
    * agent-facing verbs settle by default.
    */
   settle?: boolean;
+  /**
+   * On a stale ref with no suggested replacement, take one fresh capture and
+   * re-resolve before failing. This is the case the registry cannot see: the
+   * substrate's map predates an external navigation the caller never went
+   * through. On by default; the retry costs one snapshot, and only on the
+   * failure path.
+   */
+  recovery?: boolean;
 };
 
 export type DeltaEntry = {
@@ -281,7 +289,17 @@ export class Substrate {
     const before = this.last;
     const beforeRefs = this.current;
 
-    const resolution = this.registry.resolve(request.ref);
+    let resolution = this.registry.resolve(request.ref);
+
+    if (!resolution.ok && resolution.new_ref === undefined && options.recovery !== false) {
+      // One fresh capture before giving up: the substrate's map may predate
+      // a navigation that happened outside its verbs (a driver's goto, a
+      // redirect, a site-initiated route change). The new_ref suggestion
+      // path is left to the caller on purpose - a replacement is a hint,
+      // not a license to act.
+      await this.view();
+      resolution = this.registry.resolve(request.ref);
+    }
 
     if (!resolution.ok) {
       return resolution.new_ref === undefined

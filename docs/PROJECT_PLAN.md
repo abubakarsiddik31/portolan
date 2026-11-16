@@ -25,7 +25,7 @@
 
 | Order | Task | Status | Effort | Done |
 |---|---|---|---|---|
-| 1 | **T6.01** Score 3 candidate verticals | **Done** — [scorecard](./VERTICALS.md) | 4h | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
+| 1 | **T6.01** Score 3 candidate verticals | **Done** — [scorecard](./VERTICALS.md); QA automation added 2026-11-15 as candidate D (80/100) | 4h | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
 | 2 | **T6.02** Run 8 discovery interviews (not 15) | Next | 8h | Pain, volume, budget, and one workflow to test per interview |
 | 3 | **T6.03** Decide the vertical (ADR-006) | Pending | 2h | ADR merged; one vertical named |
 | 4 | **T6.05** Recruit 3 design partners | Pending | 8h | 3 signed; test accounts provisioned |
@@ -35,6 +35,8 @@
 | 8 | **T4.14** Write the G0 decision | Pending | 2h | ADR merged; pass → G1, fail → stop or narrow |
 
 **T6.01 result:** procurement portals score highest (**87/100**) on G0 feasibility, write risk, buyer reachability, and lack of a standard API. Insurance eligibility scores lowest (61) because PHI and payer credentials make a three-week gate unrealistic. Interview procurement first, logistics second. Full scoring and sources: [docs/VERTICALS.md](./VERTICALS.md).
+
+**Revised 2026-11-15:** the founder named **QA automation** as the initial product goal (end goal unchanged: an agent-native runtime that does what a human does, without the human UI). It is scored as candidate D (**80/100**) — the cheapest G0 to run and the easiest partner recruitment, with the weakest write-safety wedge. Interview order is now procurement first, QA second. T6.03 may pick D if QA interviews show budget for maintenance reduction.
 
 **Target:** Mon 2026-11-30. No Phase 2–7 commit before this table is complete.
 
@@ -131,7 +133,7 @@ Effort is AS hours unless noted. "Done" is what a reviewer checks. Every task is
 
 | ID | Task | Effort | Depends on | Done criteria |
 |---|---|---|---|---|
-| T6.01 | Score 3 candidate verticals (insurance eligibility, procurement portals, logistics carriers) | 4h | — | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
+| T6.01 | Score candidate verticals (insurance eligibility, procurement portals, logistics carriers; QA automation added 2026-11-15) | 4h | — | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
 | T6.02 | Run 8 discovery interviews (compressed from 15) | 8h | T6.01 | Notes with pain, volume, budget, and one workflow to test |
 | T6.03 | Decide the vertical (ADR-006) | 2h | T6.02 | One vertical named; ADR merged |
 | T6.05 | Recruit 3 design partners; sign pilot agreements | 8h | T6.03 | 3 signed; test accounts provisioned |
@@ -258,7 +260,7 @@ Effort is AS hours unless noted. "Done" is what a reviewer checks. Every task is
 
 | ID | Task | Effort | Depends on | Done criteria |
 |---|---|---|---|---|
-| T6.01 | Score 3 candidate verticals (insurance eligibility, procurement portals, logistics carriers) | 4h | — | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
+| T6.01 | Score candidate verticals (insurance eligibility, procurement portals, logistics carriers; QA automation added 2026-11-15) | 4h | — | Scorecard: site count, repeat volume, write risk, budget, reachable buyers |
 | T6.02 | Run 15 discovery interviews (~1h each, W2–W10) | 15h | T6.01 | Notes + pain/volume/budget per interview |
 | T6.03 | Decide vertical (ADR-006) | 2h | T6.02, T4.14 | ADR merged |
 | T6.04 | Select 10 target sites; ToS review per site (with Counsel) | 6h + 2h Counsel | T6.03 | Allow-list with ToS notes; no site that forbids automation |

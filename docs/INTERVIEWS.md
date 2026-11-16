@@ -41,6 +41,8 @@ If the answer to 5 is no, T6.03 does not pick a vertical — it revisits the the
 
 **Do not** interview vendors selling into the space as if they were buyers. Their pain is not the buyer's pain.
 
+**Candidate D segment (added 2026-11-15).** The founder named QA automation as the initial product goal; it scored 80/100 as candidate D in the [vertical scorecard](./VERTICALS.md). Reserve **2–3 of the 8 slots** for QA buyers: QA leads at SMB SaaS companies and test-automation agencies. Find them via Ministry of Testing communities, r/QualityAssurance, and agencies selling QA retainers. Same script; for these rows `portals_per_week` means sites under test, `bids_per_month` means regression runs per release, and `workflow_to_test` is one end-to-end flow they re-run on every release.
+
 ## 3. Screener (send before booking)
 
 Five questions. Disqualify if they do not touch portals weekly.

@@ -25,10 +25,13 @@ older one.
 | `skills` | string | `"skills"` | `export-skills`, `init` | Output directory for `portolan-<site>` skills. |
 | `policies` | string | `"policies"` | `init` | Directory containing `<site>.json` egress policies. |
 | `database` | string | `"portolan.db"` | `serve` | SQLite path. `:memory:` gives an ephemeral store. |
+| `traces` | string | `"traces"` | `mcp`, `serve`, `map` | Directory for recorded traces (JSONL + HAR). `TRACES_DIR` overrides it. |
 | `host` | string | `"127.0.0.1"` | `serve` | Listen address. |
 | `port` | integer ≥ 0 | `4200` | `serve` | Listen port. `0` asks the OS for one. |
-| `baseUrl` | string | unset | `compile`, `verify` | Live site origin, used when `--base-url` is not passed. |
-| `chrome` | string | unset | `compile`, `verify` | Chrome binary. Unset means `CHROME_PATH`, then the usual install paths. |
+| `baseUrl` | string | unset | `map`, `compile`, `verify` | Live site origin, used when `--url` or `--base-url` is not passed. |
+| `chrome` | string | unset | `map`, `compile`, `verify` | Chrome binary. Unset means `CHROME_PATH`, then the usual install paths. |
+| `start` | string | unset | `map` | Command that boots the app, e.g. `"npm run dev"`; used with `--verify`. |
+| `storageState` | string | unset | `map`, `verify`, `compile`, `mcp`, `serve` | Playwright storage-state file for pages behind auth. `PORTOLAN_STORAGE_STATE` overrides it. |
 | `headless` | boolean | `true` | `compile`, `verify` | Run Chromium headless. `--headed` overrides it to `false`. |
 | `sessionTtlMs` | integer ≥ 1 | `1800000` (30 min) | `serve` | Idle time after which a session is closed. |
 | `maxOpenSessions` | integer ≥ 1 | `100` | `serve` | A create at the cap returns `429 session_limit`. |
@@ -45,6 +48,7 @@ older one.
   "skills": "skills",
   "policies": "policies",
   "database": "portolan.db",
+  "traces": "traces",
   "host": "127.0.0.1",
   "port": 4200,
   "headless": true,

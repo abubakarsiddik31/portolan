@@ -57,3 +57,11 @@ not break execution; it can only mislead.
 - It is not a credential store. It must not contain secrets; the exporter scans
   for the common shapes and fails.
 - It is not a substitute for `open_site`. The map is the source of truth.
+
+## The map-building skill
+
+`skills/portolan-map/SKILL.md` is the authoring counterpart to a site skill. It
+teaches a coding agent to inventory capabilities from the codebase and the live
+app, work `capabilities.json` until no entry is `missing` or `stale`, and gate
+publication with `--require-complete`. Site skills (`portolan-<site>`) teach an
+agent how to *use* the finished map.

@@ -1,3 +1,4 @@
+import { TraceStore } from "@abubakarsiddiik/runtime";
 import {
   assertBindAllowed,
   BrowserRegistry,
@@ -57,6 +58,7 @@ export async function runServe(input: ServeInput, deps: ServeDeps = {}): Promise
     store,
     maps: new MapStore(maps),
     browsers,
+    traceStore: new TraceStore(process.env.TRACES_DIR ?? input.config.traces),
     ...(factory !== undefined ? { substrateFactory: factory } : {}),
     ...(authToken !== undefined ? { authToken } : {}),
     logger: true,

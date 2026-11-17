@@ -332,8 +332,9 @@ export const MAP_SCHEMA = {
         id: { $ref: "#/$defs/id" },
         url: { type: "string", minLength: 1 },
         marks: {
+          // A state may be URL-only: `/p/:id` is a page even before we name a
+          // landmark on it. Marks add specificity; they are not required.
           type: "array",
-          minItems: 1,
           items: { $ref: "#/$defs/locator" },
         },
         not: { type: "array", items: { $ref: "#/$defs/locator" } },

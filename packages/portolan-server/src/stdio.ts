@@ -1,5 +1,5 @@
 import type { SessionRecord } from "@abubakarsiddiik/protocol";
-import type { WriteLedger } from "@abubakarsiddiik/runtime";
+import type { TraceStore, WriteLedger } from "@abubakarsiddiik/runtime";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
@@ -23,6 +23,8 @@ export type StdioServerOptions = {
   browsers?: BrowserRegistry;
   /** Write ledger. Defaults to the session store's SQLite ledger. */
   ledger?: WriteLedger;
+  /** Persists fallback and explore traces as JSONL and HAR. */
+  traceStore?: TraceStore;
 };
 
 export type StdioServerHandle = {
@@ -49,6 +51,7 @@ export async function startStdioServer(
     maps,
     sessions,
     ledger: options.ledger ?? sessions.writeLedger(),
+    ...(options.traceStore !== undefined ? { traceStore: options.traceStore } : {}),
     ...(options.executor !== undefined ? { executor: options.executor } : {}),
     ...(options.substrateFactory !== undefined
       ? { substrateFactory: options.substrateFactory }

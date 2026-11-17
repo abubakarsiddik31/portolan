@@ -14,12 +14,18 @@ export type CliConfig = {
   policies: string;
   /** SQLite path, or `:memory:`. */
   database: string;
+  /** Directory for recorded traces (JSONL + HAR). */
+  traces: string;
   host: string;
   port: number;
   /** Optional base URL for a live site; compile and verify use it. */
   baseUrl?: string;
   /** Optional Chrome binary; otherwise CHROME_PATH or auto-detection. */
   chrome?: string;
+  /** Playwright storage state for pages behind auth. */
+  storageState?: string;
+  /** Command that boots the app for discovery and verification. */
+  start?: string;
   /** Run the browser headless. */
   headless: boolean;
   /** Idle time after which a session is closed. */
@@ -40,6 +46,7 @@ export const DEFAULT_CONFIG: CliConfig = {
   skills: "skills",
   policies: "policies",
   database: "portolan.db",
+  traces: "traces",
   host: "127.0.0.1",
   port: 4200,
   headless: true,
@@ -92,9 +99,12 @@ export function mergeConfig(
     "skills",
     "policies",
     "database",
+    "traces",
     "host",
     "baseUrl",
     "chrome",
+    "storageState",
+    "start",
   ] as const) {
     const value = raw[key];
     if (value === undefined) continue;

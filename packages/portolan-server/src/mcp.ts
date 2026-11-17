@@ -84,6 +84,8 @@ export function createMcpServer(deps: McpDeps): McpServer {
   const budget = deps.toolBudget ?? 30;
   let currentSid: string | undefined;
   let nativeTools: RegisteredTool[] = [];
+  /** Raw entry URL for a mapless explore session, keyed by sid. */
+  const exploreUrls = new Map<string, string>();
 
   async function callOp(input: CallInput) {
     if (currentSid === undefined) {
@@ -99,7 +101,18 @@ export function createMcpServer(deps: McpDeps): McpServer {
     const site = session.site;
     const version = session.map_version;
     if (site === undefined || version === undefined) {
-      return failure("internal", "the session is not pinned to a map");
+      return failure(
+        "invalid_request",
+        "this is an explore session with no map; use view, act, and read, then fallback_done",
+        {
+          next: [
+            "view to list affordances",
+            "act to perform one action",
+            "fallback_done with the scope_id to save the trace",
+            "portolan map build --site <site> to compile it",
+          ],
+        },
+      );
     }
 
     const map = deps.maps.getVersion(site, version);
@@ -329,8 +342,16 @@ export function createMcpServer(deps: McpDeps): McpServer {
     if (current.snapshot.url !== "about:blank") return;
 
     const session = currentSession();
-    if (session?.site === undefined || session.map_version === undefined) return;
+    if (session === undefined) return;
 
+    // An explore session has no map, so the explicit URL is the only entry.
+    const explicit = exploreUrls.get(session.sid);
+    if (explicit !== undefined) {
+      await substrate.goto(explicit);
+      return;
+    }
+
+    if (session.site === undefined || session.map_version === undefined) return;
     const map = deps.maps.getVersion(session.site, session.map_version);
     if (map === undefined) return;
 
@@ -356,7 +377,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
   function registerNativeTools(map: SiteMap): void {
     clearNativeTools();
 
-    const used = new Set(["list_sites", "open_site", "call"]);
+    const used = new Set(["list_sites", "open_site", "open_url", "call"]);
 
     for (const op of map.ops.slice(0, budget)) {
       const name = sanitizeToolName(toolName(map.site, op.name));
@@ -405,11 +426,28 @@ export function createMcpServer(deps: McpDeps): McpServer {
     async ({ site }) => {
       const map = deps.maps.get(site);
       if (map === undefined) {
-        return failure("map_not_found", `no map for site "${site}"`);
+        return failure("map_not_found", `no map for site "${site}"`, {
+          next: [
+            {
+              tool: "open_url",
+              params: {
+                url: "<the app's URL>",
+                intent: "<one task to record, e.g. search for a product>",
+                site,
+              },
+              why: "record one real run, then build a map from it",
+            },
+            {
+              command: `portolan map build --site ${site} --base-url <url> --from codebase --verify`,
+              why: "derive candidate ops from the repository and its API spec",
+            },
+          ],
+        });
       }
 
       if (currentSid !== undefined) {
         deps.sessions.close(currentSid);
+        exploreUrls.delete(currentSid);
       }
 
       const session = deps.sessions.create({ site });
@@ -424,6 +462,58 @@ export function createMcpServer(deps: McpDeps): McpServer {
           site,
           map_version: map.version,
           map: renderMap(map),
+        }),
+      );
+    },
+  );
+
+  server.registerTool(
+    "open_url",
+    {
+      description:
+        "Explore a site that has no map. Opens the URL in a fallback scope so view, act, and read record a trace that can be compiled into a map.",
+      inputSchema: {
+        url: z.string().url(),
+        intent: z.string().min(1).max(200),
+        site: z.string().min(1).max(64).optional(),
+        effect: z.enum(["read", "write", "irreversible"]).optional(),
+      },
+    },
+    async ({ url, intent, site, effect }) => {
+      if (currentSid !== undefined) {
+        deps.sessions.close(currentSid);
+        exploreUrls.delete(currentSid);
+      }
+
+      const name = site ?? siteNameFromUrl(url);
+      const session = deps.sessions.create({ site: name });
+      currentSid = session.sid;
+      exploreUrls.set(session.sid, url);
+
+      const existing = deps.maps.get(name);
+      if (existing !== undefined) {
+        deps.sessions.pin(session.sid, existing.version);
+        registerNativeTools(existing);
+      } else {
+        clearNativeTools();
+      }
+
+      const scope = scopes.begin({ sid: session.sid, intent, effect: effect ?? "write" });
+
+      return text(
+        JSON.stringify({
+          sid: session.sid,
+          site: name,
+          mode: "explore",
+          url,
+          scope_id: scope.id,
+          next: [
+            "view to read the page",
+            "act with a ref from view",
+            "read to inspect text",
+            "fallback_done with the scope_id to save the trace",
+            "then run: portolan map build --site " + name,
+          ],
         }),
       );
     },
@@ -717,6 +807,37 @@ function untrusted<T extends object>(value: T): T & { untrusted: true; notice: s
  * Native tool names must match `^[a-zA-Z0-9_-]{1,64}$`. Valid maps already
  * satisfy that, so this is a defensive layer for imported maps.
  */
+/**
+ * A site id from a URL, for a mapless explore session.
+ *
+ * `https://app.herbie.dev` becomes `herbie`, not `app-herbie-dev`, because the
+ * site id is what a map directory and a tool prefix are named after.
+ */
+export function siteNameFromUrl(url: string): string {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return "site";
+  }
+
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]") {
+    return "localhost";
+  }
+
+  const parts = host
+    .replace(/^www\./, "")
+    .split(".")
+    .filter((part) => part.length > 0);
+  const name = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+  const safe = (name ?? "site")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return safe.slice(0, 64).replace(/^-+|-+$/g, "") || "site";
+}
+
 export function sanitizeToolName(name: string): string {
   const sanitized = name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
   return sanitized.length === 0 ? "tool" : sanitized;

@@ -13,6 +13,8 @@ export type VerifyInput = {
   executablePath?: string;
   /** Default true. */
   headless?: boolean;
+  /** Playwright storage state for pages behind auth. */
+  storageState?: string;
 };
 
 export type VerifyDeps = {
@@ -67,6 +69,7 @@ export async function runVerify(input: VerifyInput, deps: VerifyDeps = {}): Prom
         paramSets: sets,
         ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
         ...(input.executablePath !== undefined ? { executablePath: input.executablePath } : {}),
+        ...(input.storageState !== undefined ? { storageState: input.storageState } : {}),
       }),
     );
   }

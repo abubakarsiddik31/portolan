@@ -210,6 +210,7 @@ describe("server", () => {
       expect(tools.tools.map((tool) => tool.name)).toEqual([
         "list_sites",
         "open_site",
+        "open_url",
         "call",
         "fallback_begin",
         "view",

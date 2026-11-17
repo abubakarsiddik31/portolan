@@ -1,0 +1,41 @@
+{
+  "name": "@abubakarsiddiik/sources",
+  "version": "0.1.0",
+  "description": "Map source adapters: discover a site from its live DOM, traces, or specs.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abubakarsiddik31/portolan.git",
+    "directory": "packages/sources"
+  },
+  "homepage": "https://github.com/abubakarsiddik31/portolan#readme",
+  "bugs": {
+    "url": "https://github.com/abubakarsiddik31/portolan/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@abubakarsiddiik/protocol": "workspace:*",
+    "@abubakarsiddiik/substrate": "workspace:*"
+  }
+}

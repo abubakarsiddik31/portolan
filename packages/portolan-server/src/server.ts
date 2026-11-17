@@ -1,7 +1,7 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import type { ErrorCode, ResultEnvelope, SessionRecord } from "@abubakarsiddiik/protocol";
 import { createSessionRequestSchema } from "@abubakarsiddiik/protocol";
-import type { WriteLedger } from "@abubakarsiddiik/runtime";
+import type { TraceStore, WriteLedger } from "@abubakarsiddiik/runtime";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import Fastify, {
   type FastifyError,
@@ -41,6 +41,8 @@ export type ServerOptions = {
   log?: Logger;
   /** Write ledger. Defaults to the store's SQLite ledger. */
   ledger?: WriteLedger;
+  /** Persists fallback and explore traces as JSONL and HAR. */
+  traceStore?: TraceStore;
   /** Creates the browser substrate used by view, act, and read. */
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
   /** When set, every route except /v1/health requires this bearer token. */
@@ -232,6 +234,7 @@ export function createServer(options: ServerOptions): FastifyInstance {
         sessions: options.store,
         ...(options.executor !== undefined ? { executor: options.executor } : {}),
         ledger: options.ledger ?? options.store.writeLedger(),
+        ...(options.traceStore !== undefined ? { traceStore: options.traceStore } : {}),
         ...(options.substrateFactory !== undefined
           ? { substrateFactory: options.substrateFactory }
           : {}),

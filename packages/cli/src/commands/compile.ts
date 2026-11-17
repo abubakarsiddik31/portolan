@@ -28,6 +28,8 @@ export type CompileOptionsInput = {
   chrome?: string;
   /** Default true. */
   headless?: boolean;
+  /** Playwright storage state for pages behind auth. */
+  storageState?: string;
 };
 
 export type CompileDeps = {
@@ -67,7 +69,7 @@ export async function runCompile(
 
   const live =
     deps.capture === undefined && input.baseUrl !== undefined
-      ? await liveCapture(input.baseUrl, input.chrome, input.headless ?? true)
+      ? await liveCapture(input.baseUrl, input.chrome, input.headless ?? true, input.storageState)
       : undefined;
   const capture = deps.capture ?? live?.capture ?? (async () => undefined);
 
@@ -107,6 +109,7 @@ async function liveCapture(
   baseUrl: string,
   chrome: string | undefined,
   headless: boolean,
+  storageState: string | undefined,
 ): Promise<{
   capture: (url: string) => Promise<SubstrateView | undefined>;
   close: () => Promise<void>;
@@ -116,7 +119,11 @@ async function liveCapture(
     throw new Error("compile --base-url needs Chrome; install it or set CHROME_PATH");
   }
 
-  const engine = await PlaywrightEngine.launch({ executablePath, headless });
+  const engine = await PlaywrightEngine.launch({
+    executablePath,
+    headless,
+    ...(storageState !== undefined ? { storageState } : {}),
+  });
   const substrate = new Substrate(engine);
 
   return {

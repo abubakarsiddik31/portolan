@@ -41,11 +41,12 @@
   "dependencies": {
     "@abubakarsiddiik/compiler": "workspace:*",
     "@abubakarsiddiik/protocol": "workspace:*",
+    "@abubakarsiddiik/qa": "workspace:*",
     "@abubakarsiddiik/runtime": "workspace:*",
     "@abubakarsiddiik/server": "workspace:*",
     "@abubakarsiddiik/skills": "workspace:*",
-    "@abubakarsiddiik/substrate": "workspace:*",
-    "@abubakarsiddiik/qa": "workspace:*"
+    "@abubakarsiddiik/sources": "workspace:*",
+    "@abubakarsiddiik/substrate": "workspace:*"
   },
   "devDependencies": {
     "fastify": "5.12.8",

@@ -57,7 +57,7 @@ Requires Node 22.12+ and Chrome or Chromium.
 Install the published CLI:
 
 ```bash
-npm install -g @abubakarsiddiik/cli
+npm install -g @abubakarsiddiik/portolan
 portolan init ./my-site
 ```
 

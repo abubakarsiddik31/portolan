@@ -1,4 +1,4 @@
-# @abubakarsiddiik/cli
+# @abubakarsiddiik/portolan
 
 ## 0.1.0
 

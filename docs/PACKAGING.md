@@ -15,7 +15,7 @@ Every package under `packages/` is publishable under the `@abubakarsiddiik` scop
 | `@abubakarsiddiik/runtime` | Op runtime and write safety |
 | `@abubakarsiddiik/server` | HTTP and MCP server |
 | `@abubakarsiddiik/skills` | Skill exporter |
-| `@abubakarsiddiik/cli` | The `portolan` command |
+| `@abubakarsiddiik/portolan` | The `portolan` command |
 
 Each manifest carries:
 
@@ -82,7 +82,7 @@ CI runs the dry run after the build.
 
 ### Clean-machine check
 
-`pnpm --filter @abubakarsiddiik/cli deploy --prod --legacy <dir>` builds a
+`pnpm --filter @abubakarsiddiik/portolan deploy --prod --legacy <dir>` builds a
 self-contained tree: the CLI, its `@abubakarsiddiik/*` dependencies, and third-party
 packages, with no symlinks into the workspace. Run `node <dir>/dist/bin.js
 doctor --json` from a directory with no `node_modules`.
@@ -113,7 +113,7 @@ The image is a multi-stage build:
 
 1. **build:** `node:24-bookworm-slim`, corepack, `pnpm install
    --frozen-lockfile`, `pnpm build`, then
-   `pnpm --filter @abubakarsiddiik/cli deploy --prod --legacy /out`.
+   `pnpm --filter @abubakarsiddiik/portolan deploy --prod --legacy /out`.
 2. **runtime:** `node:24-bookworm-slim` plus Debian's `chromium`,
    `ca-certificates`, and `fonts-liberation`.
 

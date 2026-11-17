@@ -4,7 +4,7 @@ One binary serves MCP over stdio, which is the transport every client
 supports. Install it, then add it to the client.
 
 ```bash
-npm install -g @abubakarsiddiik/cli
+npm install -g @abubakarsiddiik/portolan
 portolan init ./my-site
 ```
 
@@ -19,8 +19,8 @@ can spawn it directly. It reads:
 Set both to absolute paths in a client config: a client spawns the server from
 its own working directory, not yours.
 
-The CLI is published as `@abubakarsiddiik/cli`. If you do not want a global
-install, use `npx @abubakarsiddiik/cli` or the absolute path to `dist/bin.js`
+The CLI is published as `@abubakarsiddiik/portolan`. If you do not want a global
+install, use `npx @abubakarsiddiik/portolan` or the absolute path to `dist/bin.js`
 in a source checkout.
 
 ## Claude Code

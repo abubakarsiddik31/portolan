@@ -38,7 +38,7 @@ for (const entry of readdirSync(PACKAGES, { withFileTypes: true })) {
   if (pkg.exports?.["."]?.types === undefined || pkg.exports?.["."]?.import === undefined) {
     fail('exports["."] must have "types" and "import"');
   }
-  if (name === "@abubakarsiddiik/cli" && pkg.bin?.portolan !== "./dist/bin.js") {
+  if (name === "@abubakarsiddiik/portolan" && pkg.bin?.portolan !== "./dist/bin.js") {
     fail('bin.portolan must be "./dist/bin.js"');
   }
 
@@ -71,7 +71,7 @@ if (!existsSync(dockerfile)) {
     ["PORTOLAN_CHROME_SANDBOX", "exposes the sandbox switch"],
     ["EXPOSE 4200", "exposes 4200"],
     ["ENTRYPOINT", "has an entrypoint"],
-    ["pnpm --filter @abubakarsiddiik/cli deploy", "deploys the CLI"],
+    ["pnpm --filter @abubakarsiddiik/portolan deploy", "deploys the CLI"],
   ];
   for (const [needle, label] of checks) {
     if (!docker.includes(needle)) errors.push(`Dockerfile: does not ${label}`);

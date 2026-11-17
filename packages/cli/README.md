@@ -1,11 +1,11 @@
-# @abubakarsiddiik/cli
+# @abubakarsiddiik/portolan
 
 The `portolan` command.
 
 ## Run
 
 ```bash
-pnpm --filter @abubakarsiddiik/cli build
+pnpm --filter @abubakarsiddiik/portolan build
 node packages/cli/dist/bin.js --help
 ```
 

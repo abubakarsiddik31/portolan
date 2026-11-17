@@ -48,7 +48,7 @@
 
 | # | Release criterion | Measured by |
 |---|---|---|
-| R1 | `npx @abubakarsiddiik/cli serve` and the Docker image start the MCP server on macOS and Linux from a clean machine | RC install test (T7.09) |
+| R1 | `npx @abubakarsiddiik/portolan serve` and the Docker image start the MCP server on macOS and Linux from a clean machine | RC install test (T7.09) |
 | R2 | Works in ≥3 MCP clients (Claude Code, Codex CLI, one of Gemini CLI / Cursor / VS Code) with the `portolan` skill | Conformance suite (T4.13, T7.09) |
 | R3 | Works with ≥2 model providers; gates hold on both | Benchmark (T4.11) |
 | R4 | Gates G0, G1, G2 passed and recorded in `DECISIONS.md` | ADR-005 |

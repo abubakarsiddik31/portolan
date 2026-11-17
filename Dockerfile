@@ -16,7 +16,7 @@ COPY bench/package.json ./bench/package.json
 
 RUN pnpm install --frozen-lockfile
 RUN pnpm build
-RUN pnpm --filter @abubakarsiddiik/cli deploy --prod --legacy /out
+RUN pnpm --filter @abubakarsiddiik/portolan deploy --prod --legacy /out
 
 # Runtime: Chromium is the only system dependency the substrate needs.
 FROM node:24-bookworm-slim AS runtime

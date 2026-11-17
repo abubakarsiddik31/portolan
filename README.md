@@ -21,9 +21,11 @@ and typed operations like `search(query)`, `add_to_cart(product_id, size)` or
 `export(filter)` that move between them. Agents call operations instead of
 looking at screens and clicking.
 
-Maps are learned from real runs, verified by replay, and repaired when the site
-changes. Portolan works with **any model and any MCP client**: MCP carries
-execution and safety, Agent Skills carry the know-how.
+Maps are learned from real runs, verified by replay, and repaired when the
+site changes. Portolan works with **any model and any MCP client**: MCP
+carries execution and safety, Agent Skills carry the know-how. The same
+substrate powers **agent-first QA**: your coding agent authors, runs, and
+repairs end-to-end tests as JSON files in your repo.
 
 <details open>
 <summary><strong>Copy-paste setup prompt for your agent</strong></summary>
@@ -164,6 +166,32 @@ Claude Code, Claude Desktop, Codex CLI, Cursor, Gemini CLI, or VS Code.
 See [Client setup](https://abubakarsiddik31.github.io/portolan/guide/clients) for
 a snippet per client.
 
+## QA your app
+
+The map runtime drives *other* sites. The QA vertical turns the same substrate
+on *your* app: your coding agent authors test cases as JSON, runs them
+deterministically (no model in the run path), reads typed failures with
+evidence, and repairs broken locators after a UI change.
+
+```bash
+portolan qa init           # config, qa/cases, skill, MCP wiring, doctor
+```
+
+Then let the agent work the loop: `qa_plan` after a diff, `qa_run` the
+affected cases, `qa_repair` on a moved target, `qa_verify` to promote a case
+from draft to verified. Trust lives in a local database, not in the JSON —
+editing a case by hand can never forge a pass.
+
+```text
+qa_plan  → 2 cases touched by your diff
+qa_run   → auth/login: fail · not_found · step 3 (button "Login" is gone)
+qa_repair→ recovered {button "Sign in"} · draft rewritten · confirmation pass
+qa_verify→ 3 fresh replays, all pass · case promoted to verified
+```
+
+See the [QA guide](https://abubakarsiddik31.github.io/portolan/guide/qa) and
+[docs/QA.md](./docs/QA.md) for the design and trust model.
+
 ## Documentation
 
 Full docs live at **https://abubakarsiddik31.github.io/portolan/**.
@@ -175,6 +203,7 @@ Full docs live at **https://abubakarsiddik31.github.io/portolan/**.
 | [Concepts](https://abubakarsiddik31.github.io/portolan/guide/concepts) | Map, state, op, tier, session |
 | [Write safety](https://abubakarsiddik31.github.io/portolan/guide/write-safety) | Confirmation, idempotency, unknown outcomes |
 | [Skills](https://abubakarsiddik31.github.io/portolan/guide/skills) | Knowledge, not execution |
+| [QA your app](https://abubakarsiddik31.github.io/portolan/guide/qa) | Agent-authored tests, deterministic runs, repair |
 | [MCP tools](https://abubakarsiddik31.github.io/portolan/reference/mcp-tools) | Tool inputs, results, and errors |
 | [Map format](https://abubakarsiddik31.github.io/portolan/reference/map-format) | The full field reference |
 | [Configuration](https://abubakarsiddik31.github.io/portolan/reference/configuration) | Every option and default |
@@ -201,21 +230,24 @@ happens to run on one.
 
 **Early build. Open source. The gates have not been run yet.**
 
-Phase 5 code is complete: compiler, verifier, repair, MCP server, CLI,
-packaging, and docs. The current focus is **G0 on one vertical** — proving that
+The map pipeline is complete: compiler, verifier, repair, MCP server, CLI,
+packaging, and docs. The **QA vertical** shipped its first milestone — case
+authoring and generation, deterministic runs, DB-backed verification, and
+locator repair. The current focus is **G0 on one vertical**: proving that
 hand-written operations beat a step-by-step browser agent on steps and cost
 before building more. See [the build plan](./docs/BUILD_PLAN.md) and
 [decisions](./docs/DECISIONS.md).
 
-**v0.1.0** is the first public alpha, published to npm as
-`@abubakarsiddiik/*`. The G0–G2 gates have not passed yet, so treat it as an
-early alpha: `webmcp` is reserved in the map format and has no executor.
+**v0.1.1** is the current alpha, published to npm as `@abubakarsiddiik/*`
+(v0.1.0 was the first public release). The G0–G2 gates have not passed yet, so
+treat it as an early alpha: `webmcp` is reserved in the map format and has no
+executor.
 
 ## Repository map
 
 | Path | What's in it |
 |---|---|
-| [`packages/`](./packages) | Runtime, substrate, compiler, protocol, server, CLI, skills |
+| [`packages/`](./packages) | Runtime, substrate, compiler, protocol, server, QA, CLI, skills |
 | [`maps/`](./maps) | Site maps and the held-out fixtures |
 | [`bench/`](./bench) | Benchmarks and the scripted evidence |
 | [`docs/`](./docs) | Design, plans, decisions, and the map spec |

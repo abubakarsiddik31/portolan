@@ -14,6 +14,7 @@ portolan <command> [options]
 | `portolan compile <trace...>` | Compile traces into a new map version. |
 | `portolan verify` | Verify a map's operations on a fresh session. |
 | `portolan export-skills` | Export a `portolan-<site>` skill from a map. |
+| `portolan qa <command>` | Agent-first QA: generate, run, repair, and verify test cases. |
 | `portolan bench [suite]` | Run a benchmark suite from the source checkout. |
 | `portolan doctor` | Diagnose the browser, config, providers, and clients. |
 
@@ -25,6 +26,30 @@ portolan <command> [options]
 | `--help` | Show usage. |
 
 Command flags beat the config file, which beats the default.
+
+## QA commands
+
+| Command | What it does |
+|---|---|
+| `portolan qa init` | Write config, dirs, skill, and harness wiring. |
+| `portolan qa list` | List cases and their status. |
+| `portolan qa plan` | Choose cases affected by the git diff. |
+| `portolan qa run` | Run cases (deterministic; no model). |
+| `portolan qa result <run_id>` | Read a run's typed results. |
+| `portolan qa case read <id>` | Read one case spec. |
+| `portolan qa case write <file>` | Validate and write one case (always draft). |
+| `portolan qa generate` | Turn a spec or a recorded trace into a draft case. |
+| `portolan qa repair <case_id>` | Recover a broken locator from a failed run. |
+| `portolan qa verify` | Replay cases and promote verified ones. |
+| `portolan qa coverage` | List routes covered by cases. |
+| `portolan qa report <run_id>` | Render a run as json, md, or junit. |
+| `portolan qa sync` | Reconcile case files with the local database. |
+| `portolan qa doctor` | Check config, database, and the browser. |
+| `portolan qa mcp` | Serve the QA MCP server over stdio. |
+
+Selection flags: `--changed`, `--suite NAME`, `--case ID` (repeatable),
+`--tag TAG`, `--all`. Common flags: `--json`, `--config PATH`, `--repeat N`,
+`--allow-unverified`, `--base-url URL`.
 
 ## Examples
 

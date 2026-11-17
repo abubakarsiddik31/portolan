@@ -6,10 +6,15 @@ import {
   nameReturns,
   repairIntent,
   validateInferredReturns,
-} from "@portolan/compiler";
-import type { ModelPort, ObjectResult, Usage } from "@portolan/model";
-import { parseMap, type SiteMap } from "@portolan/protocol";
-import { findChrome, PlaywrightEngine, Substrate, type SubstrateView } from "@portolan/substrate";
+} from "@abubakarsiddiik/compiler";
+import type { ModelPort, ObjectResult, Usage } from "@abubakarsiddiik/model";
+import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import {
+  findChrome,
+  PlaywrightEngine,
+  Substrate,
+  type SubstrateView,
+} from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

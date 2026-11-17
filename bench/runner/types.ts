@@ -1,4 +1,4 @@
-import type { ModelPort, Usage } from "@portolan/model";
+import type { ModelPort, Usage } from "@abubakarsiddiik/model";
 
 import type { Arm, RunResult } from "../results/schema.js";
 import type { ExpandedTask } from "../tasks/load.js";

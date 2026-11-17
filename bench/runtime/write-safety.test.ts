@@ -1,9 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
-import { MemoryWriteLedger, runUiOp, runWrite, type WriteExecution } from "@portolan/runtime";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import {
+  MemoryWriteLedger,
+  runUiOp,
+  runWrite,
+  type WriteExecution,
+} from "@abubakarsiddiik/runtime";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

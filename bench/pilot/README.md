@@ -3,7 +3,7 @@
 One param set per held-out template, one run each, through the shared runner.
 
 ```sh
-pnpm --filter @portolan/bench pilot
+pnpm --filter @abubakarsiddiik/bench pilot
 ```
 
 The script writes:

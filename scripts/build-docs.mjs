@@ -132,7 +132,7 @@ executed through the cheapest verified path and governed by write safety.</p>
 <pre><code>git clone ${REPO}.git
 cd portolan
 pnpm install &amp;&amp; pnpm build
-pnpm --filter @portolan/bench fixtures:store</code></pre>
+pnpm --filter @abubakarsiddiik/bench fixtures:store</code></pre>
 <p><a href="./quickstart.html">Quickstart →</a></p>`;
 }
 

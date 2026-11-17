@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { Usage } from "@portolan/model";
+import type { Usage } from "@abubakarsiddiik/model";
 
 import { makeRunResult, type RunResult } from "../results/schema.js";
 import { type Decision, decisionJsonSchema } from "./decision.js";

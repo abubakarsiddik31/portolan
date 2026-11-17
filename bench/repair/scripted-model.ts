@@ -1,5 +1,5 @@
-import type { RepairDecision } from "@portolan/compiler";
-import type { ModelPort, ObjectRequest, Usage } from "@portolan/model";
+import type { RepairDecision } from "@abubakarsiddiik/compiler";
+import type { ModelPort, ObjectRequest, Usage } from "@abubakarsiddiik/model";
 
 import type { Decision } from "../runner/types.js";
 

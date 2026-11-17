@@ -220,7 +220,7 @@ The project, repository, CLI, packages, MCP server and skills are named **Portol
 
 | Conflict | Risk | Action |
 |---|---|---|
-| npm `portolan` 0.1.0 (Aug 2026, wighawag): "a format for describing UI flows so one context can resolve them and a fresh context can implement them" | Medium: adjacent idea, takes the bare npm name | Publish under a scope (`@portolan/*`) if available; otherwise `@<org>/portolan-*`. Watch it. |
+| npm `portolan` 0.1.0 (Aug 2026, wighawag): "a format for describing UI flows so one context can resolve them and a fresh context can implement them" | Medium: adjacent idea, takes the bare npm name | Publish under a scope (`@abubakarsiddiik/*`) if available; otherwise `@<org>/portolan-*`. Watch it. |
 | "Portolan: Local Dev Servers" (Mac App Store developer utility) | Low: different product, same audience | Note for trademark review. |
 | GitHub user `portolan` exists | Low | Use a different org name for the public repo. |
 | Trademark classes 9/42 | Unknown | Counsel search before any public launch. |

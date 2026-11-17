@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { NetworkEffect } from "@portolan/substrate";
+import type { NetworkEffect } from "@abubakarsiddiik/substrate";
 
 import type { Trace, TraceEntry } from "./fallback.js";
 import { redactTrace } from "./redact.js";

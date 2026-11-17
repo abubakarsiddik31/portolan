@@ -1,5 +1,5 @@
 {
-  "name": "@portolan/compiler",
+  "name": "@abubakarsiddiik/compiler",
   "version": "0.1.0",
   "description": "Trace-to-map compiler and verifier for Portolan.",
   "license": "Apache-2.0",
@@ -35,10 +35,10 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@portolan/model": "workspace:*",
-    "@portolan/protocol": "workspace:*",
-    "@portolan/runtime": "workspace:*",
-    "@portolan/substrate": "workspace:*",
+    "@abubakarsiddiik/model": "workspace:*",
+    "@abubakarsiddiik/protocol": "workspace:*",
+    "@abubakarsiddiik/runtime": "workspace:*",
+    "@abubakarsiddiik/substrate": "workspace:*",
     "zod": "4.6.7"
   }
 }

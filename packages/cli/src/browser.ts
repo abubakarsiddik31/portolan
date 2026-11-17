@@ -1,6 +1,6 @@
-import type { SessionRecord } from "@portolan/protocol";
-import type { BrowserRegistry } from "@portolan/server";
-import { findChrome, loadPolicy, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import type { SessionRecord } from "@abubakarsiddiik/protocol";
+import type { BrowserRegistry } from "@abubakarsiddiik/server";
+import { findChrome, loadPolicy, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 
 import type { CliConfig } from "./config.js";
 

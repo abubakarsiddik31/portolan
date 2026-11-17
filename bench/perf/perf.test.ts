@@ -1,4 +1,4 @@
-import { findChrome } from "@portolan/substrate";
+import { findChrome } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
 import { budget, measurePerf } from "./measure.js";

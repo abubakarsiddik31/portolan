@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import type { ModelPort, ModelRole, Usage } from "@portolan/model";
-import type { SiteMap } from "@portolan/protocol";
+import type { ModelPort, ModelRole, Usage } from "@abubakarsiddiik/model";
+import type { SiteMap } from "@abubakarsiddiik/protocol";
 import {
   recognizeState,
   type Trace,
@@ -10,13 +10,13 @@ import {
   type TraceLocator,
   type TraceRead,
   type TraceView,
-} from "@portolan/runtime";
+} from "@abubakarsiddiik/runtime";
 import {
   rankAffordances,
   renderAffordances,
   type Substrate,
   type SubstrateView,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
 import { z } from "zod";
 
 /** The four substrate verbs the repair agent may use. */

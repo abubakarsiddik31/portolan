@@ -1,4 +1,4 @@
-import type { Affordance, RefMap, Snapshot } from "@portolan/substrate";
+import type { Affordance, RefMap, Snapshot } from "@abubakarsiddiik/substrate";
 import {
   buildRefMap,
   findChrome,
@@ -6,7 +6,7 @@ import {
   rankAffordances,
   renderAffordances,
   Substrate,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 

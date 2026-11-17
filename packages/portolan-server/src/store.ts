@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import type { AuditRecord, CreateSessionRequest, SessionRecord } from "@portolan/protocol";
-import type { WriteLedger } from "@portolan/runtime";
-import { redactRecord } from "@portolan/runtime";
+import type { AuditRecord, CreateSessionRequest, SessionRecord } from "@abubakarsiddiik/protocol";
+import type { WriteLedger } from "@abubakarsiddiik/runtime";
+import { redactRecord } from "@abubakarsiddiik/runtime";
 import Database from "better-sqlite3";
 
 import type { OpHealthRecord } from "./health.js";

@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { repairIntent, repairOp } from "@portolan/compiler";
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import { repairIntent, repairOp } from "@abubakarsiddiik/compiler";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

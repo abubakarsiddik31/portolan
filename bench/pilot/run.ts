@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { findChrome } from "@portolan/substrate";
+import { findChrome } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 
 import { buildLibraryApp } from "../fixtures/library/v1/app.js";

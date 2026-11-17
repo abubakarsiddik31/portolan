@@ -1,4 +1,4 @@
-import type { PlaywrightEngine } from "@portolan/substrate";
+import type { PlaywrightEngine } from "@abubakarsiddiik/substrate";
 
 import type { ScriptStep } from "../repair/scripted-model.js";
 import type { ToolBackend } from "../runner/types.js";

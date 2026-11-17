@@ -1,4 +1,4 @@
-import type { OpDef, SiteMap } from "@portolan/protocol";
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryWriteLedger, runWrite, type WriteExecution } from "./write.js";

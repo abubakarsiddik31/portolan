@@ -48,7 +48,7 @@
 
 | # | Release criterion | Measured by |
 |---|---|---|
-| R1 | `npx @portolan/cli serve` and the Docker image start the MCP server on macOS and Linux from a clean machine | RC install test (T7.09) |
+| R1 | `npx @abubakarsiddiik/cli serve` and the Docker image start the MCP server on macOS and Linux from a clean machine | RC install test (T7.09) |
 | R2 | Works in ≥3 MCP clients (Claude Code, Codex CLI, one of Gemini CLI / Cursor / VS Code) with the `portolan` skill | Conformance suite (T4.13, T7.09) |
 | R3 | Works with ≥2 model providers; gates hold on both | Benchmark (T4.11) |
 | R4 | Gates G0, G1, G2 passed and recorded in `DECISIONS.md` | ADR-005 |
@@ -247,7 +247,7 @@ Effort is AS hours unless noted. "Done" is what a reviewer checks. Every task is
 | T5.05 | Add observability: structured logs, `portolan doctor` | 4h | T2.06 | `doctor` diagnoses browser, config, providers, clients |
 | T5.06 | Build CLI: `init`, `serve`, `compile`, `verify`, `export-skills`, `bench` | 6h | T3.14 | `--help` complete; e2e test per command |
 | T5.07 | Document config file options | 3h | T5.06 | Every option documented with a default |
-| T5.08 | Package: npm under `@portolan` scope with provenance; Docker image with Chromium | 6h | T5.06 | Clean-machine install works on macOS + Linux |
+| T5.08 | Package: npm under `@abubakarsiddiik` scope with provenance; Docker image with Chromium | 6h | T5.06 | Clean-machine install works on macOS + Linux |
 | T5.09 | Add release automation: Changesets, semver, GitHub release workflow | 4h | T5.08 | Dry-run release produces notes and artifacts |
 | T5.10 | Write install snippets for Claude Code, Codex CLI, Cursor, Gemini CLI, VS Code | 4h | T5.08 | Each snippet tested |
 | T5.11 | Performance pass on op calls | 4h | T2.19 | p50 ≤500 ms per `ui` op and ≤150 ms per `url`/`http` op on fixtures |

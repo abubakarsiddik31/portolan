@@ -5,7 +5,7 @@ import {
   renderAffordances,
   Substrate,
   type SubstrateView,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
 import type { ToolBackend, ToolDef, ToolResult } from "./types.js";
 
 export type SubstrateBackendOptions = {

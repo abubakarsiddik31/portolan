@@ -1,4 +1,4 @@
-# @portolan/runtime
+# @abubakarsiddiik/runtime
 
 ## 0.1.0
 
@@ -12,5 +12,5 @@
 
 - Updated dependencies [05f2358]
 - Updated dependencies [0f9570f]
-  - @portolan/protocol@0.1.0
-  - @portolan/substrate@0.1.0
+  - @abubakarsiddiik/protocol@0.1.0
+  - @abubakarsiddiik/substrate@0.1.0

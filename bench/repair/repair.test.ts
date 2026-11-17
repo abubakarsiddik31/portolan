@@ -1,6 +1,6 @@
-import { repairIntent } from "@portolan/compiler";
-import { createModelPort, type ModelConfig } from "@portolan/model";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import { repairIntent } from "@abubakarsiddiik/compiler";
+import { createModelPort, type ModelConfig } from "@abubakarsiddiik/model";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

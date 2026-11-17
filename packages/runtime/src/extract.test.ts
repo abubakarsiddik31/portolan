@@ -1,6 +1,6 @@
-import type { OpDef, SiteMap } from "@portolan/protocol";
-import type { SemanticNode, Snapshot, SubstrateView } from "@portolan/substrate";
-import { buildRefMap } from "@portolan/substrate";
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import type { SemanticNode, Snapshot, SubstrateView } from "@abubakarsiddiik/substrate";
+import { buildRefMap } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
 import { checkPost, extract, validateReturns } from "./extract.js";

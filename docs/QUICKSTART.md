@@ -26,7 +26,7 @@ pnpm build
 The repository ships fixtures. In one terminal:
 
 ```bash
-pnpm --filter @portolan/bench fixtures:store
+pnpm --filter @abubakarsiddiik/bench fixtures:store
 ```
 
 That serves the store fixture on `http://127.0.0.1:4100`. In a second terminal,

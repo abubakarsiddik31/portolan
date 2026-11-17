@@ -2,9 +2,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { CompiledCandidate, PublishResult, VerifyReport } from "@portolan/compiler";
-import type { SiteMap } from "@portolan/protocol";
-import type { StdioServerHandle } from "@portolan/server";
+import type { CompiledCandidate, PublishResult, VerifyReport } from "@abubakarsiddiik/compiler";
+import type { SiteMap } from "@abubakarsiddiik/protocol";
+import type { StdioServerHandle } from "@abubakarsiddiik/server";
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 

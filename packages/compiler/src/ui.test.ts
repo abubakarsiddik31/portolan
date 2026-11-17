@@ -1,4 +1,4 @@
-import type { TraceAct } from "@portolan/runtime";
+import type { TraceAct } from "@abubakarsiddiik/runtime";
 import { describe, expect, it } from "vitest";
 
 import type { ParameterizedSegment } from "./parameterize.js";

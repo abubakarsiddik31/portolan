@@ -3,9 +3,14 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { compileCandidates, publishMap, repairIntent, verifyOp } from "@portolan/compiler";
-import { parseMap, type SiteMap } from "@portolan/protocol";
-import { findChrome, PlaywrightEngine, Substrate, type SubstrateView } from "@portolan/substrate";
+import { compileCandidates, publishMap, repairIntent, verifyOp } from "@abubakarsiddiik/compiler";
+import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import {
+  findChrome,
+  PlaywrightEngine,
+  Substrate,
+  type SubstrateView,
+} from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

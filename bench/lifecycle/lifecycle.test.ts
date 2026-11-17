@@ -4,8 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createServer, SessionStore } from "@portolan/server";
-import { findChrome, reapOrphans } from "@portolan/substrate";
+import { createServer, SessionStore } from "@abubakarsiddiik/server";
+import { findChrome, reapOrphans } from "@abubakarsiddiik/substrate";
 import { afterEach, describe, expect, it } from "vitest";
 
 const ROOT = join(import.meta.dirname, "../..");

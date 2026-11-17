@@ -1,6 +1,6 @@
 # Op latency
 
-Generated 2026-11-08T23:18:39.259Z with `pnpm --filter @portolan/bench perf`.
+Generated 2026-11-08T23:18:39.259Z with `pnpm --filter @abubakarsiddiik/bench perf`.
 
 | Op | Tier | Runs | p50 | p95 | Max | Budget (p50) |
 |---|---|---:|---:|---:|---:|---:|

@@ -1,10 +1,10 @@
-import type { ModelPort, ObjectResult, Usage } from "@portolan/model";
+import type { ModelPort, ObjectResult, Usage } from "@abubakarsiddiik/model";
 import {
   buildRefMap,
   type SemanticNode,
   type Snapshot,
   type SubstrateView,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
 import { inferReturns, nameReturns, validateInferredReturns } from "./returns.js";

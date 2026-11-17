@@ -1,5 +1,5 @@
-import type { Locator, SiteMap, StateDef } from "@portolan/protocol";
-import type { SemanticNode, Snapshot } from "@portolan/substrate";
+import type { Locator, SiteMap, StateDef } from "@abubakarsiddiik/protocol";
+import type { SemanticNode, Snapshot } from "@abubakarsiddiik/substrate";
 
 export type StateMatch = {
   state: StateDef;

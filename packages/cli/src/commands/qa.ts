@@ -12,7 +12,7 @@ import {
   renderMarkdown,
   type Selection,
   startQaMcpServer,
-} from "@portolan/qa";
+} from "@abubakarsiddiik/qa";
 
 import { booleanFlag, listFlag, numberFlag, parseArgs, stringFlag } from "../args.js";
 

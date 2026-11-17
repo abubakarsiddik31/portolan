@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-
-import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   type ErrorCode,
   type OpDef,
@@ -9,7 +7,7 @@ import {
   type SiteMap,
   toolName,
   validateJsonSchema,
-} from "@portolan/protocol";
+} from "@abubakarsiddiik/protocol";
 import {
   type FallbackScope,
   FallbackScopes,
@@ -21,13 +19,14 @@ import {
   type WriteExecution,
   type WriteFailureCode,
   type WriteLedger,
-} from "@portolan/runtime";
+} from "@abubakarsiddiik/runtime";
 import {
   rankAffordances,
   renderAffordances,
   type Snapshot,
   type Substrate,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
+import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { type OpAudit, type OpExecutor, runtimeExecutor } from "./executor.js";

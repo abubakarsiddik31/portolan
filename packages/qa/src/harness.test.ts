@@ -23,7 +23,7 @@ describe("qaInit", () => {
     expect(ignore.split("\n")).not.toContain("qa/");
 
     expect(result.harnesses).toEqual(["unknown"]);
-    expect(result.mcpSnippet).toContain("@portolan/qa");
+    expect(result.mcpSnippet).toContain("@abubakarsiddiik/qa");
   });
 
   it("does not overwrite an existing config without force", () => {

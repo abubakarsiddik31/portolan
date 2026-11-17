@@ -1,5 +1,5 @@
-import { repairIntent } from "@portolan/compiler";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import { repairIntent } from "@abubakarsiddiik/compiler";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

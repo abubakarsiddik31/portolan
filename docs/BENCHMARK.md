@@ -155,11 +155,11 @@ It is the smallest real-model check; it has not produced a committed row.
 pnpm install
 pnpm build
 
-pnpm --filter @portolan/bench pilot        # 16 rows, scripted
-pnpm --filter @portolan/bench n3           # 48 rows, scripted
-pnpm --filter @portolan/bench drift        # v1 -> v2 repair, scripted
-pnpm --filter @portolan/bench conformance  # MCP clients
-pnpm --filter @portolan/bench perf         # latency
+pnpm --filter @abubakarsiddiik/bench pilot        # 16 rows, scripted
+pnpm --filter @abubakarsiddiik/bench n3           # 48 rows, scripted
+pnpm --filter @abubakarsiddiik/bench drift        # v1 -> v2 repair, scripted
+pnpm --filter @abubakarsiddiik/bench conformance  # MCP clients
+pnpm --filter @abubakarsiddiik/bench perf         # latency
 ```
 
 A real run needs `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` (or an

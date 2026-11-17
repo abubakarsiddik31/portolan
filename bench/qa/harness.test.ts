@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
-import type { Engine, SemanticNode } from "@portolan/substrate";
-import { findChrome, Substrate } from "@portolan/substrate";
+import type { Engine, SemanticNode } from "@abubakarsiddiik/substrate";
+import { findChrome, Substrate } from "@abubakarsiddiik/substrate";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {

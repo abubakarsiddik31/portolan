@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { parseMap, type SiteMap } from "@portolan/protocol";
+import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
 
 import type { QaConfig } from "./config.js";
 import { QaError } from "./errors.js";

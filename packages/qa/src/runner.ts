@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { SiteMap } from "@portolan/protocol";
-import { matchingNodes } from "@portolan/runtime";
+import type { SiteMap } from "@abubakarsiddiik/protocol";
+import { matchingNodes } from "@abubakarsiddiik/runtime";
 import {
   EngineError,
   findChrome,
@@ -10,7 +10,7 @@ import {
   rankAffordances,
   renderAffordances,
   Substrate,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
 
 import { evaluateCheck } from "./checks.js";
 import type { EvidenceMode } from "./config.js";
@@ -364,7 +364,7 @@ async function executeStep(
 
     for (const impl of op.impls) {
       if (impl.tier === "ui") {
-        const { runUiOp } = await import("@portolan/runtime");
+        const { runUiOp } = await import("@abubakarsiddiik/runtime");
         const result = await runUiOp({
           map: options.map,
           op,
@@ -377,7 +377,7 @@ async function executeStep(
       }
 
       if (impl.tier === "url") {
-        const { runUrlOp } = await import("@portolan/runtime");
+        const { runUrlOp } = await import("@abubakarsiddiik/runtime");
         const result = await runUrlOp({
           map: options.map,
           op,
@@ -391,7 +391,7 @@ async function executeStep(
       }
 
       if (impl.tier === "http") {
-        const { runHttpOp } = await import("@portolan/runtime");
+        const { runHttpOp } = await import("@abubakarsiddiik/runtime");
         const result = await runHttpOp({
           map: options.map,
           op,

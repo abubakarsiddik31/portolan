@@ -1,4 +1,4 @@
-# @portolan/substrate
+# @abubakarsiddiik/substrate
 
 The four-method browser adapter. It is the only place the runtime touches a
 rendering engine.
@@ -153,7 +153,7 @@ runtime dies without closing (SIGKILL, a crashed container), the browser is
 reparented and keeps running. The next process with the same id can kill it:
 
 ```ts
-import { reapOrphans } from "@portolan/substrate";
+import { reapOrphans } from "@abubakarsiddiik/substrate";
 
 const pids = reapOrphans("portolan-local");
 ```

@@ -1,5 +1,5 @@
-import type { SiteMap } from "@portolan/protocol";
-import { checkPost, matchingNodes } from "@portolan/runtime";
+import type { SiteMap } from "@abubakarsiddiik/protocol";
+import { checkPost, matchingNodes } from "@abubakarsiddiik/runtime";
 
 import type { QaCheck } from "./spec.js";
 import type { QaSubstrate, QaView } from "./types.js";

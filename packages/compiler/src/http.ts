@@ -5,8 +5,8 @@ import type {
   HttpStep,
   JsonSchema,
   OpDef,
-} from "@portolan/protocol";
-import type { NetworkEffect } from "@portolan/substrate";
+} from "@abubakarsiddiik/protocol";
+import type { NetworkEffect } from "@abubakarsiddiik/substrate";
 
 import type { ParameterizedSegment } from "./parameterize.js";
 import type { InferredReturns } from "./returns.js";

@@ -1,5 +1,5 @@
-import type { Extractor, HttpImpl, OpDef, SiteMap } from "@portolan/protocol";
-import type { HttpResponse, Substrate } from "@portolan/substrate";
+import type { Extractor, HttpImpl, OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import type { HttpResponse, Substrate } from "@abubakarsiddiik/substrate";
 
 import { type ExtractResult, validateReturns } from "./extract.js";
 import { fillRoute, fillTemplate } from "./template.js";

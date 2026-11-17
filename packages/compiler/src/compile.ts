@@ -1,6 +1,6 @@
-import type { Extractor, Impl, OpDef, SiteMap } from "@portolan/protocol";
-import type { Trace } from "@portolan/runtime";
-import type { Effect, NetworkEffect, SubstrateView } from "@portolan/substrate";
+import type { Extractor, Impl, OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import type { Trace } from "@abubakarsiddiik/runtime";
+import type { Effect, NetworkEffect, SubstrateView } from "@abubakarsiddiik/substrate";
 
 import { liftHttp } from "./http.js";
 import { liftUrl } from "./lift.js";

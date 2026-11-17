@@ -1,4 +1,4 @@
-import type { OpDef } from "@portolan/protocol";
+import type { OpDef } from "@abubakarsiddiik/protocol";
 import { describe, expect, it } from "vitest";
 
 import { liftUrl, withUrlLift } from "./lift.js";

@@ -1,6 +1,6 @@
-import type { OpDef, PostCheck, SiteMap } from "@portolan/protocol";
-import type { Trace } from "@portolan/runtime";
-import type { SubstrateView } from "@portolan/substrate";
+import type { OpDef, PostCheck, SiteMap } from "@abubakarsiddiik/protocol";
+import type { Trace } from "@abubakarsiddiik/runtime";
+import type { SubstrateView } from "@abubakarsiddiik/substrate";
 
 import { type CompiledCandidate, compileCandidates } from "./compile.js";
 import { type PublishResult, publishMap } from "./publish.js";

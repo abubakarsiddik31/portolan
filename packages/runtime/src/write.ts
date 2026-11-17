@@ -1,4 +1,4 @@
-import type { OpDef, SiteMap } from "@portolan/protocol";
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
 
 export type WriteOutcome = "done" | "not_done" | "unknown";
 

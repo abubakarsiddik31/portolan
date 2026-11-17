@@ -1,5 +1,5 @@
-import type { OpDef, SiteMap, UrlImpl } from "@portolan/protocol";
-import type { Substrate } from "@portolan/substrate";
+import type { OpDef, SiteMap, UrlImpl } from "@abubakarsiddiik/protocol";
+import type { Substrate } from "@abubakarsiddiik/substrate";
 
 import { checkPost, extract, validateReturns } from "./extract.js";
 import { recognizeState } from "./state.js";

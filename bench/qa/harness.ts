@@ -16,7 +16,7 @@ import {
   rankAffordances,
   Substrate,
   type SubstrateView,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
 
 export type Status = "pass" | "fail" | "skip";
 

@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { segmentTrace } from "@portolan/compiler";
-import type { JsonSchema, OpDef, SiteMap } from "@portolan/protocol";
-import type { Trace } from "@portolan/runtime";
+import { segmentTrace } from "@abubakarsiddiik/compiler";
+import type { JsonSchema, OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import type { Trace } from "@abubakarsiddiik/runtime";
 import { parse } from "yaml";
 
 export type Recipe = {

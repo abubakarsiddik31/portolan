@@ -65,7 +65,7 @@ Start the demo store and the MCP server:
 
 ```bash
 # terminal 1
-pnpm --filter @portolan/bench fixtures:store
+pnpm --filter @abubakarsiddiik/bench fixtures:store
 
 # terminal 2
 DATABASE_PATH=:memory: MAPS_DIR=maps node packages/cli/dist/bin.js mcp

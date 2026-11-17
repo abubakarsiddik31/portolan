@@ -1,21 +1,21 @@
 # Packaging
 
-Two artifacts: the `@portolan/*` npm packages and a Docker image with Chromium.
+Two artifacts: the `@abubakarsiddiik/*` npm packages and a Docker image with Chromium.
 
 ## npm packages
 
-Every package under `packages/` is publishable under the `@portolan` scope:
+Every package under `packages/` is publishable under the `@abubakarsiddiik` scope:
 
 | Package | What it is |
 |---|---|
-| `@portolan/protocol` | Types, schemas, and the map loader |
-| `@portolan/model` | The provider-agnostic model port |
-| `@portolan/substrate` | Browser capture, refs, actions, egress, reaper |
-| `@portolan/compiler` | Trace-to-map compiler and verifier |
-| `@portolan/runtime` | Op runtime and write safety |
-| `@portolan/server` | HTTP and MCP server |
-| `@portolan/skills` | Skill exporter |
-| `@portolan/cli` | The `portolan` command |
+| `@abubakarsiddiik/protocol` | Types, schemas, and the map loader |
+| `@abubakarsiddiik/model` | The provider-agnostic model port |
+| `@abubakarsiddiik/substrate` | Browser capture, refs, actions, egress, reaper |
+| `@abubakarsiddiik/compiler` | Trace-to-map compiler and verifier |
+| `@abubakarsiddiik/runtime` | Op runtime and write safety |
+| `@abubakarsiddiik/server` | HTTP and MCP server |
+| `@abubakarsiddiik/skills` | Skill exporter |
+| `@abubakarsiddiik/cli` | The `portolan` command |
 
 Each manifest carries:
 
@@ -45,7 +45,7 @@ runs `npm pack --dry-run` and asserts each tarball contains `dist/` and not
 Changesets owns the version bump and the publish.
 
 - **`.changeset/config.json`**: `access: "public"`, `baseBranch: "main"`,
-  `updateInternalDependencies: "patch"`, `@portolan/bench` ignored.
+  `updateInternalDependencies: "patch"`, `@abubakarsiddiik/bench` ignored.
 - **Every user-visible change adds a changeset** (`pnpm changeset`): the
   packages and a `patch` / `minor` / `major` bump, plus a summary.
 - **`.github/workflows/release.yml`** runs on a push to `main`. It opens or
@@ -54,7 +54,7 @@ Changesets owns the version bump and the publish.
 - **`.changeset/initial-release.md`** bumps all eight packages from `0.0.0` to
   `0.1.0`.
 
-The workflow needs `NPM_TOKEN` (an npm automation token for the `@portolan`
+The workflow needs `NPM_TOKEN` (an npm automation token for the `@abubakarsiddiik`
 scope) and `id-token: write`, which npm uses for provenance. `GITHUB_TOKEN`
 comes from the workflow.
 
@@ -82,8 +82,8 @@ CI runs the dry run after the build.
 
 ### Clean-machine check
 
-`pnpm --filter @portolan/cli deploy --prod --legacy <dir>` builds a
-self-contained tree: the CLI, its `@portolan/*` dependencies, and third-party
+`pnpm --filter @abubakarsiddiik/cli deploy --prod --legacy <dir>` builds a
+self-contained tree: the CLI, its `@abubakarsiddiik/*` dependencies, and third-party
 packages, with no symlinks into the workspace. Run `node <dir>/dist/bin.js
 doctor --json` from a directory with no `node_modules`.
 
@@ -113,7 +113,7 @@ The image is a multi-stage build:
 
 1. **build:** `node:24-bookworm-slim`, corepack, `pnpm install
    --frozen-lockfile`, `pnpm build`, then
-   `pnpm --filter @portolan/cli deploy --prod --legacy /out`.
+   `pnpm --filter @abubakarsiddiik/cli deploy --prod --legacy /out`.
 2. **runtime:** `node:24-bookworm-slim` plus Debian's `chromium`,
    `ca-certificates`, and `fonts-liberation`.
 

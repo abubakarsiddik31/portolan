@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { parseMap, type SiteMap } from "@portolan/protocol";
-import type { SemanticNode, Snapshot } from "@portolan/substrate";
+import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import type { SemanticNode, Snapshot } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
 import { matchesLocator, matchingNodes, matchUrl, recognizeState } from "./state.js";

@@ -4,7 +4,7 @@ Switch the held-out fixtures from v1 to v2 mid-run and repair the ops that
 break.
 
 ```sh
-pnpm --filter @portolan/bench drift
+pnpm --filter @abubakarsiddiik/bench drift
 ```
 
 The run:

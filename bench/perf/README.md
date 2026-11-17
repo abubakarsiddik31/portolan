@@ -4,7 +4,7 @@ Measures the runtime, not the CLI: `runUrlOp`, `runHttpOp`, and `runUiOp`
 against the store fixture on a local Chrome.
 
 ```bash
-pnpm --filter @portolan/bench perf
+pnpm --filter @abubakarsiddiik/bench perf
 ```
 
 Writes `bench/results/perf.json` and `perf.md`. `PERF_RUNS` overrides the

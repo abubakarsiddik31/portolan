@@ -1,4 +1,4 @@
-# @portolan/skills
+# @abubakarsiddiik/skills
 
 Generate a `portolan-<site>` skill from a map version.
 

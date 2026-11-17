@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { Delta, Effect } from "@portolan/substrate";
+import type { Delta, Effect } from "@abubakarsiddiik/substrate";
 
 export type FallbackEffect = "read" | "write" | "irreversible";
 

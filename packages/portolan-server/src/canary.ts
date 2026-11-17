@@ -1,4 +1,4 @@
-import type { OpDef, SiteMap } from "@portolan/protocol";
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
 
 import type { OpHealthRecord, OpHealthStatus } from "./health.js";
 import type { MapStore } from "./maps.js";

@@ -1,4 +1,4 @@
-import type { Extractor, Locator, UiStep } from "@portolan/protocol";
+import type { Extractor, Locator, UiStep } from "@abubakarsiddiik/protocol";
 
 import type { ParameterizedSegment } from "./parameterize.js";
 import type { InferredReturns } from "./returns.js";

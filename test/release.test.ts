@@ -54,7 +54,7 @@ describe("changesets", () => {
     const config = JSON.parse(readFileSync(CONFIG, "utf8")) as Record<string, unknown>;
 
     expect(config).toMatchObject({ access: "public", baseBranch: "main" });
-    expect(config.ignore).toContain("@portolan/bench");
+    expect(config.ignore).toContain("@abubakarsiddiik/bench");
   });
 });
 
@@ -72,7 +72,7 @@ describe("release dry run", () => {
     };
 
     expect(notes).toContain("Synthetic changeset for the release dry-run test.");
-    expect(notes).toContain("@portolan/cli");
+    expect(notes).toContain("@abubakarsiddiik/cli");
     expect(plan.releases).toHaveLength(PACKAGE_COUNT);
     expect(plan.releases.every((release) => /^\d+\.\d+\.\d+$/.test(release.nextVersion))).toBe(
       true,

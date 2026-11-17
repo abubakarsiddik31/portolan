@@ -2,9 +2,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { repairIntent, repairOp } from "@portolan/compiler";
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import { repairIntent, repairOp } from "@abubakarsiddiik/compiler";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 
 import { buildLibraryApp } from "../fixtures/library/v1/app.js";
 import { buildSupportApp } from "../fixtures/support/v1/app.js";

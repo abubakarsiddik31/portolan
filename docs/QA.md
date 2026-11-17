@@ -48,7 +48,7 @@ coding harness (Claude Code / Codex / Cursor / opencode / Gemini CLI)
         │  MCP (qa_* tools)          or          CLI (portolan qa ...)
         ▼                                        ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ @portolan/qa                                                  │
+│ @abubakarsiddiik/qa                                                  │
 │                                                               │
 │  spec/     case + suite schema (zod), file IO, validation      │
 │  plan/     git-diff → affected cases (touches globs, routes)   │
@@ -60,13 +60,13 @@ coding harness (Claude Code / Codex / Cursor / opencode / Gemini CLI)
 │  mcp/      qa_* tools over stdio                               │
 └───────────────────────────────────────────────────────────────┘
         │
-        ├── @portolan/substrate  (Playwright/Chromium, refs, settle)
-        ├── @portolan/runtime    (checks, traces, redaction)
-        ├── @portolan/protocol   (Locator, PostCheck, map types)
+        ├── @abubakarsiddiik/substrate  (Playwright/Chromium, refs, settle)
+        ├── @abubakarsiddiik/runtime    (checks, traces, redaction)
+        ├── @abubakarsiddiik/protocol   (Locator, PostCheck, map types)
         └── better-sqlite3       (local database)
 ```
 
-`@portolan/qa` does not depend on `@portolan/server`. It owns its MCP server so
+`@abubakarsiddiik/qa` does not depend on `@abubakarsiddiik/server`. It owns its MCP server so
 the harness sees only QA tools; the site-map MCP tools stay separate and small.
 
 ## 4. Storage model: files are canonical, SQLite is the product store
@@ -539,7 +539,7 @@ at a preview deployment without editing config.
 
 ### M1 — this branch (vertical slice, shippable)
 
-- `@portolan/qa`: config, case/suite schema, file IO, SQLite store with
+- `@abubakarsiddiik/qa`: config, case/suite schema, file IO, SQLite store with
   migrations, sync, runner (goto + UI steps + map op steps + assertions +
   readback fill + `ctx` resolution + evidence), plan (git diff + touches),
   DB-derived trust gate, flake recording.
@@ -558,7 +558,7 @@ at a preview deployment without editing config.
 
 ### M2 — generation and self-healing
 
-- `qa generate --from-trace`: trace → draft case (reuse `@portolan/runtime`
+- `qa generate --from-trace`: trace → draft case (reuse `@abubakarsiddiik/runtime`
   trace and compiler lift), plus `--spec` normalization.
 - `qa repair`: stale locator recovery, re-verify, drift event.
 - `qa coverage`: routes/states from a crawl or from case specs.

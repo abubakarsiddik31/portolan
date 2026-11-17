@@ -7,10 +7,10 @@ import {
   parameterizeTrace,
   repairIntent,
   withUrlLift,
-} from "@portolan/compiler";
-import { parseMap, type SiteMap } from "@portolan/protocol";
-import { runUrlOp } from "@portolan/runtime";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+} from "@abubakarsiddiik/compiler";
+import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import { runUrlOp } from "@abubakarsiddiik/runtime";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

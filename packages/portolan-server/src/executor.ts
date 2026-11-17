@@ -1,6 +1,12 @@
-import type { ErrorCode, OpDef, ResultEnvelope, SessionRecord, SiteMap } from "@portolan/protocol";
-import { recognizeState, runHttpOp, runUiOp, runUrlOp } from "@portolan/runtime";
-import type { Substrate } from "@portolan/substrate";
+import type {
+  ErrorCode,
+  OpDef,
+  ResultEnvelope,
+  SessionRecord,
+  SiteMap,
+} from "@abubakarsiddiik/protocol";
+import { recognizeState, runHttpOp, runUiOp, runUrlOp } from "@abubakarsiddiik/runtime";
+import type { Substrate } from "@abubakarsiddiik/substrate";
 
 export type OpAudit = {
   tier?: "webmcp" | "url" | "http" | "ui";

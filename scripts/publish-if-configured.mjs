@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 
 if (process.env.NPM_TOKEN === undefined || process.env.NPM_TOKEN === "") {
   console.warn("NPM_TOKEN is not set; skipping npm publish.");
-  console.warn("Add the repository secret NPM_TOKEN to publish @portolan/* packages.");
+  console.warn("Add the repository secret NPM_TOKEN to publish @abubakarsiddiik/* packages.");
   process.exit(0);
 }
 

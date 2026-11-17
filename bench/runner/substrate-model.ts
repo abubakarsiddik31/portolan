@@ -1,4 +1,4 @@
-import type { ModelPort, ObjectResult, Usage } from "@portolan/model";
+import type { ModelPort, ObjectResult, Usage } from "@abubakarsiddiik/model";
 
 import type { Decision } from "./types.js";
 

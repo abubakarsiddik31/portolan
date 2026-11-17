@@ -29,7 +29,7 @@ pnpm build
 The repository ships a store fixture. In one terminal:
 
 ```bash
-pnpm --filter @portolan/bench fixtures:store
+pnpm --filter @abubakarsiddiik/bench fixtures:store
 ```
 
 That serves the store on `http://127.0.0.1:4100`. In a second terminal, from the

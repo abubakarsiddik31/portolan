@@ -1,4 +1,4 @@
-import type { Extractor, JsonSchema, OpDef, UrlImpl } from "@portolan/protocol";
+import type { Extractor, JsonSchema, OpDef, UrlImpl } from "@abubakarsiddiik/protocol";
 
 import type { ParameterizedSegment } from "./parameterize.js";
 import type { InferredReturns } from "./returns.js";

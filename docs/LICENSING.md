@@ -17,7 +17,7 @@ The split is deliberate:
 - **CC-BY-4.0 for the spec** lets another implementation copy and adapt the
   document with attribution, which is the point of a spec.
 
-The `@portolan/protocol` *code* (the loader, validator, and types) is
+The `@abubakarsiddiik/protocol` *code* (the loader, validator, and types) is
 Apache-2.0. The *spec text and the published schema document* are CC-BY-4.0.
 A map a user compiles from their own site is the user's data; these licenses
 do not claim it.

@@ -4,7 +4,7 @@
  * Usage:
  *   CK_EMAIL=... CK_PASS=... \
  *   CHROME_PATH=~/.cache/ms-playwright/chromium_headless_shell-1254/chrome-linux/headless_shell \
- *   pnpm --filter @portolan/bench exec tsx local/careerkor/explore.ts [phase]
+ *   pnpm --filter @abubakarsiddiik/bench exec tsx local/careerkor/explore.ts [phase]
  *
  * phase: "public" (default) | "auth" | "tour"
  * Credentials are read from the environment and never printed.
@@ -18,7 +18,7 @@ import {
   renderAffordances,
   Substrate,
   type SubstrateView,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
 
 const BASE = "https://careerkor.com";
 

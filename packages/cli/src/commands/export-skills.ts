@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 
-import { parseMap } from "@portolan/protocol";
-import type { Trace } from "@portolan/runtime";
-import { exportSkill, type SkillExport } from "@portolan/skills";
+import { parseMap } from "@abubakarsiddiik/protocol";
+import type { Trace } from "@abubakarsiddiik/runtime";
+import { exportSkill, type SkillExport } from "@abubakarsiddiik/skills";
 
 export type ExportSkillsInput = {
   mapPath: string;

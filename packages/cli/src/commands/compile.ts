@@ -7,10 +7,15 @@ import {
   compileCandidates,
   type PublishResult,
   publishMap,
-} from "@portolan/compiler";
-import { parseMap, type SiteMap } from "@portolan/protocol";
-import type { Trace } from "@portolan/runtime";
-import { findChrome, PlaywrightEngine, Substrate, type SubstrateView } from "@portolan/substrate";
+} from "@abubakarsiddiik/compiler";
+import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import type { Trace } from "@abubakarsiddiik/runtime";
+import {
+  findChrome,
+  PlaywrightEngine,
+  Substrate,
+  type SubstrateView,
+} from "@abubakarsiddiik/substrate";
 
 export type CompileOptionsInput = {
   mapPath: string;

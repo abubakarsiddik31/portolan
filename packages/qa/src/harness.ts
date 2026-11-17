@@ -31,7 +31,7 @@ const MCP_SNIPPET = `${JSON.stringify(
     mcpServers: {
       "portolan-qa": {
         command: "npx",
-        args: ["-y", "-p", "@portolan/qa", "portolan-qa"],
+        args: ["-y", "-p", "@abubakarsiddiik/qa", "portolan-qa"],
       },
     },
   },

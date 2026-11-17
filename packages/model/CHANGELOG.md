@@ -1,4 +1,4 @@
-# @portolan/model
+# @abubakarsiddiik/model
 
 ## 0.1.0
 

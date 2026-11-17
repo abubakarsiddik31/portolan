@@ -6,7 +6,7 @@ parameterizes it, infers returns, lifts it to the cheapest tier, verifies it
 on fresh sessions, and publishes a new map version.
 
 ```sh
-pnpm --filter @portolan/bench heldout:compile
+pnpm --filter @abubakarsiddiik/bench heldout:compile
 ```
 
 Outputs:

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
 import { describe, expect, it } from "vitest";
 
 import { routableOps, routeTo, routeToAny } from "./router.js";

@@ -1,7 +1,7 @@
-import type { Impl, OpDef, SiteMap } from "@portolan/protocol";
-import { validateJsonSchema } from "@portolan/protocol";
-import { checkPost, runHttpOp, runUiOp, runUrlOp } from "@portolan/runtime";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import type { Impl, OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import { validateJsonSchema } from "@abubakarsiddiik/protocol";
+import { checkPost, runHttpOp, runUiOp, runUrlOp } from "@abubakarsiddiik/runtime";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 
 export type VerifyRun = {
   params: Record<string, unknown>;

@@ -1,9 +1,8 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
-
+import type { ErrorCode, ResultEnvelope, SessionRecord } from "@abubakarsiddiik/protocol";
+import { createSessionRequestSchema } from "@abubakarsiddiik/protocol";
+import type { WriteLedger } from "@abubakarsiddiik/runtime";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { ErrorCode, ResultEnvelope, SessionRecord } from "@portolan/protocol";
-import { createSessionRequestSchema } from "@portolan/protocol";
-import type { WriteLedger } from "@portolan/runtime";
 import Fastify, {
   type FastifyError,
   type FastifyInstance,

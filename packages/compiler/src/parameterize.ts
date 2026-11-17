@@ -1,5 +1,5 @@
-import type { JsonSchema, OpDef, SiteMap } from "@portolan/protocol";
-import type { Trace, TraceAct } from "@portolan/runtime";
+import type { JsonSchema, OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import type { Trace, TraceAct } from "@abubakarsiddiik/runtime";
 
 import { type SegmentLabel, segmentTrace, type TraceSegment } from "./segment.js";
 

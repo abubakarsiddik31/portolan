@@ -1,5 +1,5 @@
-import type { ActResult, SemanticNode, Snapshot } from "@portolan/substrate";
-import { buildRefMap } from "@portolan/substrate";
+import type { ActResult, SemanticNode, Snapshot } from "@abubakarsiddiik/substrate";
+import { buildRefMap } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
 import { runCases } from "./runner.js";

@@ -6,7 +6,7 @@ import {
   MapStore,
   type ServerOptions,
   SessionStore,
-} from "@portolan/server";
+} from "@abubakarsiddiik/server";
 import type { FastifyInstance } from "fastify";
 
 import { createBrowserFactory } from "../browser.js";

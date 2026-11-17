@@ -22,7 +22,7 @@ body:
       description: The smallest map, task id, fixture, or command that shows the bug.
       placeholder: |
         1. pnpm fixtures:store
-        2. pnpm --filter @portolan/bench exec tsx oracle/main.ts
+        2. pnpm --filter @abubakarsiddiik/bench exec tsx oracle/main.ts
         3. call add_to_cart with ...
     validations:
       required: true

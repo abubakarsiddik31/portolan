@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { ModelPort, ObjectResult, Usage } from "@portolan/model";
-import { parseMap, type SiteMap } from "@portolan/protocol";
-import type { Trace, TraceAct } from "@portolan/runtime";
+import type { ModelPort, ObjectResult, Usage } from "@abubakarsiddiik/model";
+import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import type { Trace, TraceAct } from "@abubakarsiddiik/runtime";
 import { describe, expect, it } from "vitest";
 
 import { labelSegments, type SegmentLabel, segmentTrace } from "./segment.js";

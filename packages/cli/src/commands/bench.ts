@@ -53,7 +53,7 @@ function defaultRun(findRoot: BenchDeps["findRoot"]): (suite: BenchSuite) => Pro
     }
 
     return new Promise((resolvePromise, reject) => {
-      const child = spawn("pnpm", ["--filter", "@portolan/bench", "run", suite], {
+      const child = spawn("pnpm", ["--filter", "@abubakarsiddiik/bench", "run", suite], {
         cwd: root,
         stdio: "inherit",
       });

@@ -1,5 +1,5 @@
 {
-  "name": "@portolan/cli",
+  "name": "@abubakarsiddiik/cli",
   "version": "0.1.0",
   "description": "The portolan command: init, serve, compile, verify, export-skills, bench, doctor.",
   "license": "Apache-2.0",
@@ -39,13 +39,13 @@
     "doctor": "node dist/bin.js doctor"
   },
   "dependencies": {
-    "@portolan/compiler": "workspace:*",
-    "@portolan/protocol": "workspace:*",
-    "@portolan/runtime": "workspace:*",
-    "@portolan/server": "workspace:*",
-    "@portolan/skills": "workspace:*",
-    "@portolan/substrate": "workspace:*",
-    "@portolan/qa": "workspace:*"
+    "@abubakarsiddiik/compiler": "workspace:*",
+    "@abubakarsiddiik/protocol": "workspace:*",
+    "@abubakarsiddiik/runtime": "workspace:*",
+    "@abubakarsiddiik/server": "workspace:*",
+    "@abubakarsiddiik/skills": "workspace:*",
+    "@abubakarsiddiik/substrate": "workspace:*",
+    "@abubakarsiddiik/qa": "workspace:*"
   },
   "devDependencies": {
     "fastify": "5.12.8",

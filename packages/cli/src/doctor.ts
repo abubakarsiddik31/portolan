@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { findChrome } from "@portolan/substrate";
+import { findChrome } from "@abubakarsiddiik/substrate";
 
 export type CheckStatus = "ok" | "warn" | "fail";
 

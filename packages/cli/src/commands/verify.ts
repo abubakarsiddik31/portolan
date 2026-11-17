@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
-import { type VerifyReport, verifyOp } from "@portolan/compiler";
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
+import { type VerifyReport, verifyOp } from "@abubakarsiddiik/compiler";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
 
 export type VerifyInput = {
   mapPath: string;

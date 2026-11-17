@@ -1,5 +1,5 @@
 {
-  "name": "@portolan/runtime",
+  "name": "@abubakarsiddiik/runtime",
   "version": "0.1.0",
   "description": "Op runtime, routers, and write safety for Portolan maps.",
   "license": "Apache-2.0",
@@ -35,7 +35,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@portolan/protocol": "workspace:*",
-    "@portolan/substrate": "workspace:*"
+    "@abubakarsiddiik/protocol": "workspace:*",
+    "@abubakarsiddiik/substrate": "workspace:*"
   }
 }

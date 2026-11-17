@@ -24,9 +24,9 @@ download a browser; the runner uses the system Chrome via `CHROME_PATH` or
 Start the fixtures first:
 
 ```bash
-pnpm --filter @portolan/bench run fixtures:store
-pnpm --filter @portolan/bench run fixtures:wizard
-pnpm --filter @portolan/bench run fixtures:portal
+pnpm --filter @abubakarsiddiik/bench run fixtures:store
+pnpm --filter @abubakarsiddiik/bench run fixtures:wizard
+pnpm --filter @abubakarsiddiik/bench run fixtures:portal
 ```
 
 Then, with provider keys in the repository `.env`:

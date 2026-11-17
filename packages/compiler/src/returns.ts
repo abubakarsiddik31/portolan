@@ -1,12 +1,12 @@
-import type { ModelPort, ModelRole, Usage } from "@portolan/model";
+import type { ModelPort, ModelRole, Usage } from "@abubakarsiddiik/model";
 import {
   coerceJsonSchema,
   type Extractor,
   type JsonSchema,
   type Locator,
-} from "@portolan/protocol";
-import { extract } from "@portolan/runtime";
-import type { SemanticNode, Snapshot, SubstrateView } from "@portolan/substrate";
+} from "@abubakarsiddiik/protocol";
+import { extract } from "@abubakarsiddiik/runtime";
+import type { SemanticNode, Snapshot, SubstrateView } from "@abubakarsiddiik/substrate";
 import { z } from "zod";
 
 export type InferredReturns = {

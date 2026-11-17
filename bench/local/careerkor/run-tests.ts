@@ -2,7 +2,7 @@
  * CareerKor regression run: executes docs/qa/careerkor/test-cases.md one by one.
  *
  * CHROME_PATH=... CK_EMAIL=... CK_PASS=... \
- *   pnpm --filter @portolan/bench exec tsx local/careerkor/run-tests.ts
+ *   pnpm --filter @abubakarsiddiik/bench exec tsx local/careerkor/run-tests.ts
  *
  * Credentials come from the environment and are never printed. Results go to
  * docs/qa/careerkor/results.md and stdout.
@@ -15,7 +15,7 @@ import {
   rankAffordances,
   Substrate,
   type SubstrateView,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
 
 const BASE = "https://careerkor.com";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

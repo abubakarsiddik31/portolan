@@ -1,4 +1,4 @@
-import { isSensitiveKey, REDACTED, redactText } from "@portolan/runtime";
+import { isSensitiveKey, REDACTED, redactText } from "@abubakarsiddiik/runtime";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 

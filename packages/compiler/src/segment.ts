@@ -1,6 +1,6 @@
-import type { ModelPort, ModelRole, Usage } from "@portolan/model";
-import type { OpDef, SiteMap } from "@portolan/protocol";
-import type { Trace, TraceAct } from "@portolan/runtime";
+import type { ModelPort, ModelRole, Usage } from "@abubakarsiddiik/model";
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import type { Trace, TraceAct } from "@abubakarsiddiik/runtime";
 import { z } from "zod";
 
 /** One contiguous run of acts that should become an op. */

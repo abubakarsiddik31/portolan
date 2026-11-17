@@ -1,8 +1,7 @@
+import type { SessionRecord } from "@abubakarsiddiik/protocol";
+import type { WriteLedger } from "@abubakarsiddiik/runtime";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { SessionRecord } from "@portolan/protocol";
-
-import type { WriteLedger } from "@portolan/runtime";
 
 import type { BrowserRegistry } from "./browsers.js";
 import type { OpExecutor } from "./executor.js";

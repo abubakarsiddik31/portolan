@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
 
 export type CandidateOp = {
   op: OpDef;

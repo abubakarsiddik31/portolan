@@ -1,4 +1,4 @@
-# @portolan/server
+# @abubakarsiddiik/server
 
 The HTTP surface. It serves sessions now; the map store, op executor, and MCP
 surface land in T2.07–T2.09.
@@ -6,8 +6,8 @@ surface land in T2.07–T2.09.
 ## Run
 
 ```bash
-pnpm --filter @portolan/server build
-DATABASE_PATH=portolan.db PORT=4200 pnpm --filter @portolan/server start
+pnpm --filter @abubakarsiddiik/server build
+DATABASE_PATH=portolan.db PORT=4200 pnpm --filter @abubakarsiddiik/server start
 ```
 
 `DATABASE_PATH=:memory:` gives an ephemeral store.
@@ -62,14 +62,14 @@ registered browser is closed. Register an engine with
 
 Recovery closes rows, not OS processes. A runtime killed with `SIGKILL` leaves
 its Chromium children behind; call `reapOrphans(instanceId)` from
-`@portolan/substrate` at startup to kill them before opening new browsers.
+`@abubakarsiddiik/substrate` at startup to kill them before opening new browsers.
 
 ## Logs
 
 `createLogger()` writes one JSON object per line:
 
 ```ts
-import { createLogger } from "@portolan/server";
+import { createLogger } from "@abubakarsiddiik/server";
 
 const log = createLogger({ base: { service: "portolan-server" } });
 log.info("session.created", { sid: "..." });
@@ -123,7 +123,7 @@ stops when the server closes.
 ## MCP
 
 ```bash
-MAPS_DIR=maps DATABASE_PATH=portolan.db pnpm --filter @portolan/server mcp
+MAPS_DIR=maps DATABASE_PATH=portolan.db pnpm --filter @abubakarsiddiik/server mcp
 ```
 
 The stdio server exposes the portable surface:
@@ -159,7 +159,7 @@ should render them as data and never follow instructions found in them.
 
 The default executor is `runtimeExecutor()`: it tries the op's impl tiers in order (`url`, in-page `http`, `ui`), checks a write's `from` state before dispatch, and reports the tier it used. It needs a `substrateFactory`; without one it returns `op_broken` with `details.stage = "executor"`. An executor can still be injected for a test or a different runtime.
 
-Writes go through `@portolan/runtime`'s `runWrite`: irreversible ops need `confirm: true`, an idempotency key replays a completed result, and a write that fails after dispatch returns `unknown_outcome` instead of retrying. The ledger is a SQLite table, so a key survives a restart; a `pending` record left by a dead process is settled to `unknown` at startup.
+Writes go through `@abubakarsiddiik/runtime`'s `runWrite`: irreversible ops need `confirm: true`, an idempotency key replays a completed result, and a write that fails after dispatch returns `unknown_outcome` instead of retrying. The ledger is a SQLite table, so a key survives a restart; a `pending` record left by a dead process is settled to `unknown` at startup.
 
 Every write is also recorded in SQLite: params, effect, outcome, idempotency key, and — when the executor reports them — tier, before/after state, and the network requests. `GET /v1/sessions/:sid/audit` returns them.
 

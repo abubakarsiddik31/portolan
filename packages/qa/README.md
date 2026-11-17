@@ -1,4 +1,4 @@
-# @portolan/qa
+# @abubakarsiddiik/qa
 
 Local, agent-first QA for Portolan. A coding agent plugs this into its harness
 through MCP or the CLI, authors test cases as JSON, runs them deterministically
@@ -15,7 +15,7 @@ against a local app, and gets typed results and evidence.
 ## Install into a harness
 
 ```sh
-npx -y -p @portolan/qa portolan-qa   # stdio MCP server
+npx -y -p @abubakarsiddiik/qa portolan-qa   # stdio MCP server
 # or, from a checkout:
 portolan qa init
 portolan qa plan --changed

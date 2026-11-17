@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { parseMap } from "@portolan/protocol";
+import { parseMap } from "@abubakarsiddiik/protocol";
 import { describe, expect, it } from "vitest";
 
 const ROOT = join(import.meta.dirname, "../..");

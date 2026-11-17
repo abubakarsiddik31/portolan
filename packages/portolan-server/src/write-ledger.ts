@@ -1,4 +1,4 @@
-import type { WriteLedger, WriteRecord } from "@portolan/runtime";
+import type { WriteLedger, WriteRecord } from "@abubakarsiddiik/runtime";
 import type Database from "better-sqlite3";
 
 type WriteRow = {

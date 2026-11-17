@@ -1,5 +1,5 @@
-import { createModelPort, type ModelConfig, type ProviderConfig } from "@portolan/model";
-import { findChrome } from "@portolan/substrate";
+import { createModelPort, type ModelConfig, type ProviderConfig } from "@abubakarsiddiik/model";
+import { findChrome } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

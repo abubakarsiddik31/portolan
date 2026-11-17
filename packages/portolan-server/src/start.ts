@@ -1,4 +1,4 @@
-import { reapOrphans } from "@portolan/substrate";
+import { reapOrphans } from "@abubakarsiddiik/substrate";
 
 import { assertBindAllowed } from "./host.js";
 

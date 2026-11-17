@@ -3,7 +3,7 @@ import {
   type StdioServerHandle,
   type StdioServerOptions,
   startStdioServer,
-} from "@portolan/server";
+} from "@abubakarsiddiik/server";
 
 import { createBrowserFactory } from "../browser.js";
 import type { CliConfig } from "../config.js";

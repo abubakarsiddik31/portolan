@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { verifyOp } from "@portolan/compiler";
-import { parseMap, type SiteMap } from "@portolan/protocol";
-import { findChrome } from "@portolan/substrate";
+import { verifyOp } from "@abubakarsiddiik/compiler";
+import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import { findChrome } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

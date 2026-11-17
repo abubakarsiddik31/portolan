@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
-import { runHttpOp, runUiOp, runUrlOp } from "@portolan/runtime";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import { runHttpOp, runUiOp, runUrlOp } from "@abubakarsiddiik/runtime";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 
 import { buildStoreApp } from "../fixtures/store/v1/app.js";

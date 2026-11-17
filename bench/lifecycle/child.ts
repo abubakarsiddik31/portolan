@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 
-import { SessionStore } from "@portolan/server";
-import { PlaywrightEngine } from "@portolan/substrate";
+import { SessionStore } from "@abubakarsiddiik/server";
+import { PlaywrightEngine } from "@abubakarsiddiik/substrate";
 
 /**
  * A child process that holds a session and a live browser.

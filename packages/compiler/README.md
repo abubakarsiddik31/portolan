@@ -1,4 +1,4 @@
-# @portolan/compiler
+# @abubakarsiddiik/compiler
 
 From traces to verified ops. The compiler starts with the repair agent, because
 the first traces come from finishing an intent that no op could serve.

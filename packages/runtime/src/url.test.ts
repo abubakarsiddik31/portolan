@@ -1,11 +1,11 @@
-import type { OpDef, SiteMap } from "@portolan/protocol";
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
 import {
   buildRefMap,
   type SemanticNode,
   type Snapshot,
   type Substrate,
   type SubstrateView,
-} from "@portolan/substrate";
+} from "@abubakarsiddiik/substrate";
 import { describe, expect, it, vi } from "vitest";
 
 import { runUrlOp } from "./url.js";

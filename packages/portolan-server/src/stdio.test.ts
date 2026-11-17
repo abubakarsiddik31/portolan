@@ -1,8 +1,7 @@
 import { join } from "node:path";
-
+import { buildRefMap, type SemanticNode, type Snapshot } from "@abubakarsiddiik/substrate";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { buildRefMap, type SemanticNode, type Snapshot } from "@portolan/substrate";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type StdioServerHandle, startStdioServer } from "./stdio.js";

@@ -3,7 +3,7 @@
 Sixteen held-out templates, three param sets each, through the shared runner.
 
 ```sh
-pnpm --filter @portolan/bench n3
+pnpm --filter @abubakarsiddiik/bench n3
 ```
 
 Outputs:

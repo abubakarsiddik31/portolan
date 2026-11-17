@@ -1,4 +1,4 @@
-import type { OpDef, SiteMap } from "@portolan/protocol";
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
 import { describe, expect, it } from "vitest";
 
 import { verifyOp } from "./verify.js";

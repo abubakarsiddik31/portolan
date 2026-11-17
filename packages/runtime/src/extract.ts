@@ -7,8 +7,8 @@ import {
   type PostCheck,
   type RowsExtractor,
   type SiteMap,
-} from "@portolan/protocol";
-import type { SemanticNode, Snapshot, SubstrateView } from "@portolan/substrate";
+} from "@abubakarsiddiik/protocol";
+import type { SemanticNode, Snapshot, SubstrateView } from "@abubakarsiddiik/substrate";
 
 import { matchingNodes, recognizeState } from "./state.js";
 

@@ -1,6 +1,6 @@
-import type { OpDef } from "@portolan/protocol";
-import type { TraceAct } from "@portolan/runtime";
-import type { Effect, NetworkEffect } from "@portolan/substrate";
+import type { OpDef } from "@abubakarsiddiik/protocol";
+import type { TraceAct } from "@abubakarsiddiik/runtime";
+import type { Effect, NetworkEffect } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
 import { liftHttp, withHttpLift } from "./http.js";

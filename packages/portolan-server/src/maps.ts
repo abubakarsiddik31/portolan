@@ -7,7 +7,7 @@ import {
   type OpDef,
   parseMap,
   type SiteMap,
-} from "@portolan/protocol";
+} from "@abubakarsiddiik/protocol";
 
 export type OpSummary = {
   name: string;

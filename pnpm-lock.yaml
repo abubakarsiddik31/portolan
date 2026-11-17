@@ -47,6 +47,9 @@ importers:
 
   bench:
     dependencies:
+      '@abubakarsiddiik/model':
+        specifier: workspace:*
+        version: link:../packages/model
       '@fastify/cookie':
         specifier: 11.1.5
         version: 11.1.5
@@ -59,9 +62,6 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(zod@4.6.7)
-      '@portolan/model':
-        specifier: workspace:*
-        version: link:../packages/model
       fastify:
         specifier: 5.12.8
         version: 5.12.8
@@ -72,19 +72,19 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@portolan/compiler':
+      '@abubakarsiddiik/compiler':
         specifier: workspace:*
         version: link:../packages/compiler
-      '@portolan/protocol':
+      '@abubakarsiddiik/protocol':
         specifier: workspace:*
         version: link:../packages/protocol
-      '@portolan/runtime':
+      '@abubakarsiddiik/runtime':
         specifier: workspace:*
         version: link:../packages/runtime
-      '@portolan/server':
+      '@abubakarsiddiik/server':
         specifier: workspace:*
         version: link:../packages/portolan-server
-      '@portolan/substrate':
+      '@abubakarsiddiik/substrate':
         specifier: workspace:*
         version: link:../packages/substrate
       agent-browser:
@@ -99,25 +99,25 @@ importers:
 
   packages/cli:
     dependencies:
-      '@portolan/compiler':
+      '@abubakarsiddiik/compiler':
         specifier: workspace:*
         version: link:../compiler
-      '@portolan/protocol':
+      '@abubakarsiddiik/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@portolan/qa':
+      '@abubakarsiddiik/qa':
         specifier: workspace:*
         version: link:../qa
-      '@portolan/runtime':
+      '@abubakarsiddiik/runtime':
         specifier: workspace:*
         version: link:../runtime
-      '@portolan/server':
+      '@abubakarsiddiik/server':
         specifier: workspace:*
         version: link:../portolan-server
-      '@portolan/skills':
+      '@abubakarsiddiik/skills':
         specifier: workspace:*
         version: link:../skills
-      '@portolan/substrate':
+      '@abubakarsiddiik/substrate':
         specifier: workspace:*
         version: link:../substrate
     devDependencies:
@@ -130,16 +130,16 @@ importers:
 
   packages/compiler:
     dependencies:
-      '@portolan/model':
+      '@abubakarsiddiik/model':
         specifier: workspace:*
         version: link:../model
-      '@portolan/protocol':
+      '@abubakarsiddiik/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@portolan/runtime':
+      '@abubakarsiddiik/runtime':
         specifier: workspace:*
         version: link:../runtime
-      '@portolan/substrate':
+      '@abubakarsiddiik/substrate':
         specifier: workspace:*
         version: link:../substrate
       zod:
@@ -166,18 +166,18 @@ importers:
 
   packages/portolan-server:
     dependencies:
+      '@abubakarsiddiik/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@abubakarsiddiik/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@abubakarsiddiik/substrate':
+        specifier: workspace:*
+        version: link:../substrate
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(zod@4.6.7)
-      '@portolan/protocol':
-        specifier: workspace:*
-        version: link:../protocol
-      '@portolan/runtime':
-        specifier: workspace:*
-        version: link:../runtime
-      '@portolan/substrate':
-        specifier: workspace:*
-        version: link:../substrate
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3
@@ -203,18 +203,18 @@ importers:
 
   packages/qa:
     dependencies:
+      '@abubakarsiddiik/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@abubakarsiddiik/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@abubakarsiddiik/substrate':
+        specifier: workspace:*
+        version: link:../substrate
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(zod@4.6.7)
-      '@portolan/protocol':
-        specifier: workspace:*
-        version: link:../protocol
-      '@portolan/runtime':
-        specifier: workspace:*
-        version: link:../runtime
-      '@portolan/substrate':
-        specifier: workspace:*
-        version: link:../substrate
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3
@@ -228,22 +228,22 @@ importers:
 
   packages/runtime:
     dependencies:
-      '@portolan/protocol':
+      '@abubakarsiddiik/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@portolan/substrate':
+      '@abubakarsiddiik/substrate':
         specifier: workspace:*
         version: link:../substrate
 
   packages/skills:
     dependencies:
-      '@portolan/compiler':
+      '@abubakarsiddiik/compiler':
         specifier: workspace:*
         version: link:../compiler
-      '@portolan/protocol':
+      '@abubakarsiddiik/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@portolan/runtime':
+      '@abubakarsiddiik/runtime':
         specifier: workspace:*
         version: link:../runtime
       yaml:

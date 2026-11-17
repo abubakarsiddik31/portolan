@@ -1,10 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { type RepairOpResult, repairIntent, repairOp } from "@portolan/compiler";
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
-import { runHttpOp, runUiOp, runUrlOp } from "@portolan/runtime";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import { type RepairOpResult, repairIntent, repairOp } from "@abubakarsiddiik/compiler";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import { runHttpOp, runUiOp, runUrlOp } from "@abubakarsiddiik/runtime";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 
 import { buildLibraryApp } from "../fixtures/library/v1/app.js";

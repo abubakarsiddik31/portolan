@@ -3,7 +3,7 @@
 Run the same MCP conformance prompt in three clients:
 
 ```sh
-pnpm --filter @portolan/bench conformance
+pnpm --filter @abubakarsiddiik/bench conformance
 ```
 
 The prompt asks the client to call `list_sites`, `open_site("store")`, and

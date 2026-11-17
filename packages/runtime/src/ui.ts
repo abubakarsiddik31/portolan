@@ -1,5 +1,5 @@
-import type { Locator, OpDef, SiteMap, UiImpl } from "@portolan/protocol";
-import type { ActResult, Effect, Substrate, SubstrateView } from "@portolan/substrate";
+import type { Locator, OpDef, SiteMap, UiImpl } from "@abubakarsiddiik/protocol";
+import type { ActResult, Effect, Substrate, SubstrateView } from "@abubakarsiddiik/substrate";
 
 import { checkPost, extract, validateReturns } from "./extract.js";
 import { matchingNodes, recognizeState } from "./state.js";

@@ -1,4 +1,4 @@
-# @portolan/skills
+# @abubakarsiddiik/skills
 
 ## 0.1.0
 
@@ -11,6 +11,6 @@
 ### Patch Changes
 
 - Updated dependencies [05f2358]
-  - @portolan/protocol@0.1.0
-  - @portolan/compiler@0.1.0
-  - @portolan/runtime@0.1.0
+  - @abubakarsiddiik/protocol@0.1.0
+  - @abubakarsiddiik/compiler@0.1.0
+  - @abubakarsiddiik/runtime@0.1.0

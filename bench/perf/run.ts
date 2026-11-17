@@ -25,7 +25,7 @@ function table(rows: PerfSample[]): string {
   const lines = [
     "# Op latency",
     "",
-    `Generated ${new Date().toISOString()} with \`pnpm --filter @portolan/bench perf\`.`,
+    `Generated ${new Date().toISOString()} with \`pnpm --filter @abubakarsiddiik/bench perf\`.`,
     "",
     "| Op | Tier | Runs | p50 | p95 | Max | Budget (p50) |",
     "|---|---|---:|---:|---:|---:|---:|",

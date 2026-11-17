@@ -1,8 +1,7 @@
 import { join } from "node:path";
-
+import { buildRefMap, type SemanticNode, type Snapshot } from "@abubakarsiddiik/substrate";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { buildRefMap, type SemanticNode, type Snapshot } from "@portolan/substrate";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

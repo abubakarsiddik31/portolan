@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { publishMap } from "./publish.js";

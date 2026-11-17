@@ -1,5 +1,5 @@
 {
-  "name": "@portolan/server",
+  "name": "@abubakarsiddiik/server",
   "version": "0.1.0",
   "description": "HTTP and MCP server for Portolan maps.",
   "license": "Apache-2.0",
@@ -38,9 +38,9 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "@portolan/protocol": "workspace:*",
-    "@portolan/runtime": "workspace:*",
-    "@portolan/substrate": "workspace:*",
+    "@abubakarsiddiik/protocol": "workspace:*",
+    "@abubakarsiddiik/runtime": "workspace:*",
+    "@abubakarsiddiik/substrate": "workspace:*",
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.8",
     "zod": "4.6.7"

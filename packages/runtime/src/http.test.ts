@@ -1,5 +1,5 @@
-import type { OpDef, SiteMap } from "@portolan/protocol";
-import type { HttpResponse, Substrate } from "@portolan/substrate";
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import type { HttpResponse, Substrate } from "@abubakarsiddiik/substrate";
 import { describe, expect, it, vi } from "vitest";
 
 import { runHttpOp } from "./http.js";

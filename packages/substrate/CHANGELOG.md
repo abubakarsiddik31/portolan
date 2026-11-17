@@ -1,4 +1,4 @@
-# @portolan/substrate
+# @abubakarsiddiik/substrate
 
 ## 0.1.0
 

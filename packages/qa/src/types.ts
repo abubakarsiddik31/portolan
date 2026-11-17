@@ -1,4 +1,4 @@
-import type { ActResult, Substrate, SubstrateView } from "@portolan/substrate";
+import type { ActResult, Substrate, SubstrateView } from "@abubakarsiddiik/substrate";
 
 /** The substrate surface the QA runner needs. `Substrate` satisfies it. */
 export type QaSubstrate = Pick<Substrate, "view" | "goto" | "act" | "read" | "state"> & {

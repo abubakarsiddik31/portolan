@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { type OpDef, parseMap, type SiteMap } from "@portolan/protocol";
-import { runHttpOp } from "@portolan/runtime";
-import { findChrome, PlaywrightEngine, Substrate } from "@portolan/substrate";
+import { type OpDef, parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import { runHttpOp } from "@abubakarsiddiik/runtime";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 import type { FastifyInstance } from "fastify";
 import { type Browser, chromium } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

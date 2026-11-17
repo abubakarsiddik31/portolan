@@ -1,4 +1,4 @@
-import type { Effect, SiteMap } from "@portolan/protocol";
+import type { Effect, SiteMap } from "@abubakarsiddiik/protocol";
 
 export type OpHealthStatus = "healthy" | "degraded" | "broken";
 

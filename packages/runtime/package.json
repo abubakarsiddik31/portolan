@@ -1,6 +1,6 @@
 {
   "name": "@abubakarsiddiik/runtime",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Op runtime, routers, and write safety for Portolan maps.",
   "license": "Apache-2.0",
   "type": "module",

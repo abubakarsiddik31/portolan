@@ -1,5 +1,13 @@
 # @abubakarsiddiik/qa
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [099fe69]
+  - @abubakarsiddiik/protocol@0.2.0
+  - @abubakarsiddiik/runtime@0.1.1
+
 ## 0.1.1
 
 ### Patch Changes

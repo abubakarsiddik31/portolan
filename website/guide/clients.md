@@ -19,8 +19,9 @@ can spawn it directly. It reads:
 Set both to absolute paths in a client config: a client spawns the server from
 its own working directory, not yours.
 
-Until a release is published, replace `portolan` with `npx @abubakarsiddiik/cli` or the
-absolute path to `dist/bin.js`.
+The CLI is published as `@abubakarsiddiik/cli`. If you do not want a global
+install, use `npx @abubakarsiddiik/cli` or the absolute path to `dist/bin.js`
+in a source checkout.
 
 ## Claude Code
 

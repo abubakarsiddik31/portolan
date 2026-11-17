@@ -1,7 +1,8 @@
 # Quickstart
 
-From a clone to a working MCP call in about ten minutes. Nothing is published
-to npm yet, so this uses the source checkout.
+From a clone to a working MCP call in about ten minutes. The CLI is published
+to npm, but this guide uses the source checkout so you can run the demo
+fixtures.
 
 ## 1. Prerequisites
 

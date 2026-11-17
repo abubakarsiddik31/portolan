@@ -54,6 +54,15 @@ open_site("acme-store")
 
 Requires Node 22.12+ and Chrome or Chromium.
 
+Install the published CLI:
+
+```bash
+npm install -g @abubakarsiddiik/cli
+portolan init ./my-site
+```
+
+Or run from source:
+
 ```bash
 git clone https://github.com/abubakarsiddik31/portolan.git
 cd portolan
@@ -147,8 +156,9 @@ hand-written operations beat a step-by-step browser agent on steps and cost
 before building more. See [the build plan](./docs/BUILD_PLAN.md) and
 [decisions](./docs/DECISIONS.md).
 
-The first public alpha is targeted for **Tue 2027-03-02**, contingent on G0–G2.
-`webmcp` is reserved in the map format and has no executor yet.
+**v0.1.0** is the first public alpha, published to npm as
+`@abubakarsiddiik/*`. The G0–G2 gates have not passed yet, so treat it as an
+early alpha: `webmcp` is reserved in the map format and has no executor.
 
 ## Repository map
 

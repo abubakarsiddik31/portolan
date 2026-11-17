@@ -2,8 +2,13 @@
 
 From a clone to a working MCP call in about ten minutes.
 
-::: tip No npm release yet
-Portolan is not published to npm yet, so this guide uses a source checkout.
+::: tip Install from npm
+The CLI is published as `@abubakarsiddiik/cli`. This guide uses a source
+checkout so you can run the demo fixtures, but you can install the CLI directly:
+
+```bash
+npm install -g @abubakarsiddiik/cli
+```
 :::
 
 ## 1. Prerequisites

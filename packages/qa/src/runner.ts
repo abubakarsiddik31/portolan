@@ -298,6 +298,48 @@ async function runAttempt(
   }
 }
 
+/**
+ * Replay a case's setup and its first `uptoStep` steps against an existing
+ * substrate. Used by `qa repair` to reach the point of a recorded failure.
+ * Throws the typed step error when the prefix itself fails.
+ */
+export async function replaySteps(input: {
+  spec: QaCase;
+  /** Exclusive upper bound on `spec.steps`; setup always runs in full. */
+  uptoStep: number;
+  substrate: QaSubstrate;
+  baseUrl: string;
+  timeoutMs?: number;
+  fixtures?: Fixtures;
+  env?: NodeJS.ProcessEnv;
+  redact?: string[];
+  loadMap?: (site: string, version?: number) => SiteMap | undefined;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => Date;
+}): Promise<void> {
+  const context = {
+    fixtures: input.fixtures ?? {},
+    env: input.env ?? process.env,
+    redact: input.redact ?? [],
+  };
+  const map =
+    input.spec.map === undefined
+      ? undefined
+      : input.loadMap?.(input.spec.map.site, input.spec.map.version);
+
+  for (const steps of [input.spec.setup, input.spec.steps.slice(0, Math.max(0, input.uptoStep))]) {
+    for (const step of steps) {
+      await executeStep(resolveStep(step, context) as QaStep, input.substrate, {
+        baseUrl: input.baseUrl,
+        timeoutMs: input.timeoutMs ?? 15_000,
+        sleep: input.sleep ?? sleep,
+        now: input.now ?? (() => new Date()),
+        ...(map !== undefined ? { map } : {}),
+      });
+    }
+  }
+}
+
 async function executeStep(
   step: QaStep,
   substrate: QaSubstrate,
@@ -657,7 +699,7 @@ class StepFailure extends Error {
   }
 }
 
-function defaultCreateSubstrate(input: {
+export function defaultCreateSubstrate(input: {
   headless: boolean;
   executablePath?: string;
   timeoutMs: number;

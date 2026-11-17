@@ -26,14 +26,14 @@ Commands:
   result <run_id>        read a run's typed results
   case read <id>         read one case spec
   case write <file>      validate and write one case (always draft)
+  generate              turn a spec or a recorded trace into a draft case
+  repair <case_id>       recover a broken locator and rewrite the case (draft)
   verify                 replay cases and promote verified ones
   sync                   reconcile case files with the local database
   coverage               list routes covered by cases
   report <run_id>        render a run as json, md, or junit
   doctor                 check config, database, and the browser
   mcp                    serve the QA MCP server over stdio
-  generate               not implemented yet
-  repair                 not implemented yet
 
 Selection: --changed, --suite NAME, --case ID (repeatable), --tag TAG, --all
 Common: --json, --config PATH, --repeat N, --allow-unverified, --base-url URL
@@ -343,10 +343,97 @@ export async function runQa(argv: string[], deps: QaCommandDeps = {}): Promise<n
         return 0;
       }
 
-      case "generate":
+      case "generate": {
+        const fromTrace = stringFlag(args, "from-trace");
+        const specFile = stringFlag(args, "spec");
+        const map = stringFlag(args, "map");
+
+        if (fromTrace === undefined && specFile === undefined) {
+          err(
+            "usage: portolan qa generate --from-trace PATH | --spec FILE [--id ID] [--suite S] [--title T] [--map site/version/op]",
+          );
+          return 2;
+        }
+
+        let mapSpec: { site: string; version: number; op: string } | undefined;
+        if (map !== undefined) {
+          const parts = map.split("/");
+          const version = Number(parts[1]);
+          if (
+            parts.length !== 3 ||
+            parts[0] === "" ||
+            parts[2] === "" ||
+            !Number.isInteger(version) ||
+            version < 1
+          ) {
+            err(`--map must look like site/version/op, got "${map}"`);
+            return 2;
+          }
+          mapSpec = { site: parts[0] ?? "", version, op: parts[2] ?? "" };
+        }
+
+        const report = service.generate(
+          {
+            ...(fromTrace !== undefined ? { fromTracePath: resolve(fromTrace) } : {}),
+            ...(specFile !== undefined
+              ? { fromSpec: JSON.parse(readFileSync(resolve(specFile), "utf8")) }
+              : {}),
+          },
+          {
+            ...(stringFlag(args, "id") !== undefined ? { id: stringFlag(args, "id") } : {}),
+            ...(stringFlag(args, "suite") !== undefined
+              ? { suite: stringFlag(args, "suite") }
+              : {}),
+            ...(stringFlag(args, "title") !== undefined
+              ? { title: stringFlag(args, "title") }
+              : {}),
+            ...(mapSpec !== undefined ? { map: mapSpec } : {}),
+          },
+        );
+
+        if (json) {
+          out(JSON.stringify(report, null, 2));
+          return 0;
+        }
+
+        out(`generated ${report.case_id} → ${report.path} (draft)`);
+        for (const warning of report.warnings) out(`  warning: ${warning}`);
+        for (const next of report.next) out(`  next: ${next}`);
+        return 0;
+      }
+
       case "repair": {
-        err(`qa ${sub} is not implemented yet; use qa case write and qa verify`);
-        return 2;
+        const caseId = args.positional[0];
+        if (caseId === undefined) {
+          err("usage: portolan qa repair <case_id> [--from-run RUN]");
+          return 2;
+        }
+
+        const report = await service.repair({
+          caseId,
+          ...(stringFlag(args, "from-run") !== undefined
+            ? { fromRun: stringFlag(args, "from-run") }
+            : {}),
+        });
+
+        if (json) {
+          out(JSON.stringify(report, null, 2));
+        } else {
+          out(`${report.repaired ? "repaired" : "REFUSED "} ${report.case_id} — ${report.reason}`);
+          for (const change of report.changes) {
+            out(
+              `  ${change.phase} ${change.index}: ${JSON.stringify(change.from)} → ${JSON.stringify(change.to)}`,
+            );
+          }
+          if (report.confirmation !== undefined) {
+            out(
+              `  confirmation: ${report.confirmation.status}${report.confirmation.fail_code === undefined ? "" : ` (${report.confirmation.fail_code})`}`,
+            );
+          }
+          for (const next of report.next) out(`  next: ${next}`);
+        }
+
+        return report.repaired && report.confirmation?.status === "pass" ? 0 : 1;
       }
 
       default: {

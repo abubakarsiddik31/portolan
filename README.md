@@ -25,7 +25,7 @@ Maps are learned from real runs, verified by replay, and repaired when the site
 changes. Portolan works with **any model and any MCP client**: MCP carries
 execution and safety, Agent Skills carry the know-how.
 
-<details>
+<details open>
 <summary><strong>Copy-paste setup prompt for your agent</strong></summary>
 
 Paste this into OpenCode, Claude Code, Codex, Cursor, Gemini CLI, or any

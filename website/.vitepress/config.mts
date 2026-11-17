@@ -48,6 +48,7 @@ export default defineConfig({
             { text: "Using maps", link: "/guide/using-maps" },
             { text: "Write safety", link: "/guide/write-safety" },
             { text: "Skills", link: "/guide/skills" },
+            { text: "QA your app", link: "/guide/qa" },
           ],
         },
         {

@@ -26,7 +26,7 @@ export default defineConfig({
     logo: "/logo.svg",
     siteTitle: "Portolan",
     nav: [
-      { text: "Guide", link: "/guide/what-is-portolan", activeMatch: "/guide/" },
+      { text: "Guide", link: "/guide/agent-setup", activeMatch: "/guide/" },
       { text: "Reference", link: "/reference/mcp-tools", activeMatch: "/reference/" },
       { text: "Project", link: "/project/vision", activeMatch: "/project/" },
     ],
@@ -35,6 +35,7 @@ export default defineConfig({
         {
           text: "Getting started",
           items: [
+            { text: "Set up with your agent", link: "/guide/agent-setup" },
             { text: "What is Portolan?", link: "/guide/what-is-portolan" },
             { text: "Quickstart", link: "/guide/quickstart" },
             { text: "Connect your agent", link: "/guide/clients" },

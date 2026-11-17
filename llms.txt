@@ -8,6 +8,7 @@ Docs site: https://abubakarsiddik31.github.io/portolan/
 Source: https://github.com/abubakarsiddik31/portolan
 
 ## Guide
+- https://abubakarsiddik31.github.io/portolan/guide/agent-setup
 - https://abubakarsiddik31.github.io/portolan/guide/what-is-portolan
 - https://abubakarsiddik31.github.io/portolan/guide/quickstart
 - https://abubakarsiddik31.github.io/portolan/guide/clients

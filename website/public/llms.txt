@@ -11,6 +11,7 @@ Docs: https://abubakarsiddik31.github.io/portolan/
 Source: https://github.com/abubakarsiddik31/portolan
 
 ## Guide
+- Set up with your agent: https://abubakarsiddik31.github.io/portolan/guide/agent-setup
 - What is Portolan: https://abubakarsiddik31.github.io/portolan/guide/what-is-portolan
 - Quickstart: https://abubakarsiddik31.github.io/portolan/guide/quickstart
 - Connect your agent: https://abubakarsiddik31.github.io/portolan/guide/clients

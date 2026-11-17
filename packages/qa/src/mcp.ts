@@ -295,34 +295,48 @@ export function createQaMcpServer(service: QaService, deps: QaMcpDeps = {}): Mcp
     "qa_generate",
     {
       description:
-        "Generate draft cases from an agent-authored spec or a recorded trace. Not implemented yet: write the case with qa_case_write.",
+        "Generate a draft case from an agent-authored spec (from_spec) or a recorded trace file (from_trace). Writes the case as draft; qa_verify promotes it.",
       inputSchema: {
         from_trace: z.string().min(1).optional(),
         from_spec: z.record(z.string(), z.unknown()).optional(),
+        id: z.string().min(1).optional(),
+        suite: z.string().min(1).optional(),
+        title: z.string().min(1).optional(),
       },
     },
-    async () =>
-      failure(
-        "not_implemented",
-        "qa_generate lands after the core runner; author a case with qa_case_write for now",
-      ),
+    async ({ from_trace, from_spec, id, suite, title }) =>
+      guarded(() =>
+        qa.generate(
+          {
+            ...(from_trace !== undefined ? { fromTracePath: from_trace } : {}),
+            ...(from_spec !== undefined ? { fromSpec: from_spec } : {}),
+          },
+          {
+            ...(id !== undefined ? { id } : {}),
+            ...(suite !== undefined ? { suite } : {}),
+            ...(title !== undefined ? { title } : {}),
+          },
+        ),
+      )(),
   );
 
   server.registerTool(
     "qa_repair",
     {
       description:
-        "Repair a broken case from a failed run. Not implemented yet; read the evidence and update the case.",
+        "Repair a case that failed on a moved or renamed target: replay to the failure, recover the locator by name similarity, rewrite the case as draft, and confirm with one run.",
       inputSchema: {
         case_id: z.string().min(1),
         from_run: z.string().min(1).optional(),
       },
     },
-    async () =>
-      failure(
-        "not_implemented",
-        "qa_repair lands after the core runner; read qa_result and update the case",
-      ),
+    async ({ case_id, from_run }) =>
+      guarded(() =>
+        qa.repair({
+          caseId: case_id,
+          ...(from_run !== undefined ? { fromRun: from_run } : {}),
+        }),
+      )(),
   );
 
   return server;

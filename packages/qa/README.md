@@ -25,9 +25,13 @@ portolan qa run --changed
 ## MCP tools
 
 `qa_list`, `qa_plan`, `qa_run`, `qa_status`, `qa_result`, `qa_case_read`,
-`qa_case_write`, `qa_verify`, `qa_coverage`, `qa_report`.
+`qa_case_write`, `qa_generate`, `qa_verify`, `qa_repair`, `qa_coverage`,
+`qa_report`.
 
-`qa_generate` and `qa_repair` are planned; author cases with `qa_case_write`
-and promote them with `qa_verify`.
+`qa_generate` turns a loose spec or a recorded trace into a draft case; fill
+values for secret-looking fields become `${env.*}` references. `qa_repair`
+recovers a moved or renamed target from a failed run and rewrites the case as
+a draft, then confirms with one run. Neither is a path to `verified`; only
+`qa_verify` is.
 
 See [docs/QA.md](../../docs/QA.md) for the design and trust model.

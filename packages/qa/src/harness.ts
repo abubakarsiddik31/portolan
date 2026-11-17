@@ -150,8 +150,10 @@ what you write.
 3. On a failure, call \`qa_result\` for the case. Read \`fail_code\`, the failed
    step, expected vs actual, and the evidence paths. Branch on the code:
    - \`assertion_failed\` — the app or the expectation is wrong.
-   - \`not_found\`, \`stale_ref\`, \`not_interactive\` — the UI moved; repair the
-     locator, then verify.
+   - \`not_found\`, \`stale_ref\`, \`not_interactive\` — the UI moved; call
+     \`qa_repair\` with the case id. It replays to the failure, recovers the
+     target by name similarity, rewrites the case as a draft, and confirms
+     with one run. If it refuses, update the locator by hand.
    - \`harness_error\` — the app or browser is not ready; call \`qa_doctor\`.
    - \`unknown_outcome\` — a write may have happened. Stop. Do not retry.
 4. Fix the app or the case, then rerun the affected case.
@@ -160,6 +162,10 @@ what you write.
 
 - Write one case per file with \`qa_case_write\`. The id must match the path:
   \`auth/login\` lives in \`qa/cases/auth/login.json\`.
+- Or hand \`qa_generate\` a step list (\`from_spec\`) or a recorded trace file
+  (\`from_trace\`); it fills id, suite, routes, and fixtures and writes a
+  draft. Secret-looking fill values become \`\${env.QA_*}\` references — set
+  them before running.
 - Prefer semantic targets: \`{ role, name }\`, \`{ label }\`, or \`{ test_id }\`.
   Never use CSS selectors.
 - Assert with \`expect\` checks: \`url\`, \`visible\`, \`absent\`, \`text\`, \`value\`.

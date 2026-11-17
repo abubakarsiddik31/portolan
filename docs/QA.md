@@ -447,9 +447,9 @@ draft ──qa verify (N fresh replays, all pass)──▶ verified (DB record)
 | `qa_result` | One case's typed result, evidence paths, `next[]` |
 | `qa_case_read` | One case spec + status |
 | `qa_case_write` | Validate and write a case file; returns diff summary |
-| `qa_generate` | Normalize an agent-authored step list or trace into a draft |
+| `qa_generate` | Normalize an agent-authored step list or a recorded trace into a draft |
 | `qa_verify` | Replay N times and promote or reject |
-| `qa_repair` | Attempt locator recovery from a failed run; returns draft |
+| `qa_repair` | Attempt locator recovery from a failed run; rewrites the case as a draft, records a drift event, and confirms with one run |
 | `qa_coverage` | Routes/states/ops covered and gaps |
 | `qa_report` | JSON/JUnit/markdown for a run |
 
@@ -467,7 +467,8 @@ portolan qa run [--changed|--suite S|--case ID...|--tag T] [--repeat N] [--json]
 portolan qa result <run_id> [--case ID] [--json]
 portolan qa case read <id> [--json]
 portolan qa case write <file> [--json]
-portolan qa generate --from-trace <id>|--spec <file> [--out FILE]
+portolan qa generate (--from-trace PATH | --spec FILE) [--id ID] [--suite S]
+                     [--title T] [--map site/version/op]
 portolan qa verify [--suite S|--case ID...] [--repeat N]
 portolan qa repair <case_id> [--from-run RUN]
 portolan qa coverage [--json]
@@ -558,12 +559,23 @@ at a preview deployment without editing config.
 
 ### M2 — generation and self-healing
 
-- `qa generate --from-trace`: trace → draft case (reuse `@abubakarsiddiik/runtime`
-  trace and compiler lift), plus `--spec` normalization.
-- `qa repair`: stale locator recovery, re-verify, drift event.
-- `qa coverage`: routes/states from a crawl or from case specs.
-- JUnit and adapter export (Jira/Xray/TestRail/Qase) behind a stable interface.
-- Flake quarantine policy and `qa doctor` drift detection.
+- `qa generate --from-trace`: trace → draft case, plus `--spec`
+  normalization. Views become `goto` steps when the route changes and no
+  recorded act caused the navigation; acts with locators become semantic
+  steps; secret-looking fill values become `${env.QA_*}` references. A
+  writing trace without a map is generated as `read` with a warning.
+- `qa repair`: replay to the recorded failure, recover the target by name
+  similarity over the candidates its other locator fields match (conservative:
+  exact or clearly-best matches only; a role drift demands an exact name),
+  rewrite every occurrence, write the case as draft, record a `selector` drift
+  event, and confirm with one run. Transient failures (the target resolves
+  again) are reported, not edited.
+- `qa coverage`: routes/states from case specs (crawl-driven coverage and
+  the op tier remain future work).
+- JUnit export (report renderer). Adapter export (Jira/Xray/TestRail/Qase)
+  behind a stable interface is future work.
+- Flake quarantine policy (recorded, `quarantined` rows) and `qa doctor`
+  drift detection remain future work.
 
 ### M3 — after G0/ADR-006 confirms the vertical
 

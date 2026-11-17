@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -45,6 +53,29 @@ function withSyntheticChangeset<T>(fn: () => T): T {
   }
 }
 
+/**
+ * A feature branch carries its own changesets, so the empty-tree case is
+ * simulated by moving them aside for the duration of the run.
+ */
+function withPendingChangesetsSetAside<T>(fn: () => T): T {
+  const holding = tempDir();
+  const setAside: Array<[string, string]> = [];
+
+  for (const file of readdirSync(join(ROOT, ".changeset"))) {
+    if (!file.endsWith(".md")) continue;
+    const from = join(ROOT, ".changeset", file);
+    const to = join(holding, file);
+    renameSync(from, to);
+    setAside.push([from, to]);
+  }
+
+  try {
+    return fn();
+  } finally {
+    for (const [from, to] of setAside) renameSync(to, from);
+  }
+}
+
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
@@ -82,7 +113,11 @@ describe("release dry run", () => {
   it("handles a tree with no pending changesets", () => {
     const out = tempDir();
 
-    execFileSync(process.execPath, [SCRIPT, "--out", out, "--notes-only"], { encoding: "utf8" });
+    withPendingChangesetsSetAside(() => {
+      execFileSync(process.execPath, [SCRIPT, "--out", out, "--notes-only"], {
+        encoding: "utf8",
+      });
+    });
 
     const plan = JSON.parse(readFileSync(join(out, "release-plan.json"), "utf8")) as {
       releases: unknown[];

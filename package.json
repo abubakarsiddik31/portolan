@@ -24,6 +24,7 @@
     "package:check:tarballs": "node scripts/verify-packages.mjs --tarballs",
     "version-packages": "changeset version && pnpm install --lockfile-only",
     "release": "pnpm build && changeset publish",
+    "release:ci": "node scripts/publish-if-configured.mjs",
     "release:dry-run": "node scripts/release-dry-run.mjs",
     "docs:build": "node scripts/build-docs.mjs",
     "licenses:check": "node scripts/check-licenses.mjs"

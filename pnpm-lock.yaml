@@ -84,6 +84,9 @@ importers:
       '@abubakarsiddiik/server':
         specifier: workspace:*
         version: link:../packages/portolan-server
+      '@abubakarsiddiik/sources':
+        specifier: workspace:*
+        version: link:../packages/sources
       '@abubakarsiddiik/substrate':
         specifier: workspace:*
         version: link:../packages/substrate
@@ -117,6 +120,9 @@ importers:
       '@abubakarsiddiik/skills':
         specifier: workspace:*
         version: link:../skills
+      '@abubakarsiddiik/sources':
+        specifier: workspace:*
+        version: link:../sources
       '@abubakarsiddiik/substrate':
         specifier: workspace:*
         version: link:../substrate
@@ -249,6 +255,15 @@ importers:
       yaml:
         specifier: 2.9.1
         version: 2.9.1
+
+  packages/sources:
+    dependencies:
+      '@abubakarsiddiik/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@abubakarsiddiik/substrate':
+        specifier: workspace:*
+        version: link:../substrate
 
   packages/substrate:
     dependencies:

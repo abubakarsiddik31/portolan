@@ -2,7 +2,15 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { type Browser, type CDPSession, chromium, type Frame, type Page } from "playwright-core";
+import {
+  type Browser,
+  type BrowserContext,
+  type BrowserContextOptions,
+  type CDPSession,
+  chromium,
+  type Frame,
+  type Page,
+} from "playwright-core";
 
 import {
   type Action,
@@ -23,6 +31,12 @@ export type PlaywrightEngineOptions = {
   timeoutMs?: number;
   /** Extra Chromium flags, e.g. --no-sandbox in a container. */
   launchArgs?: string[];
+  /**
+   * Cookies and localStorage from a signed-in session, as a Playwright storage
+   * state file or object. The user signs in once; Portolan never sees the
+   * password.
+   */
+  storageState?: BrowserContextOptions["storageState"];
   /**
    * Tags the browser's command line so `reapOrphans` can find it after this
    * process dies without a graceful close.
@@ -125,6 +139,7 @@ export class PlaywrightEngine implements Engine {
 
   private constructor(
     private readonly browser: Browser,
+    private readonly context: BrowserContext,
     private readonly page: Page,
     private readonly cdp: CDPSession,
     timeoutMs: number,
@@ -144,12 +159,15 @@ export class PlaywrightEngine implements Engine {
       args,
     });
 
-    const context = await browser.newContext({ acceptDownloads: true });
+    const context = await browser.newContext({
+      acceptDownloads: true,
+      ...(options.storageState !== undefined ? { storageState: options.storageState } : {}),
+    });
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
     const downloadDir = await mkdtemp(join(tmpdir(), "portolan-download-"));
 
-    const engine = new PlaywrightEngine(browser, page, cdp, options.timeoutMs ?? 30_000);
+    const engine = new PlaywrightEngine(browser, context, page, cdp, options.timeoutMs ?? 30_000);
 
     page.on("framenavigated", (frame) => {
       if (frame === page.mainFrame()) engine.doc += 1;
@@ -183,6 +201,16 @@ export class PlaywrightEngine implements Engine {
     return engine;
   }
 
+  /** Save the signed-in session so another run can reuse it. */
+  /** The current main-frame URL, without a snapshot. */
+  url(): string {
+    return this.page.url();
+  }
+
+  async storageState(path?: string): Promise<Awaited<ReturnType<BrowserContext["storageState"]>>> {
+    return this.context.storageState(path === undefined ? undefined : { path });
+  }
+
   async navigate(url: string): Promise<NavigateResult> {
     try {
       const response = await this.page.goto(url, {
@@ -196,6 +224,21 @@ export class PlaywrightEngine implements Engine {
         status: response?.status() ?? null,
       };
     } catch (error) {
+      // A client-side redirect aborts the initial navigation with ERR_ABORTED
+      // even though a real document is now loaded. Keep the page we landed on;
+      // a DNS/connection failure or a timeout still fails.
+      const current = this.page.url();
+      const aborted =
+        error instanceof Error && /ERR_ABORTED|frame was detached|interrupted/i.test(error.message);
+
+      if (aborted && /^https?:/.test(current) && current !== "about:blank") {
+        return {
+          url: current,
+          title: await this.page.title().catch(() => ""),
+          status: null,
+        };
+      }
+
       throw new EngineError("navigation_failed", `could not navigate to ${url}`, {
         cause: error,
       });

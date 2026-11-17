@@ -1,11 +1,115 @@
 # Build a map
 
-A map starts as a hand-written contract, gets verified against a live site, and
-is then compiled from real traces. This page is the short version; the
-[build plan](https://github.com/abubakarsiddik31/portolan/blob/main/docs/BUILD_PLAN.md)
-has the full pipeline.
+A map is learned, not hand-written. Portolan discovers what a site can do, turns
+each finding into a candidate op, and publishes only the ops that pass on a live
+run. No OpenAPI file or hand-authored JSON is required.
 
-## 1. Initialize
+## Start from the live app
+
+```bash
+portolan map build --site herbie \
+  --url http://localhost:3000 \
+  --start "npm run dev" \
+  --verify --publish
+```
+
+Portolan opens the app in Chromium (the same DOM and CDP surface DevTools uses),
+walks same-origin pages, and turns what it finds into drafts:
+
+- every page becomes a URL-only state like `/p/:id`;
+- every navigation link becomes a `url` read op;
+- every form becomes a typed op: inputs become params, the submit button becomes
+  a `ui` step, and a GET form also gets the cheaper `url` route.
+
+Discovery never submits a form. Writes publish only when re-verified with
+`--verify-writes` or proven by a recorded run.
+
+The command writes two reviewable files next to the map versions:
+
+```text
+maps/herbie/
+  draft.json    candidate ops, provenance, and observed params
+  tasks.json    what discovery could not know (missing params, outcome checks)
+  v1.json       published, verified ops
+```
+
+### Pages behind auth
+
+Sign in once in a visible browser and reuse that session. Portolan never sees
+the password:
+
+```bash
+portolan auth login --url https://careerkor.com/sign-in \
+  --out ./portolan/auth.json
+
+portolan map build --site careerkor \
+  --url https://careerkor.com/dashboard \
+  --storage-state ./portolan/auth.json \
+  --verify --publish
+```
+
+The same file works for `portolan verify`, `portolan compile`, and the MCP
+runtime (`PORTOLAN_STORAGE_STATE` or `storageState` in the config). A different
+account or an expired session means a new file.
+
+## Update the map when the app changes
+
+```bash
+portolan map update --site herbie --url http://localhost:3000 --verify --publish
+```
+
+An update keeps ops that rediscovery did not see, replaces ops it did see after
+verification passes, and publishes a new version. A session pins a version, so an
+update never changes the meaning of an in-flight call.
+
+If the app has no link or form to start from, record one run instead:
+
+```text
+open_url(url, intent)   → explore session + fallback scope
+view() / act() / read()  → the task, recorded
+fallback_done(scope_id)  → saves the trace
+```
+
+Then `portolan map build --site herbie` compiles the trace into candidates.
+
+## Coverage: the capability ledger
+
+A crawl finds pages, not every capability. `map build` therefore writes
+`capabilities.json` next to the map: every link, form, and button it saw on every
+visited page, marked `mapped`, `missing`, `excluded`, or `stale`.
+
+```bash
+portolan map coverage --site careerkor --maps ./portolan/maps
+# careerkor: 27 mapped, 48 missing, 51 excluded, 0 stale (36% of actionable)
+
+portolan map capability set --site careerkor --maps ./portolan/maps \
+  --id pricing.button.choose_pro --status excluded --reason "requires a paid plan"
+```
+
+The ledger is the reviewable contract:
+
+- `mapped` only when a verified op covers that exact trigger;
+- `missing` is the work queue;
+- `excluded` requires a reason (destructive, credit-spending, obsolete);
+- a manual decision has `source: "manual"` and survives rediscovery;
+- code-derived capabilities (`source: "code"`) cover things the crawl cannot see.
+
+Use `--require-complete` to refuse publication while anything is `missing` or
+`stale`:
+
+```bash
+portolan map build ... --require-complete --verify --publish
+```
+
+`portolan init` installs `skills/portolan-map/SKILL.md`, the companion skill that
+tells a coding agent how to work the ledger until it is complete.
+
+## Optional: hand-written seed
+
+For a precise contract you can still write `maps/<site>/v0.json` by hand and
+verify it:
+
+### Initialize
 
 ```bash
 portolan init ./my-site --site store
@@ -14,7 +118,7 @@ portolan init ./my-site --site store
 This writes `portolan.config.json`, an egress policy at
 `policies/store.json`, and the `maps/` and `skills/` directories.
 
-## 2. Write the operations
+### Write the operations
 
 Create `maps/store/v0.json` with states, operations, and their schemas. A
 minimal operation:
@@ -33,14 +137,14 @@ minimal operation:
     "properties": { "results": { "type": "array" } }
   },
   "impls": [
-    { "tier": "url", "template": "/search?q={query}" }
+    { "tier": "url", "route": "/search?q={query}", "extract": { "kind": "none" } }
   ]
 }
 ```
 
 The full field reference is [Map format v0](/reference/map-format).
 
-## 3. Verify
+### Verify
 
 Verification runs each operation against a live site on a fresh session. Every
 operation needs at least three param sets:
@@ -61,7 +165,7 @@ portolan verify --map maps/store/v0.json --params store.params.json --base-url h
 
 Each operation is reported per tier. A failed verification never publishes.
 
-## 4. Compile from traces
+## Compile from traces
 
 Collect fallback traces from real runs, then compile them into a new map
 version:
@@ -77,7 +181,7 @@ The compiler proposes candidates, verifies them, and publishes a new version.
 The map is versioned: a session pins one version, so a publish never changes the
 meaning of a call in flight.
 
-## 5. Export a skill
+## Export a skill
 
 ```bash
 portolan export-skills --map maps/store/v1.json --out skills --trace run-1.json

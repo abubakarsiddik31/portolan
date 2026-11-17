@@ -44,6 +44,7 @@
     "@abubakarsiddiik/protocol": "workspace:*",
     "@abubakarsiddiik/runtime": "workspace:*",
     "@abubakarsiddiik/server": "workspace:*",
+    "@abubakarsiddiik/sources": "workspace:*",
     "@abubakarsiddiik/substrate": "workspace:*",
     "agent-browser": "0.41.2",
     "playwright-core": "1.65.0",

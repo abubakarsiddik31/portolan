@@ -1,3 +1,4 @@
+import { TraceStore } from "@abubakarsiddiik/runtime";
 import {
   BrowserRegistry,
   type StdioServerHandle,
@@ -32,6 +33,7 @@ export async function runMcp(input: McpInput, deps: McpDeps = {}): Promise<Stdio
   return start({
     mapsDir: process.env.MAPS_DIR ?? input.config.maps,
     databasePath: process.env.DATABASE_PATH ?? input.config.database,
+    traceStore: new TraceStore(process.env.TRACES_DIR ?? input.config.traces),
     browsers,
     ...(factory !== undefined ? { substrateFactory: factory } : {}),
   });

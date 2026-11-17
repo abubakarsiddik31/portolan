@@ -1,8 +1,22 @@
+import { join } from "node:path";
+
+import {
+  type CapabilityLedger,
+  coverageOf,
+  formatCoverage,
+  gapsOf,
+  makeCapabilityId,
+  readCapabilities,
+  writeCapabilities,
+} from "@abubakarsiddiik/sources";
+
 import { booleanFlag, listFlag, numberFlag, parseArgs, stringFlag } from "./args.js";
+import { runAuthLogin } from "./commands/auth.js";
 import { runBench } from "./commands/bench.js";
 import { runCompile } from "./commands/compile.js";
 import { runExportSkills } from "./commands/export-skills.js";
 import { runInit } from "./commands/init.js";
+import { runMapBuild } from "./commands/map.js";
 import { runMcp } from "./commands/mcp.js";
 import { runQa } from "./commands/qa.js";
 import { runServe } from "./commands/serve.js";
@@ -14,8 +28,12 @@ export const USAGE = `portolan <command> [options]
 
 Commands:
   init [dir]             write a config, a policy, and the maps/skills dirs
+  auth login             open a browser, sign in, save the session for --storage-state
   serve                  start the HTTP and MCP server
   mcp                    serve MCP over stdio (for a client to spawn)
+  map <build|update>     discover a URL and/or traces into a map draft, verify, publish
+  map coverage           report mapped vs missing app capabilities
+  map capability         add or set a capability manually (add|set)
   compile <trace...>     compile traces into a new map version
   verify                 verify a map's ops on a fresh session
   export-skills          export a portolan-<site> skill from a map
@@ -33,6 +51,8 @@ export type CliDeps = {
   serve?: typeof runServe;
   mcp?: typeof runMcp;
   compile?: typeof runCompile;
+  map?: typeof runMapBuild;
+  auth?: typeof runAuthLogin;
   verify?: typeof runVerify;
   exportSkills?: typeof runExportSkills;
   bench?: typeof runBench;
@@ -99,6 +119,207 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         return 0;
       }
 
+      case "auth": {
+        const sub = args.positional[0];
+        if (sub !== undefined && sub !== "login") {
+          throw new Error(`unknown auth command "${sub}"; expected "login"`);
+        }
+        const config = loadConfig(stringFlag(args, "config"));
+        const url = stringFlag(args, "url");
+        if (url === undefined) throw new Error("auth login needs --url <sign-in page>");
+        const result = await (deps.auth ?? runAuthLogin)({
+          url,
+          ...(stringFlag(args, "out") !== undefined ? { out: stringFlag(args, "out") } : {}),
+          ...(stringFlag(args, "chrome") !== undefined
+            ? { chrome: stringFlag(args, "chrome") }
+            : config.chrome !== undefined
+              ? { chrome: config.chrome }
+              : {}),
+          ...(numberFlag(args, "timeout-ms") !== undefined
+            ? { timeoutMs: numberFlag(args, "timeout-ms") }
+            : {}),
+        });
+        out(`saved ${result.out}`);
+        out(
+          `next: portolan map build --storage-state ${result.out} --url <app url> --verify --publish`,
+        );
+        return 0;
+      }
+
+      case "map": {
+        const config = loadConfig(stringFlag(args, "config"));
+        const explicit = args.positional[0];
+        const update = explicit === "update";
+        const site = stringFlag(args, "site") ?? config.site;
+        const mapsDir = stringFlag(args, "maps") ?? config.maps;
+
+        if (explicit === "capability") {
+          const sub = args.positional[1];
+          const dir = join(mapsDir, site);
+          const ledger: CapabilityLedger = readCapabilities(dir) ?? {
+            schema: 1,
+            site,
+            generated_at: new Date().toISOString(),
+            capabilities: [],
+          };
+
+          if (sub === "add") {
+            const page = stringFlag(args, "page");
+            const name = stringFlag(args, "name");
+            const kind = stringFlag(args, "kind") ?? "button";
+            if (page === undefined || name === undefined) {
+              throw new Error("map capability add needs --page and --name");
+            }
+            if (kind !== "button" && kind !== "form" && kind !== "link") {
+              throw new Error('--kind must be "button", "form", or "link"');
+            }
+            const status = stringFlag(args, "status") ?? "missing";
+            if (status !== "missing" && status !== "excluded") {
+              throw new Error('--status must be "missing" or "excluded"');
+            }
+            const reason = stringFlag(args, "reason");
+            if (status === "excluded" && (reason === undefined || reason.length === 0)) {
+              throw new Error("an excluded capability needs --reason");
+            }
+            const target = stringFlag(args, "target");
+            if (kind === "link" && target === undefined) {
+              throw new Error("a link capability needs --target <state id>");
+            }
+            const base = makeCapabilityId({
+              page,
+              kind,
+              name,
+              ...(target !== undefined ? { target } : {}),
+            });
+            const existing = ledger.capabilities.find((item) => item.id === base);
+            if (existing !== undefined) {
+              existing.status = status;
+              existing.source = stringFlag(args, "source") === "code" ? "code" : "manual";
+              if (reason !== undefined) existing.reason = reason;
+            } else {
+              ledger.capabilities.push({
+                id: base,
+                page,
+                trigger: {
+                  kind,
+                  name,
+                  ...(target !== undefined ? { target } : {}),
+                },
+                status,
+                source: stringFlag(args, "source") === "code" ? "code" : "manual",
+                ...(reason !== undefined ? { reason } : {}),
+              });
+            }
+          } else if (sub === "set") {
+            const id = stringFlag(args, "id");
+            const status = stringFlag(args, "status");
+            if (id === undefined || status === undefined) {
+              throw new Error("map capability set needs --id and --status");
+            }
+            if (status !== "missing" && status !== "excluded") {
+              throw new Error('--status must be "missing" or "excluded"');
+            }
+            const item = ledger.capabilities.find((candidate) => candidate.id === id);
+            if (item === undefined) throw new Error(`no capability "${id}"`);
+            const reason = stringFlag(args, "reason");
+            if (status === "excluded" && (reason === undefined || reason.length === 0)) {
+              throw new Error("an excluded capability needs --reason");
+            }
+            item.status = status;
+            item.source = "manual";
+            if (reason !== undefined) item.reason = reason;
+          } else {
+            throw new Error('map capability expects "add" or "set"');
+          }
+
+          ledger.generated_at = new Date().toISOString();
+          const path = writeCapabilities(dir, ledger);
+          const coverage = coverageOf(ledger);
+          if (booleanFlag(args, "json")) {
+            out(JSON.stringify({ coverage, ledger }, null, 2));
+          } else {
+            out(`${site}: ${formatCoverage(coverage)}`);
+            out(`  ${path}`);
+          }
+          return 0;
+        }
+
+        if (explicit === "coverage") {
+          const ledger = readCapabilities(join(mapsDir, site));
+          if (ledger === undefined) {
+            throw new Error(`no capabilities.json for "${site}" in ${join(mapsDir, site)}`);
+          }
+          const coverage = coverageOf(ledger);
+          if (booleanFlag(args, "json")) {
+            out(JSON.stringify({ coverage, gaps: gapsOf(ledger), ledger }, null, 2));
+          } else {
+            out(`${site}: ${formatCoverage(coverage)}`);
+            for (const gap of gapsOf(ledger)) {
+              out(`  ${gap.status.padEnd(7)} ${gap.id} :: ${gap.reason ?? gap.trigger.name}`);
+            }
+          }
+          return 0;
+        }
+
+        const positional =
+          explicit === "build" || update ? args.positional.slice(1) : args.positional;
+        const url = stringFlag(args, "url");
+        const baseUrl = stringFlag(args, "base-url") ?? config.baseUrl;
+        const traces = [...positional, ...listFlag(args, "trace"), ...listFlag(args, "traces")];
+        const result = await (deps.map ?? runMapBuild)({
+          site,
+          mapsDir,
+          ...(url !== undefined ? { url } : {}),
+          ...(baseUrl !== undefined ? { baseUrl } : {}),
+          ...(traces.length > 0 ? { traces } : {}),
+          tracesDir: stringFlag(args, "traces-dir") ?? process.env.TRACES_DIR ?? config.traces,
+          ...(stringFlag(args, "params") !== undefined
+            ? { paramsPath: stringFlag(args, "params") }
+            : {}),
+          ...(numberFlag(args, "max-pages") !== undefined
+            ? { maxPages: numberFlag(args, "max-pages") }
+            : {}),
+          update,
+          verify: booleanFlag(args, "verify"),
+          verifyWrites: booleanFlag(args, "verify-writes"),
+          publish: booleanFlag(args, "publish"),
+          requireComplete: booleanFlag(args, "require-complete"),
+          ...(listFlag(args, "exclude").length > 0 ? { exclude: listFlag(args, "exclude") } : {}),
+          ...(stringFlag(args, "start") !== undefined
+            ? { start: stringFlag(args, "start") }
+            : config.start !== undefined
+              ? { start: config.start }
+              : {}),
+          ...(stringFlag(args, "chrome") !== undefined
+            ? { chrome: stringFlag(args, "chrome") }
+            : config.chrome !== undefined
+              ? { chrome: config.chrome }
+              : {}),
+          headless: booleanFlag(args, "headed") ? false : config.headless,
+          policiesDir: config.policies,
+          ...(stringFlag(args, "storage-state") !== undefined
+            ? { storageState: stringFlag(args, "storage-state") }
+            : process.env.PORTOLAN_STORAGE_STATE !== undefined
+              ? { storageState: process.env.PORTOLAN_STORAGE_STATE }
+              : config.storageState !== undefined
+                ? { storageState: config.storageState }
+                : {}),
+        });
+
+        out(
+          `drafted ${result.draft.proposals.length} ops, ${result.draft.tasks.length} tasks at ${result.draftPath}`,
+        );
+        out(`capabilities: ${formatCoverage(result.coverage)}`);
+        out(`  ${result.capabilitiesPath}`);
+        if (result.verified.length > 0) out(`verified ${result.verified.join(", ")}`);
+        if (result.published !== undefined) {
+          out(`published v${result.published.version} at ${result.published.path}`);
+        } else if (!booleanFlag(args, "publish")) {
+          out("not published; rerun with --verify --publish");
+        }
+        return 0;
+      }
+
       case "compile": {
         const config = loadConfig(stringFlag(args, "config"));
         const mapPath = required(args, "map");
@@ -106,12 +327,17 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         const baseUrl = stringFlag(args, "base-url") ?? config.baseUrl;
         const outcomeChecksPath = stringFlag(args, "outcome-checks");
         const chrome = stringFlag(args, "chrome") ?? config.chrome;
+        const compileStorageState =
+          stringFlag(args, "storage-state") ??
+          process.env.PORTOLAN_STORAGE_STATE ??
+          config.storageState;
         const result = await (deps.compile ?? runCompile)({
           mapPath,
           tracePaths: traces,
           ...(baseUrl !== undefined ? { baseUrl } : {}),
           ...(outcomeChecksPath !== undefined ? { outcomeChecksPath } : {}),
           ...(chrome !== undefined ? { chrome } : {}),
+          ...(compileStorageState !== undefined ? { storageState: compileStorageState } : {}),
           headless: booleanFlag(args, "headed") ? false : config.headless,
         });
         out(
@@ -128,12 +354,17 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         const ops = listFlag(args, "op");
         const baseUrl = stringFlag(args, "base-url") ?? config.baseUrl;
         const chrome = stringFlag(args, "chrome") ?? config.chrome;
+        const storageState =
+          stringFlag(args, "storage-state") ??
+          process.env.PORTOLAN_STORAGE_STATE ??
+          config.storageState;
         const result = await (deps.verify ?? runVerify)({
           mapPath: required(args, "map"),
           paramsPath: required(args, "params"),
           ...(ops.length > 0 ? { ops } : {}),
           ...(baseUrl !== undefined ? { baseUrl } : {}),
           ...(chrome !== undefined ? { executablePath: chrome } : {}),
+          ...(storageState !== undefined ? { storageState } : {}),
           headless: booleanFlag(args, "headed") ? false : config.headless,
         });
         for (const report of result.reports) {

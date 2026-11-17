@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { type CliConfig, CONFIG_FILE, DEFAULT_CONFIG } from "../config.js";
+import { MAP_SKILL, USAGE_SKILL } from "../skills.js";
 
 export type InitOptions = {
   dir?: string;
@@ -49,6 +50,9 @@ export function runInit(options: InitOptions = {}): InitResult {
 
   mkdirSync(join(dir, config.maps, site), { recursive: true });
   mkdirSync(join(dir, config.skills), { recursive: true });
+
+  write(join(dir, config.skills, "portolan-map", "SKILL.md"), MAP_SKILL);
+  write(join(dir, config.skills, "portolan", "SKILL.md"), USAGE_SKILL);
 
   return { dir, config, files, skipped };
 }

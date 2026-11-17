@@ -64,6 +64,50 @@ describe("parseArgs", () => {
   });
 });
 
+describe("map capability", () => {
+  it("adds an excluded capability and writes the ledger", async () => {
+    const dir = tempDir();
+    const result = capture();
+
+    const code = await main(
+      [
+        "map",
+        "capability",
+        "add",
+        "--site",
+        "demo",
+        "--maps",
+        dir,
+        "--page",
+        "/resumes",
+        "--kind",
+        "button",
+        "--name",
+        "Delete resume",
+        "--status",
+        "excluded",
+        "--reason",
+        "destructive",
+      ],
+      { out: result.out, err: result.err },
+    );
+
+    expect(code).toBe(0);
+    expect(result.lines.join("\n")).toContain(
+      "0 mapped, 0 missing, 1 excluded, 0 stale (nothing actionable)",
+    );
+
+    const ledger = JSON.parse(readFileSync(join(dir, "demo", "capabilities.json"), "utf8")) as {
+      capabilities: Array<Record<string, unknown>>;
+    };
+    expect(ledger.capabilities[0]).toMatchObject({
+      status: "excluded",
+      source: "manual",
+      reason: "destructive",
+    });
+  });
+});
+
 describe("config", () => {
   it("returns the defaults when the file is missing", () => {
     expect(loadConfig(join(tempDir(), "nope.json"))).toMatchObject({ site: "site", port: 4200 });
@@ -91,11 +135,15 @@ describe("init", () => {
     const dir = tempDir();
     const result = runInit({ dir, site: "store" });
 
-    expect(result.files).toHaveLength(2);
+    expect(result.files).toHaveLength(4);
     expect(existsSync(join(dir, "portolan.config.json"))).toBe(true);
     expect(existsSync(join(dir, "policies", "store.json"))).toBe(true);
     expect(existsSync(join(dir, "maps", "store"))).toBe(true);
-    expect(existsSync(join(dir, "skills"))).toBe(true);
+    expect(existsSync(join(dir, "skills", "portolan-map", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(dir, "skills", "portolan", "SKILL.md"))).toBe(true);
+    expect(readFileSync(join(dir, "skills", "portolan-map", "SKILL.md"), "utf8")).toContain(
+      "--require-complete",
+    );
     expect(JSON.parse(readFileSync(join(dir, "policies", "store.json"), "utf8"))).toEqual({
       site: "store",
       allow: [],
@@ -108,7 +156,7 @@ describe("init", () => {
     const second = runInit({ dir, site: "store" });
 
     expect(second.files).toHaveLength(0);
-    expect(second.skipped).toHaveLength(2);
+    expect(second.skipped).toHaveLength(4);
   });
 });
 

@@ -3,6 +3,22 @@
 The loop is small: open a site, read the map, call operations, fall back only
 when nothing fits.
 
+## 0. No map yet?
+
+Call `open_url` with the app URL and one intent. It creates an explore session
+and a fallback scope, so `view`, `act`, and `read` record a trace immediately.
+Close the scope with `fallback_done`, then build a map from what you recorded:
+
+```bash
+portolan map build --site herbie --url http://localhost:3000
+```
+
+You can also discover a first map without an agent:
+
+```bash
+portolan map build --site herbie --url http://localhost:3000 --verify --publish
+```
+
 ## 1. Open the site
 
 ```json

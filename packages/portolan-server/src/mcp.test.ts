@@ -130,6 +130,7 @@ describe("mcp surface", () => {
     expect(tools.tools.map((tool) => tool.name)).toEqual([
       "list_sites",
       "open_site",
+      "open_url",
       "call",
       "fallback_begin",
       "view",
@@ -620,6 +621,78 @@ describe("mcp surface", () => {
         log: { version: string };
       };
       expect(har.log.version).toBe("1.2");
+    } finally {
+      await extra.client.close();
+      await extra.server.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  function exploreSubstrate(urls: string[]): FallbackSubstrate {
+    let snapshot = {
+      doc: 1,
+      v: 0,
+      url: "about:blank",
+      title: "",
+      nodes: [SEARCH],
+    };
+
+    const view = () => ({ snapshot, refs: buildRefMap(snapshot.nodes, snapshot.doc) });
+
+    return {
+      view: async () => view(),
+      state: () => view(),
+      goto: async (url: string) => {
+        urls.push(url);
+        snapshot = { ...snapshot, v: snapshot.v + 1, url };
+        return view();
+      },
+      act: async () => ({
+        ok: true,
+        doc: 1,
+        v: 1,
+        url: snapshot.url,
+        title: "",
+        effects: [],
+        delta: { navigation: false, entries: [] },
+      }),
+      read: async () => ({ text: "page text" }),
+    };
+  }
+
+  it("opens a URL with no map and saves the explore trace", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "portolan-explore-"));
+    const store = new TraceStore(dir);
+    const urls: string[] = [];
+    const extra = await connect({
+      substrateFactory: async () => exploreSubstrate(urls),
+      traceStore: store,
+    });
+
+    try {
+      const opened = JSON.parse(
+        textOf(
+          await extra.client.callTool({
+            name: "open_url",
+            arguments: {
+              url: "https://app.herbie.dev/dashboard",
+              intent: "find a task",
+            },
+          }),
+        ),
+      ) as { mode: string; site: string; scope_id: string };
+
+      expect(opened).toMatchObject({ mode: "explore", site: "herbie" });
+
+      await extra.client.callTool({ name: "view", arguments: {} });
+      await extra.client.callTool({
+        name: "fallback_done",
+        arguments: { scope_id: opened.scope_id },
+      });
+
+      expect(urls).toContain("https://app.herbie.dev/dashboard");
+      const trace = await store.get(opened.scope_id);
+      expect(trace?.entries.map((entry) => entry.kind)).toEqual(["view"]);
     } finally {
       await extra.client.close();
       await extra.server.close();

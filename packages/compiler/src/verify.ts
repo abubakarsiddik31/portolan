@@ -37,6 +37,8 @@ export type VerifyOptions = {
   headless?: boolean;
   /** Ops to run on the same fresh session before the candidate. */
   setup?: Array<{ op: string; params: Record<string, unknown> }>;
+  /** Playwright storage state for pages behind auth. */
+  storageState?: string;
 };
 
 const MIN_PARAM_SETS = 3;
@@ -85,6 +87,7 @@ export async function verifyOp(options: VerifyOptions): Promise<VerifyReport> {
           headless: options.headless ?? true,
           setup: options.setup ?? [],
           ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),
+          ...(options.storageState !== undefined ? { storageState: options.storageState } : {}),
         }),
       );
     }
@@ -120,6 +123,7 @@ async function runOnce(input: {
   headless: boolean;
   baseUrl?: string;
   setup: Array<{ op: string; params: Record<string, unknown> }>;
+  storageState?: string;
 }): Promise<VerifyRun> {
   const validation = validateJsonSchema(input.op.params, input.params);
   if (!validation.ok) {
@@ -133,6 +137,7 @@ async function runOnce(input: {
   const engine = await PlaywrightEngine.launch({
     executablePath: input.executablePath,
     headless: input.headless,
+    ...(input.storageState !== undefined ? { storageState: input.storageState } : {}),
   });
 
   try {

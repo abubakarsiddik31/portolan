@@ -21,12 +21,14 @@ export function createBrowserFactory(
   if (executablePath === undefined) return undefined;
 
   const instanceId = process.env.PORTOLAN_INSTANCE_ID;
+  const storageState = process.env.PORTOLAN_STORAGE_STATE ?? config.storageState;
 
   return async (session) => {
     const engine = await PlaywrightEngine.launch({
       executablePath,
       headless: config.headless,
       ...(instanceId !== undefined ? { instanceId } : {}),
+      ...(storageState !== undefined ? { storageState } : {}),
     });
     browsers.register(session.sid, engine);
 

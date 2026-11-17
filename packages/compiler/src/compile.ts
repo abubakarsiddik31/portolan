@@ -22,6 +22,12 @@ export type CompileOptions = {
   capture: (url: string) => Promise<SubstrateView | undefined>;
   /** Read op that proves a write, keyed by op name. */
   outcomeChecks?: Record<string, string>;
+  /**
+   * Drop a write that has no outcome check instead of compiling an http impl
+   * the map loader would reject. Bootstrap uses this: a recording proves the
+   * request happened, not how to check that a later write took effect.
+   */
+  skipWritesWithoutOutcomeCheck?: boolean;
 };
 
 export type CompiledCandidate = {
@@ -54,10 +60,19 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
 
     for (const segment of parameterized.segments) {
       const label = labels.get(segment.segment.index);
-      const name = label?.op ?? segment.segment.candidate;
+      const proposed = label?.action === "propose" ? label.name : undefined;
+      const name = label?.op ?? proposed ?? segment.segment.candidate;
       if (name === undefined || seen.has(name)) continue;
 
       const write = segment.segment.actions.flatMap((action) => action.effects).find(isWriteEffect);
+
+      if (
+        write !== undefined &&
+        options.skipWritesWithoutOutcomeCheck === true &&
+        options.outcomeChecks?.[name] === undefined
+      ) {
+        continue;
+      }
 
       let tier: "url" | "http" | "ui";
       let returns: InferredReturns;
@@ -103,7 +118,7 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
       const op: OpDef = {
         name,
         version: oracle?.version ?? 1,
-        summary: oracle?.summary ?? `Compiled ${name}.`,
+        summary: label?.summary ?? oracle?.summary ?? `Compiled ${name}.`,
         params: oracle?.params ?? (isEmptySchema(segment.schema) ? EMPTY_SCHEMA : segment.schema),
         returns: returns.schema,
         from: oracle?.from ?? [segment.segment.from ?? "unknown"],

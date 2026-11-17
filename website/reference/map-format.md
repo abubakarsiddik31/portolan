@@ -36,7 +36,7 @@ loudly, not silently disable an op.
 |---|---|---|---|
 | `id` | `^[a-z][a-z0-9_]*$` | yes | State id, unique in the map. |
 | `url` | string | no | URLPattern-style path, e.g. `/p/:id`. |
-| `marks` | `Locator[]`, ≥1 | yes | Every locator must be present to be in this state. |
+| `marks` | `Locator[]` | yes | Every locator must be present to be in this state. Empty means the URL alone identifies it. |
 | `not` | `Locator[]` | no | Every locator must be absent. |
 
 ## `Op`

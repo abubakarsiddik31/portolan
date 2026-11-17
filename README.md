@@ -55,20 +55,30 @@ Setup
 1. Check Node version and Chrome/Chromium. Require Node >= 22.12. If either is missing, tell me what to install and stop.
 2. Install the Portolan CLI: npm install -g @abubakarsiddiik/portolan. If global installs are blocked, use npx @abubakarsiddiik/portolan for every command.
 3. Run portolan doctor and report the result.
-4. Ask me for the site name. Then run: portolan init ./portolan --site <site>
-5. Check ./portolan/maps/<site>/ for a map version (v*.json). If none exists, stop and tell me: "Portolan needs a map for <site> before it can run operations." Ask whether I want to provide a map, compile one from traces, or use the demo store from the quickstart.
+4. Ask me for the site name. Then run: portolan init ./portolan --site <site>. This installs ./portolan/skills/portolan-map/SKILL.md (how to build the map) and ./portolan/skills/portolan/SKILL.md (how to use it).
+5. Read ./portolan/skills/portolan-map/SKILL.md and follow it. Check ./portolan/maps/<site>/ for a map version (v*.json). If none exists, do not ask me to write JSON. Build one from the live app:
+   - Ask me only for the app URL (or read baseUrl from portolan.config.json) and the dev-server command, if they are not obvious.
+   - Run: portolan map build --maps ./portolan/maps --site <site> --url <url> --verify --publish [--start "<dev command>"]
+   - If nothing verifies, call open_url with the URL and one intent, finish that task with view/act/read, call fallback_done, then rerun `portolan map build --maps ./portolan/maps --traces-dir ./portolan/traces --site <site> --verify --publish`.
+   - If the app is behind auth, run `portolan auth login --url <sign-in page> --out ./portolan/auth.json`, then add `--storage-state ./portolan/auth.json` to the map commands. Use the signed-in URL (e.g. `/dashboard`) as `--url`.
+   - Use the demo store only if I ask to try Portolan without my app.
+   - After the app changes, refresh the map with `portolan map update --maps ./portolan/maps --site <site> --url <url> --verify --publish`.
+   - Do not stop at a partial map. Read `capabilities.json`, resolve every `missing`/`stale` entry from the codebase and the live app, then rerun with `--require-complete` (see the coverage loop in the build-a-map guide).
+   - Only ask me to help when discovery finds no page, no form, and no link to start from.
 6. Configure my MCP client for this harness to spawn:
    command: portolan
    args: ["mcp"]
    env:
      MAPS_DIR: <absolute path to ./portolan/maps>
      DATABASE_PATH: <absolute path to ./portolan/portolan.db>
+     TRACES_DIR: <absolute path to ./portolan/traces>
+     PORTOLAN_STORAGE_STATE: <absolute path to ./portolan/auth.json>   # only for authenticated apps
    Detect my harness (OpenCode, Claude Code, Claude Desktop, Codex CLI, Cursor, Gemini CLI, or VS Code) and use its config format. If you cannot safely edit the config, print the exact file path and snippet.
 7. Tell me to restart or reload this session so the Portolan MCP tools load.
 
 Use once the tools and a map are available
 8. Call open_site with the site name. Read the returned map and use call for named operations. Never invent operation names or parameters.
-9. Use view, act, and read only when no operation fits, then close the fallback scope with fallback_done.
+9. Use view, act, and read only when no operation fits, then close the fallback scope with fallback_done. If a site has no map, call open_url with a URL and one intent first; that records a trace you can build a map from.
 10. Put an idempotency key on every write. Ask me before any irreversible operation. If a call returns unknown_outcome, do not retry; inspect the outcome check and report.
 11. If an operation returns needs_confirmation, ask me before re-calling it with confirm: true.
 12. After each task, summarize the operations called, the results, and any typed errors.
@@ -87,6 +97,37 @@ open_site("acme-store")
   checkout(shipping_id, payment_id)     → {order_id}                     irreversible · needs confirm
   fallback: view() / act() / read()
 ```
+
+## Build a map
+
+Point Portolan at a running app; it discovers pages, links, and forms from the
+live DOM (the same DevTools surface) and publishes only what verifies. No
+OpenAPI file and no hand-written JSON.
+
+```bash
+portolan map build --site herbie \
+  --url http://localhost:3000 \
+  --start "npm run dev" \
+  --verify --publish
+
+# after the app changes
+portolan map update --site herbie --url http://localhost:3000 --verify --publish
+```
+
+Discovery is read-only. Writes publish only after `--verify-writes` or a
+recorded run proves them. Every build writes `draft.json`, `tasks.json`, and
+`capabilities.json` next to the map. The capability ledger lists every link,
+form, and button the crawl saw; `map coverage` reports what is still missing,
+and `--require-complete` refuses to publish until every entry is mapped or
+excluded with a reason. The `portolan-map` skill tells a coding agent how to
+work that queue from the codebase and the live app.
+
+For pages behind auth, sign in once with `portolan auth login --url <sign-in page> --out ./portolan/auth.json`, then pass `--storage-state ./portolan/auth.json` (and set `PORTOLAN_STORAGE_STATE` for the MCP server). Portolan never sees the password.
+
+If a site has no link or form to start from, record one run instead: call
+`open_url(url, intent)` over MCP, finish the task with `view`/`act`/`read`, then
+`fallback_done`. The trace is saved and the next `portolan map build` compiles
+it.
 
 ## Why Portolan
 

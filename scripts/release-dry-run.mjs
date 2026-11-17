@@ -20,8 +20,7 @@ if (out === undefined) {
 
 const changesets = readChangesets();
 if (changesets.length === 0) {
-  console.error("no changesets found; add one with pnpm changeset");
-  process.exit(1);
+  console.warn("no changesets found; writing an empty release plan");
 }
 
 const releases = planReleases(changesets);

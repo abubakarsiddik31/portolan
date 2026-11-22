@@ -39,6 +39,33 @@ describe("QaStore", () => {
     store.close();
   });
 
+  it("rehydrates optional arrays from a minimal case file", () => {
+    const space = workspace();
+    mkdirSync(dirname(space.path), { recursive: true });
+    writeFileSync(
+      space.path,
+      `${JSON.stringify({
+        schema: 1,
+        id: "auth/login",
+        title: "Login",
+        suite: "smoke",
+        effect: "read",
+        steps: [{ goto: "/sign-in" }],
+      })}\n`,
+      "utf8",
+    );
+
+    const store = new QaStore(join(space.root, "qa.db"));
+    store.syncSpecs({ cases: loadCases(space.cases), suites: [] });
+
+    // The repair and runner paths iterate these; a raw file omits them.
+    const spec = store.getCase("auth/login")?.spec;
+    expect(spec?.setup).toEqual([]);
+    expect(spec?.expect).toEqual([]);
+    expect(spec?.tags).toEqual([]);
+    store.close();
+  });
+
   it("does not trust a file-authored verified status on first import", () => {
     const space = workspace();
     const spec = parseCase(caseSpec());

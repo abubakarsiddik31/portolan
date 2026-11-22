@@ -10,6 +10,7 @@ import {
   caseContentSha,
   type LoadedCase,
   type LoadedSuite,
+  parseCase,
   type QaCase,
   sha256,
 } from "./spec.js";
@@ -225,7 +226,7 @@ export class QaStore {
             JSON.stringify(item.spec.touches),
             JSON.stringify(item.spec.routes),
             item.spec.source === undefined ? null : JSON.stringify(item.spec.source),
-            item.text,
+            JSON.stringify(item.spec),
             item.sha,
             item.path,
             item.spec.map?.site ?? null,
@@ -280,7 +281,7 @@ export class QaStore {
             JSON.stringify(item.spec.touches),
             JSON.stringify(item.spec.routes),
             item.spec.source === undefined ? null : JSON.stringify(item.spec.source),
-            item.text,
+            JSON.stringify(item.spec),
             item.sha,
             item.path,
             status === "verified" ? (item.spec.verifiedAt ?? now) : null,
@@ -334,7 +335,10 @@ export class QaStore {
   getCase(id: string): { spec: QaCase; row: CaseRow } | undefined {
     const row = this.rawCase(id);
     if (row === undefined) return undefined;
-    return { spec: JSON.parse(row.spec_json) as QaCase, row: toCaseRow(row) };
+    // Older rows stored the raw file text, which omits schema defaults
+    // (`setup`, `expect`, `tags`). Parse on read so the in-memory spec always
+    // has every array the runner and repair paths iterate.
+    return { spec: parseCase(JSON.parse(row.spec_json)), row: toCaseRow(row) };
   }
 
   startRun(input: StartRun): RunRow {
@@ -582,7 +586,7 @@ export class QaStore {
         JSON.stringify(item.spec.touches),
         JSON.stringify(item.spec.routes),
         item.spec.source === undefined ? null : JSON.stringify(item.spec.source),
-        item.text,
+        JSON.stringify(item.spec),
         item.sha,
         item.path,
         status === "verified" ? (item.spec.verifiedAt ?? now) : null,

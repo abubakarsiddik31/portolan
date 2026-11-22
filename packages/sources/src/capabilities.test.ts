@@ -52,6 +52,27 @@ function discovery(): DomDiscovery {
 }
 
 describe("buildCapabilities", () => {
+  it("keeps a link mapped when the existing map already has its op", () => {
+    const existing: OpProposal = {
+      op: op("open_cart", "home", "cart"),
+      source: "dom",
+      provenance: "existing map",
+      confidence: "high",
+    };
+
+    const ledger = buildCapabilities({
+      site: "app",
+      discovery: discovery(),
+      proposals: [existing],
+      now: "2026-11-17T00:00:00.000Z",
+    });
+
+    expect(ledger.capabilities.find((item) => item.trigger.name === "Cart")).toMatchObject({
+      status: "mapped",
+      op: "open_cart",
+    });
+  });
+
   it("separates mapped, missing, and excluded actions", () => {
     const ledger = buildCapabilities({
       site: "app",

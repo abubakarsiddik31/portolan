@@ -78,7 +78,7 @@ export async function runQa(argv: string[], deps: QaCommandDeps = {}): Promise<n
     out(`  harness: ${result.harnesses.join(", ")}`);
     out("  MCP entry:");
     for (const line of result.mcpSnippet.trimEnd().split("\n")) out(`    ${line}`);
-    out("next: restart your coding harness, then ask it to run qa_plan");
+    out("next: read skills/portolan-qa/SKILL.md, restart your coding harness, then run qa_plan");
     return 0;
   }
 

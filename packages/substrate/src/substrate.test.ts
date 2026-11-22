@@ -339,6 +339,18 @@ describe("substrate act", () => {
   });
 });
 
+describe("substrate lifecycle", () => {
+  it("closes the engine", async () => {
+    const close = vi.fn(async () => undefined);
+    const engine = { close } as unknown as Engine;
+
+    const substrate = new Substrate(engine);
+    await substrate.close();
+
+    expect(close).toHaveBeenCalledOnce();
+  });
+});
+
 describe("substrate read", () => {
   it("captures the page instead of reusing a stale snapshot", async () => {
     let name = "old";

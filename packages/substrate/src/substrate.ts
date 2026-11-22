@@ -510,6 +510,11 @@ export class Substrate {
       throw error;
     }
   }
+
+  /** Close the underlying browser. Safe to call more than once. */
+  async close(): Promise<void> {
+    await this.engine.close();
+  }
 }
 
 function absolute(url: string, base: string): string {

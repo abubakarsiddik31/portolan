@@ -15,8 +15,10 @@ button that opens a dialog, or a multi-step flow. A page is not a capability.
 ## The loop
 
 1. **Inventory from the codebase.** Read the routes, API handlers, forms,
-   buttons, menus, and existing e2e tests. Add anything the live crawl cannot
-   see (feature flags, unlinked routes, admin pages) with:
+   buttons, menus, and existing e2e tests. If you have no repository access,
+   browse the live app instead and treat every page, link, form, and button you
+   see as a capability. Add anything the live crawl cannot see (feature flags,
+   unlinked routes, admin pages) with:
 
    ```bash
    portolan map capability add --site <site> --maps ./portolan/maps \
@@ -47,8 +49,9 @@ button that opens a dialog, or a multi-step flow. A page is not a capability.
        --id <capability id> --status excluded --reason "deletes user data"
      ```
 
-   - Otherwise record one real run and let Portolan compile it. Use the MCP
-     tools or the CLI:
+   - Otherwise record one real run and let Portolan compile it. Your own
+     browser is reconnaissance, not a trace; use Portolan's MCP browser tools
+     for any run that must become an op:
 
      ```text
      open_url(url, intent) → view / act / read → fallback_done(scope_id)
@@ -85,8 +88,9 @@ button that opens a dialog, or a multi-step flow. A page is not a capability.
   `map capability` has `source: "manual"`; rediscovery keeps it.
 - **Commit the ledger.** `capabilities.json`, `draft.json`, `tasks.json`, and
   `v*.json` are the map. CI can run `map coverage --json` and fail on gaps.
-- **Re-run `map update` after app changes.** New actions become `missing`,
-  vanished ones become `stale`; do not delete them silently.
+- **Keep the map in sync.** Re-run `map update` after app changes, rebuild
+  traces for what the crawl cannot see, and re-check coverage. New actions
+  become `missing`, vanished ones become `stale`; do not delete them silently.
 
 ## Definition of done
 

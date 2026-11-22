@@ -232,7 +232,20 @@ export async function runMapBuild(
     const capabilities = buildCapabilities({
       site: input.site,
       ...(discovery !== undefined ? { discovery } : {}),
-      proposals: draft.proposals,
+      // A capability the live surface still shows stays mapped when the
+      // published map already has an op for it, even if discovery reserved
+      // that target and proposed nothing new this run.
+      proposals: [
+        ...draft.proposals,
+        ...(existing?.ops ?? []).map(
+          (op): OpProposal => ({
+            op,
+            source: "dom",
+            provenance: "existing map",
+            confidence: "high",
+          }),
+        ),
+      ],
       ...(previous !== undefined ? { previous } : {}),
       ...(input.exclude !== undefined ? { exclude: input.exclude } : {}),
     });

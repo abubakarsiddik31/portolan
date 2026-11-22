@@ -30,3 +30,4 @@ Source: https://github.com/abubakarsiddik31/portolan
 - https://abubakarsiddik31.github.io/portolan/project/security
 - https://abubakarsiddik31.github.io/portolan/project/benchmark
 - https://abubakarsiddik31.github.io/portolan/project/licensing
+- https://abubakarsiddik31.github.io/portolan/project/releasing

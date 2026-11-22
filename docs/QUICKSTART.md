@@ -79,8 +79,50 @@ node packages/cli/dist/bin.js doctor
 
 `doctor` reports the browser, config, provider variables, and client configs.
 
+## Build a map for your app
+
+The demo above uses a fixture map. For your own app, let Portolan discover it:
+
+```bash
+portolan init ./portolan --site myapp
+
+# optional, for pages behind auth
+portolan auth login --url https://app.example/sign-in \
+  --out ./portolan/auth.json
+
+portolan map build --maps ./portolan/maps --site myapp \
+  --url http://localhost:3000 \
+  --start "npm run dev" \
+  --verify --publish
+```
+
+Discovery walks the live DOM, turns pages into states and links/forms into
+typed ops, and writes `draft.json`, `tasks.json`, and `capabilities.json` next
+to the map. It is read-only; forms are not submitted.
+
+Then work the capability ledger until it is complete:
+
+```bash
+portolan map coverage --site myapp --maps ./portolan/maps
+portolan map build --maps ./portolan/maps --site myapp \
+  --url http://localhost:3000 --require-complete --verify --publish
+```
+
+For every `missing` or `stale` capability, either record one run through
+Portolan (`open_url` -> `view`/`act`/`read` -> `fallback_done`) and rebuild from
+traces, or exclude it with a reason. After the app changes, run
+`portolan map update`.
+
+`portolan init` also installs `skills/portolan-map/SKILL.md`, which gives a
+coding agent this loop step by step.
+
 ## What works today
 
+- `portolan map build/update` discovers from the live DOM, writes a
+  `capabilities.json` ledger, verifies, and publishes.
+- `portolan auth login` and `--storage-state` cover pages behind auth.
+- `open_url` records a trace for a site with no map yet; the compiler can
+  bootstrap a map from traces alone.
 - `open_site`, `call`, `view`, `act`, and `read` work through `portolan mcp`.
 - `call` runs the op through the cheapest verified tier: `url`, in-page
   `http`, then `ui`. A write goes through confirmation and idempotency.

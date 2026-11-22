@@ -154,9 +154,17 @@ what you write.
      \`qa_repair\` with the case id. It replays to the failure, recovers the
      target by name similarity, rewrites the case as a draft, and confirms
      with one run. If it refuses, update the locator by hand.
-   - \`harness_error\` — the app or browser is not ready; call \`qa_doctor\`.
+   - \`harness_error\` — the app or browser is not ready; ask me to run
+     \`portolan qa doctor\` (there is no \`qa_doctor\` MCP tool).
    - \`unknown_outcome\` — a write may have happened. Stop. Do not retry.
 4. Fix the app or the case, then rerun the affected case.
+
+## Tools
+
+\`qa_list\`, \`qa_plan\`, \`qa_run\`, \`qa_status\`, \`qa_result\`,
+\`qa_case_read\`, \`qa_case_write\`, \`qa_generate\`, \`qa_verify\`,
+\`qa_repair\`, \`qa_coverage\`, \`qa_report\`. Doctor and sync are CLI-only
+(\`portolan qa doctor\`, \`portolan qa sync\`).
 
 ## Authoring
 

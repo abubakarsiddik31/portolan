@@ -25,11 +25,14 @@ older one.
 | `skills` | string | `"skills"` | `export-skills`, `init` | Output directory for `portolan-<site>` skills. |
 | `policies` | string | `"policies"` | `init` | Directory containing `<site>.json` egress policies. |
 | `database` | string | `"portolan.db"` | `serve` | SQLite path. `:memory:` gives an ephemeral store. |
+| `traces` | string | `"traces"` | `mcp`, `serve`, `map` | Recorded traces (JSONL + HAR). `TRACES_DIR` overrides it. |
 | `host` | string | `"127.0.0.1"` | `serve` | Listen address. |
 | `port` | integer ≥ 0 | `4200` | `serve` | Listen port. `0` asks the OS for one. |
-| `baseUrl` | string | unset | `compile`, `verify` | Live site origin, used when `--base-url` is not passed. |
-| `chrome` | string | unset | `compile`, `verify` | Chrome binary. Unset means `CHROME_PATH`, then the usual install paths. |
-| `headless` | boolean | `true` | `compile`, `verify` | Run Chromium headless. `--headed` overrides it to `false`. |
+| `baseUrl` | string | unset | `map`, `compile`, `verify` | Live site origin, used when `--url` / `--base-url` is not passed. |
+| `chrome` | string | unset | `map`, `compile`, `verify` | Chrome binary. Unset means `CHROME_PATH`, then the usual install paths. |
+| `storageState` | string | unset | `map`, `verify`, `compile`, `mcp`, `serve` | Playwright storage state for pages behind auth. `PORTOLAN_STORAGE_STATE` overrides it. |
+| `start` | string | unset | `map` | Command that boots the app, e.g. `"npm run dev"`; used with `--verify`. |
+| `headless` | boolean | `true` | `map`, `compile`, `verify` | Run Chromium headless. `--headed` overrides it to `false`. |
 | `sessionTtlMs` | integer ≥ 1 | `1800000` (30 min) | `serve` | Idle time after which a session is closed. |
 | `maxOpenSessions` | integer ≥ 1 | `100` | `serve` | A create at the cap returns `429 session_limit`. |
 | `cleanupIntervalMs` | integer ≥ 1 | `60000` (60 s) | `serve` | How often the expiry sweep runs. |
@@ -45,6 +48,7 @@ older one.
   "skills": "skills",
   "policies": "policies",
   "database": "portolan.db",
+  "traces": "traces",
   "host": "127.0.0.1",
   "port": 4200,
   "headless": true,
@@ -80,6 +84,8 @@ These are read in addition to the config file:
 | `GEMINI_API_KEY` | unset | Gemini provider. |
 | `OLLAMA_HOST` | unset | Local Ollama endpoint. |
 | `DATABASE_PATH` | `portolan.db` | Used by `start.ts` (the bare server process), not `portolan serve`. |
+| `TRACES_DIR` | `traces` | Recorded traces for `mcp`, `serve`, and `map`. |
+| `PORTOLAN_STORAGE_STATE` | unset | Playwright storage state for authenticated pages. |
 | `PORT` / `HOST` | `4200` / `127.0.0.1` | Used by `start.ts`, not `portolan serve`. |
 
 `portolan doctor` reports which provider variables are set without printing
@@ -98,6 +104,7 @@ These are programmatic options, passed to `createServer` by a host:
 | `browsers` | new registry | `BrowserRegistry` for session-owned engines. |
 | `substrateFactory` | unset | Creates the browser substrate for `view`, `act`, and `read`. |
 | `ledger` | the store's SQLite ledger | The write idempotency ledger. |
+| `traceStore` | unset | A `TraceStore` for fallback and explore traces. |
 | `logger` | `false` | Fastify's request log. |
 | `log` | unset | A structured `Logger` for lifecycle events. |
 

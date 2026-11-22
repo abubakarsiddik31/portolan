@@ -1,8 +1,8 @@
 # Contributing
 
 Portolan is built task-first. Every change maps to a task ID in
-[`docs/PROJECT_PLAN.md`](./docs/PROJECT_PLAN.md), one branch, one pull request, one
-squash-merged commit.
+[`docs/PROJECT_PLAN.md`](./docs/PROJECT_PLAN.md), one branch, one pull request.
+PRs merge with a merge commit, so the branch commits stay in history.
 
 ## Setup
 
@@ -60,7 +60,7 @@ non-conforming commit or PR title fails the check.
 
 - Branch: `<type>/<task-id>-<slug>`, for example `feat/t2.13-act-hit-test`.
 - One task per branch and PR. If a task grows, split it and update the plan.
-- PR title follows the commit convention; it becomes the squash commit on `main`.
+- PR title follows the commit convention; commitlint checks it and every branch commit.
 - Fill the PR template: what, task ID, why, test plan, checklist.
 - Do not merge with a red CI run. Do not merge credentials, tokens, or captured page text.
 
@@ -73,6 +73,14 @@ non-conforming commit or PR title fails the check.
   in `test/`.
 - Prefer a small, typed module over a framework. Add a dependency only when the standard
   library or an existing dependency cannot do the job.
+
+## Releasing
+
+Changesets drives releases: add a `.changeset/*.md` file in the feature PR, merge
+the feature PR, then merge the resulting `chore(release): version packages` PR.
+The release workflow publishes to npm and creates the `vX.Y.Z` GitHub release.
+See [docs/RELEASING.md](./docs/RELEASING.md) for the full checklist, secrets,
+and recovery steps.
 
 ## Gates
 

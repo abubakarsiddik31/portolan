@@ -6,17 +6,37 @@ Portolan speaks MCP over stdio or streamable HTTP. The tools are the same.
 
 | Tool | Input | Result |
 |---|---|---|
+| `list_sites` | `{}` | Every site with a map. |
 | `open_site` | `{ site }` | The compact map, a pinned version, and a session id. |
+| `open_url` | `{ url, intent, site?, effect? }` | An explore session and a fallback scope for a site with no map. |
 | `call` | `{ op, params, confirm?, idempotency_key? }` | The op's typed result, or a typed error. |
+| `fallback_begin` | `{ intent, effect? }` | A fallback scope for finishing an intent by hand. |
 | `view` | `{ format?, max_affordances?, max_tokens? }` | URL, state, and ranked affordances. `format` is `text` (default), `json`, or `both`. |
 | `act` | `{ ref, do, value?, key? }` | The delta and effects of one semantic action. |
 | `read` | `{ ref?, format? }` | Page text, or one ref's value. Plain text by default; `format: "json"` for the envelope. |
 | `fallback_done` | `{ scope_id, result? }` | The trace for the fallback scope. |
 
+`open_site` also registers each map op as a native MCP tool named
+`<site>__<op>` (up to 30 per site) and sends a tool-list change. Native tools
+are a convenience: `call` still reaches every op, including ones past the
+budget, and clients that do not refresh their tool list can use `call` only.
+
+`open_url` is how a site with no map gets one. It opens the URL in a fallback
+scope; every `view`, `act`, and `read` is recorded, and `fallback_done` saves the
+trace under `TRACES_DIR`. Compile that trace with `portolan map build`.
+
 `call` is the fast path: it runs the op through the cheapest verified tier
 (`url`, in-page `http`, `ui`). `view` / `act` / `read` are the fallback when no
 op fits; they run inside a fallback scope, which is the permission slip for the
-agent to finish an intent by hand.
+agent to finish an intent by hand. `open_url` opens that scope implicitly;
+after `open_site` (or an `op_broken` on an open map), call `fallback_begin`
+before the first `view` / `act` / `read` so the run becomes a trace.
+
+The QA vertical has its own server, `portolan qa mcp`, with `qa_list`,
+`qa_plan`, `qa_run`, `qa_status`, `qa_result`, `qa_case_read`, `qa_case_write`,
+`qa_generate`, `qa_verify`, `qa_repair`, `qa_coverage`, and `qa_report`. It is
+deliberately separate so a coding harness pays only for the QA tools. See the
+[QA guide](/guide/qa).
 
 `view` returns the compact text list by default: one line per affordance with
 its ref, role, name, and context. That is about 60% smaller than sending the
@@ -74,10 +94,11 @@ The codes are a contract. The ones an agent branches on most:
   `Authorization: Bearer <token>`; a non-loopback bind is refused without a
   token or `PORTOLAN_ALLOW_REMOTE=1`.
 
-The stdio server reads `MAPS_DIR` and `DATABASE_PATH`. Both transports launch a
-browser on the first `view` / `act` / `read`, load `policies/<site>.json` when
-present, and close the browser with the server or the session. `serve` reads
-the config file; `mcp` reads the two environment variables.
+The stdio server reads `MAPS_DIR`, `DATABASE_PATH`, `TRACES_DIR`, and
+`PORTOLAN_STORAGE_STATE`. Both transports launch a browser on the first `view` /
+`act` / `read`, load `policies/<site>.json` when present, use the storage state
+for authenticated pages, and close the browser with the server or the session.
+`serve` reads the config file; `mcp` reads the environment variables.
 
 ## Sessions
 

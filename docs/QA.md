@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Spike branch `feat/qa-local-agent-first` (from `origin/main`). Input to ADR-010; activation is gated on ADR-006 selecting QA. |
+| **Status** | Shipped in `@abubakarsiddiik/qa` 0.1.1+ (M1 and M2). M3 is not started. |
 | **Date** | 2026-11-16 |
 | **Scope** | The QA vertical (candidate D in [VERTICALS.md](./VERTICALS.md)) as a local tool an agent drives from its coding harness. |
 | **Non-goal** | A test-management web app, hosting, scheduling, RBAC, or a TestRail/Xray/Zephyr clone. |
@@ -442,8 +442,8 @@ draft ──qa verify (N fresh replays, all pass)──▶ verified (DB record)
 |---|---|
 | `qa_list` | Case index; filters: suite, tag, status; capped |
 | `qa_plan` | Cases affected by a diff; returns ids + reasons |
-| `qa_run` | Execute a selection; returns `run_id` and summary. M1 is synchronous; async start + `qa_cancel` is M2. |
-| `qa_status` | Progress for a running `run_id` |
+| `qa_run` | Execute a selection; returns `run_id` and summary. Runs are synchronous; async start + `qa_cancel` is future work. |
+| `qa_status` | A run's status, summary, and per-case outcomes |
 | `qa_result` | One case's typed result, evidence paths, `next[]` |
 | `qa_case_read` | One case spec + status |
 | `qa_case_write` | Validate and write a case file; returns diff summary |
@@ -455,11 +455,12 @@ draft ──qa verify (N fresh replays, all pass)──▶ verified (DB record)
 
 All results use the existing envelope: `{ ok, result | error, next? }`.
 `error.code` is the agent's branch key. Page text is labeled untrusted.
+`qa doctor` and `qa sync` are CLI-only; there is no `qa_doctor` MCP tool.
 
 ### 9.2 CLI
 
 ```
-portolan qa init [--base-url URL] [--harness auto|claude|codex|cursor|opencode|gemini]
+portolan qa init [--dir DIR] [--base-url URL] [--force] [--json]
 portolan qa list [--suite S] [--tag T] [--status S] [--json]
 portolan qa plan [--changed] [--base REF] [--max N] [--json]
 portolan qa run [--changed|--suite S|--case ID...|--tag T] [--repeat N] [--json]
@@ -475,6 +476,7 @@ portolan qa coverage [--json]
 portolan qa report <run_id> [--format md|json|junit] [--out PATH]
 portolan qa sync
 portolan qa doctor [--json]
+portolan qa mcp
 ```
 
 Exit codes: `0` pass, `1` test failure, `2` usage/config error, `3` harness
@@ -484,14 +486,17 @@ error (browser missing, app unreachable).
 
 `portolan qa init` is the only onboarding step:
 
-- Writes `portolan.config.json` `qa` block (or offers to merge).
-- Writes `.mcp.json`/client config for the detected harness, or prints the
-  exact snippet and exits non-zero if it cannot detect one.
-- Installs `portolan-qa` skill into the detected skills directory.
+- Writes `portolan.config.json` `qa` block (or merges into an existing one).
+- Writes `.mcp.json` when Claude Code is detected. For every other harness
+  (Codex, Cursor, opencode, Gemini CLI, VS Code) it detects the harness and
+  prints the exact MCP snippet; the user adds it to that harness's config. It
+  never edits a config it cannot safely merge, and an unknown harness still
+  exits `0` with the snippet.
+- Installs `portolan-qa` skill into `skills/portolan-qa/SKILL.md`.
 - Adds only `.portolan/` to `.gitignore`. Cases live in `qa/` and are
   committed and reviewed; runs and evidence are not.
-- Adds `"qa": "portolan qa run --changed"` to `package.json` when present.
-- Runs `qa doctor` and prints a single machine-readable line per check.
+- Does not modify `package.json`.
+- Does not run `qa doctor`; run it yourself after wiring the harness.
 
 ### 9.4 Skill
 
@@ -524,7 +529,7 @@ error (browser missing, app unreachable).
     "headless": true,
     "evidence": "failures",
     "maxCases": 50,
-    "fixtures": "qa/fixtures",
+    "fixtures": "qa/fixtures.json",
     "maps": "maps",
     "screenshot": false,
     "redact": ["password", "token", "secret", "authorization", "cookie"]
@@ -533,12 +538,13 @@ error (browser missing, app unreachable).
 ```
 
 Credentials are references (`${env.QA_PASSWORD}`), resolved at execution and
-never persisted. `QA_BASE_URL` overrides `baseUrl`, which lets a harness point
-at a preview deployment without editing config.
+never persisted. `QA_BASE_URL` overrides `baseUrl` and `QA_DATABASE` overrides
+`database`, which lets a harness point at a preview deployment or a disposable
+database without editing config.
 
 ## 11. Milestones
 
-### M1 — this branch (vertical slice, shippable)
+### M1 — vertical slice (shipped in 0.1.0)
 
 - `@abubakarsiddiik/qa`: config, case/suite schema, file IO, SQLite store with
   migrations, sync, runner (goto + UI steps + map op steps + assertions +
@@ -551,13 +557,14 @@ at a preview deployment without editing config.
   surface; it does not replace the measurement.
 - CLI: `qa init`, `list`, `plan`, `run`, `result`, `case read|write`, `verify`,
   `sync`, `report`, `doctor`.
-- MCP: the read/run/verify tools; `generate|repair` return a typed
-  `not_implemented` until M2.
+- MCP: 12 tools — `qa_list`, `qa_plan`, `qa_run`, `qa_status`, `qa_result`,
+  `qa_case_read`, `qa_case_write`, `qa_verify`, `qa_coverage`, `qa_report`,
+  `qa_generate`, `qa_repair`.
 - Skill: `portolan-qa`.
 - Tests: unit for spec, store, plan, checks, redaction; integration with an
   injected fake substrate; one real-browser test gated on Chrome.
 
-### M2 — generation and self-healing
+### M2 — generation and self-healing (shipped in 0.1.1)
 
 - `qa generate --from-trace`: trace → draft case, plus `--spec`
   normalization. Views become `goto` steps when the route changes and no
@@ -574,8 +581,9 @@ at a preview deployment without editing config.
   the op tier remain future work).
 - JUnit export (report renderer). Adapter export (Jira/Xray/TestRail/Qase)
   behind a stable interface is future work.
-- Flake quarantine policy (recorded, `quarantined` rows) and `qa doctor`
-  drift detection remain future work.
+- Flake quarantine (recorded `quarantined` rows, skipped by `qa plan`) and
+  `qa doctor` spec-drift detection are implemented. Async run start and
+  `qa_cancel` remain future work.
 
 ### M3 — after G0/ADR-006 confirms the vertical
 

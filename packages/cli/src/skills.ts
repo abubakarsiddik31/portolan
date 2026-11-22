@@ -18,8 +18,10 @@ with a reason. Never invent an op.
 
 ## Loop
 
-1. Read the repo: routes, API handlers, forms, buttons, menus, e2e tests.
-   Add capabilities the crawl cannot see:
+1. Inventory the codebase: routes, API handlers, forms, buttons, menus, e2e
+   tests. If you have no repository access, browse the live app instead and
+   treat every page, link, form, and button you see as a capability. Add what
+   the crawl cannot see:
    \`portolan map capability add --site <site> --maps ./portolan/maps --page <page> --kind button --name "<label>" --source code\`
 
 2. Inventory the live app (use a storage state for auth):
@@ -29,7 +31,9 @@ with a reason. Never invent an op.
    \`portolan map coverage --site <site> --maps ./portolan/maps --json\`
 
 4. Resolve every \`missing\` and \`stale\` entry:
-   - Record one run: \`open_url(url, intent)\` then \`view\` / \`act\` / \`read\`, then \`fallback_done(scope_id)\`.
+   - Your own browser is reconnaissance, not a trace. Record one run through
+     Portolan's MCP browser tools: \`open_url(url, intent)\` (or \`open_site\` then
+     \`fallback_begin\`), \`view\` / \`act\` / \`read\`, then \`fallback_done(scope_id)\`.
      Compile it: \`portolan map build --site <site> --maps ./portolan/maps --traces-dir ./portolan/traces --verify --publish\`
    - Or exclude it with a reason:
      \`portolan map capability set --site <site> --maps ./portolan/maps --id <id> --status excluded --reason "<why>"\`
@@ -43,7 +47,8 @@ with a reason. Never invent an op.
 - Use a dedicated test account. Never run delete, checkout, upgrade, sign-out,
   or credit-spending actions; exclude them with a reason.
 - Commit \`capabilities.json\`, \`draft.json\`, \`tasks.json\`, and \`v*.json\`.
-- Re-run \`portolan map update\` after the app changes; do not delete gaps.
+- Keep the map in sync: \`portolan map update\` after the app changes, then
+  rebuild traces and re-check coverage; do not delete gaps.
 
 Definition of done: \`0 missing, 0 stale\`, every mapped op verified, every
 exclusion has a reason, and \`--require-complete --publish\` succeeds.

@@ -18,3 +18,7 @@ Fix QA process hangs, repair on minimal cases, and map coverage on refresh.
 - `@abubakarsiddiik/portolan`: `map build/update` keeps a live capability
   `mapped` when the published map already has an op for it, instead of marking
   it missing after a refresh. `qa init` now tells the agent to read the skill.
+  The setup prompt and the installed `portolan-map` skill make building and
+  syncing the map the goal, cover a codebase-less agent that inventories by
+  browsing the live app, and distinguish its own browser (reconnaissance) from
+  Portolan-recorded runs (compilable traces).

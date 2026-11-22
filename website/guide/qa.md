@@ -16,9 +16,11 @@ portolan qa init --base-url http://127.0.0.1:3000
 ```
 
 This writes `portolan.config.json`, the `qa/cases` and `qa/suites`
-directories, the `portolan-qa` skill, and the MCP entry for a detected
-harness. Restart the harness so the QA tools load. `portolan qa doctor`
-checks config, database, and the browser.
+directories, `skills/portolan-qa/SKILL.md`, and `.mcp.json` when Claude Code is
+detected. For any other harness it prints the MCP snippet to add to that
+harness's own config. Ask the agent to read the skill, then restart the harness
+so the QA tools load. `portolan qa doctor` (CLI) checks config, database, and
+the browser; there is no `qa_doctor` MCP tool.
 
 ## The loop
 
@@ -76,6 +78,7 @@ references. Evidence is redacted before it is written.
 | `qa_list` | Case index with status, suite, tags |
 | `qa_plan` | Cases affected by the current diff |
 | `qa_run` | Execute a selection; typed per-case results |
+| `qa_status` | A run's status, summary, and per-case outcomes |
 | `qa_result` | One case's failure: expected vs actual, evidence paths, `next[]` |
 | `qa_case_read` / `qa_case_write` | Read or write a case file |
 | `qa_generate` | Normalize a spec or a recorded trace into a draft |

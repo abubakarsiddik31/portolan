@@ -27,7 +27,7 @@ carries execution and safety, Agent Skills carry the know-how. The same
 substrate powers **agent-first QA**: your coding agent authors, runs, and
 repairs end-to-end tests as JSON files in your repo.
 
-<details open>
+<details>
 <summary><strong>Copy-paste setup prompt for your agent</strong></summary>
 
 Paste this into OpenCode, Claude Code, Codex, Cursor, Gemini CLI, or any
@@ -55,16 +55,22 @@ Setup
 1. Check Node version and Chrome/Chromium. Require Node >= 22.12. If either is missing, tell me what to install and stop.
 2. Install the Portolan CLI: npm install -g @abubakarsiddiik/portolan. If global installs are blocked, use npx @abubakarsiddiik/portolan for every command.
 3. Run portolan doctor and report the result.
-4. Ask me for the site name. Then run: portolan init ./portolan --site <site>. This installs ./portolan/skills/portolan-map/SKILL.md (how to build the map) and ./portolan/skills/portolan/SKILL.md (how to use it).
-5. Read ./portolan/skills/portolan-map/SKILL.md and follow it. Check ./portolan/maps/<site>/ for a map version (v*.json). If none exists, do not ask me to write JSON. Build one from the live app:
+4. Ask me for the site name. Then run: portolan init ./portolan --site <site>. This installs ./portolan/skills/portolan-map/SKILL.md (how to build and keep the map complete) and ./portolan/skills/portolan/SKILL.md (how to use it).
+5. Read ./portolan/skills/portolan-map/SKILL.md and follow it until the map is complete. Do not ask me to write JSON.
    - Ask me only for the app URL (or read baseUrl from portolan.config.json) and the dev-server command, if they are not obvious.
    - Run: portolan map build --maps ./portolan/maps --site <site> --url <url> --verify --publish [--start "<dev command>"]
-   - If nothing verifies, call open_url with the URL and one intent, finish that task with view/act/read, call fallback_done, then rerun `portolan map build --maps ./portolan/maps --traces-dir ./portolan/traces --site <site> --verify --publish`.
-   - If the app is behind auth, run `portolan auth login --url <sign-in page> --out ./portolan/auth.json`, then add `--storage-state ./portolan/auth.json` to the map commands. Use the signed-in URL (e.g. `/dashboard`) as `--url`.
+   - For pages behind auth, run portolan auth login --url <sign-in page> --out ./portolan/auth.json, add --storage-state ./portolan/auth.json to every map command, and use the signed-in URL (e.g. /dashboard) as --url.
+   - Read the repository's routes, API handlers, forms, and tests. Add capabilities the crawl cannot see:
+     portolan map capability add --maps ./portolan/maps --site <site> --page <page> --kind button --name "<label>" --source code
+   - Read the gaps: portolan map coverage --maps ./portolan/maps --site <site> --json
+   - For every missing or stale capability, either record one run through Portolan (open_url -> view/act/read -> fallback_done, then portolan map build --maps ./portolan/maps --traces-dir ./portolan/traces --site <site> --verify --publish) or exclude it with a reason:
+     portolan map capability set --maps ./portolan/maps --site <site> --id <id> --status excluded --reason "<why>"
+   - A run in your own browser tool does not reach Portolan. Use the Portolan MCP browser tools so the trace is recorded.
+   - Repeat until this passes: portolan map build --maps ./portolan/maps --site <site> --url <url> --require-complete --verify --publish
+   - After the app changes, refresh: portolan map update --maps ./portolan/maps --site <site> --url <url> --verify --publish
+   - Commit ./portolan/maps/<site>/capabilities.json, draft.json, tasks.json, and v*.json with the app.
+   - Only ask me to help when discovery finds nothing to start from or a capability needs a decision only I can make.
    - Use the demo store only if I ask to try Portolan without my app.
-   - After the app changes, refresh the map with `portolan map update --maps ./portolan/maps --site <site> --url <url> --verify --publish`.
-   - Do not stop at a partial map. Read `capabilities.json`, resolve every `missing`/`stale` entry from the codebase and the live app, then rerun with `--require-complete` (see the coverage loop in the build-a-map guide).
-   - Only ask me to help when discovery finds no page, no form, and no link to start from.
 6. Configure my MCP client for this harness to spawn:
    command: portolan
    args: ["mcp"]
@@ -119,8 +125,14 @@ recorded run proves them. Every build writes `draft.json`, `tasks.json`, and
 `capabilities.json` next to the map. The capability ledger lists every link,
 form, and button the crawl saw; `map coverage` reports what is still missing,
 and `--require-complete` refuses to publish until every entry is mapped or
-excluded with a reason. The `portolan-map` skill tells a coding agent how to
-work that queue from the codebase and the live app.
+excluded with a reason:
+
+```bash
+portolan map coverage --site herbie --maps ./portolan/maps
+```
+
+The `portolan-map` skill tells a coding agent how to work that queue from the
+codebase and the live app.
 
 For pages behind auth, sign in once with `portolan auth login --url <sign-in page> --out ./portolan/auth.json`, then pass `--storage-state ./portolan/auth.json` (and set `PORTOLAN_STORAGE_STATE` for the MCP server). Portolan never sees the password.
 
@@ -215,7 +227,7 @@ deterministically (no model in the run path), reads typed failures with
 evidence, and repairs broken locators after a UI change.
 
 ```bash
-portolan qa init           # config, qa/cases, skill, MCP wiring, doctor
+portolan qa init           # config, qa/cases, skill, MCP snippet
 ```
 
 Then let the agent work the loop: `qa_plan` after a diff, `qa_run` the
@@ -279,7 +291,7 @@ hand-written operations beat a step-by-step browser agent on steps and cost
 before building more. See [the build plan](./docs/BUILD_PLAN.md) and
 [decisions](./docs/DECISIONS.md).
 
-**v0.1.1** is the current alpha, published to npm as `@abubakarsiddiik/*`
+**v0.2.0** is the current alpha, published to npm as `@abubakarsiddiik/*`
 (v0.1.0 was the first public release). The G0–G2 gates have not passed yet, so
 treat it as an early alpha: `webmcp` is reserved in the map format and has no
 executor.

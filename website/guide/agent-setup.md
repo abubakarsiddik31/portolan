@@ -30,16 +30,22 @@ Setup
 1. Check Node version and Chrome/Chromium. Require Node >= 22.12. If either is missing, tell me what to install and stop.
 2. Install the Portolan CLI: npm install -g @abubakarsiddiik/portolan. If global installs are blocked, use npx @abubakarsiddiik/portolan for every command.
 3. Run portolan doctor and report the result.
-4. Ask me for the site name. Then run: portolan init ./portolan --site <site>. This installs ./portolan/skills/portolan-map/SKILL.md (how to build the map) and ./portolan/skills/portolan/SKILL.md (how to use it).
-5. Read ./portolan/skills/portolan-map/SKILL.md and follow it. Check ./portolan/maps/<site>/ for a map version (v*.json). If none exists, do not ask me to write JSON. Build one from the live app:
+4. Ask me for the site name. Then run: portolan init ./portolan --site <site>. This installs ./portolan/skills/portolan-map/SKILL.md (how to build and keep the map complete) and ./portolan/skills/portolan/SKILL.md (how to use it).
+5. Read ./portolan/skills/portolan-map/SKILL.md and follow it until the map is complete. Do not ask me to write JSON.
    - Ask me only for the app URL (or read baseUrl from portolan.config.json) and the dev-server command, if they are not obvious.
    - Run: portolan map build --maps ./portolan/maps --site <site> --url <url> --verify --publish [--start "<dev command>"]
-   - If nothing verifies, call open_url with the URL and one intent, finish that task with view/act/read, call fallback_done, then rerun `portolan map build --maps ./portolan/maps --traces-dir ./portolan/traces --site <site> --verify --publish`.
-   - If the app is behind auth, run `portolan auth login --url <sign-in page> --out ./portolan/auth.json`, then add `--storage-state ./portolan/auth.json` to the map commands. Use the signed-in URL (e.g. `/dashboard`) as `--url`.
+   - For pages behind auth, run portolan auth login --url <sign-in page> --out ./portolan/auth.json, add --storage-state ./portolan/auth.json to every map command, and use the signed-in URL (e.g. /dashboard) as --url.
+   - Read the repository's routes, API handlers, forms, and tests. Add capabilities the crawl cannot see:
+     portolan map capability add --maps ./portolan/maps --site <site> --page <page> --kind button --name "<label>" --source code
+   - Read the gaps: portolan map coverage --maps ./portolan/maps --site <site> --json
+   - For every missing or stale capability, either record one run through Portolan (open_url -> view/act/read -> fallback_done, then portolan map build --maps ./portolan/maps --traces-dir ./portolan/traces --site <site> --verify --publish) or exclude it with a reason:
+     portolan map capability set --maps ./portolan/maps --site <site> --id <id> --status excluded --reason "<why>"
+   - A run in your own browser tool does not reach Portolan. Use the Portolan MCP browser tools so the trace is recorded.
+   - Repeat until this passes: portolan map build --maps ./portolan/maps --site <site> --url <url> --require-complete --verify --publish
+   - After the app changes, refresh: portolan map update --maps ./portolan/maps --site <site> --url <url> --verify --publish
+   - Commit ./portolan/maps/<site>/capabilities.json, draft.json, tasks.json, and v*.json with the app.
+   - Only ask me to help when discovery finds nothing to start from or a capability needs a decision only I can make.
    - Use the demo store only if I ask to try Portolan without my app.
-   - After the app changes, refresh the map with `portolan map update --maps ./portolan/maps --site <site> --url <url> --verify --publish`.
-   - Do not stop at a partial map. Read `capabilities.json`, resolve every `missing`/`stale` entry from the codebase and the live app, then rerun with `--require-complete` (see the coverage loop in the build-a-map guide).
-   - Only ask me to help when discovery finds no page, no form, and no link to start from.
 6. Configure my MCP client for this harness to spawn:
    command: portolan
    args: ["mcp"]
@@ -65,14 +71,35 @@ The agent will:
 
 1. Read the linked guide and reference pages before changing the project.
 2. Install `@abubakarsiddiik/portolan` and check your browser.
-3. Create a Portolan workspace with `portolan init`.
-4. Build a map from the live app when none exists, and refresh it when the app changes.
-5. Add the `portolan mcp` server to your client config with absolute paths.
-6. Ask you to restart the session so the tools load.
-7. Use `open_site`, `call`, `view`, `act`, and `read` for the actual work.
+3. Create a Portolan workspace with `portolan init`; this also installs the
+   `portolan-map` and `portolan` skills into the workspace.
+4. Build a map from the live app when none exists, including pages behind auth,
+   and refresh it with `portolan map update` when the app changes.
+5. Read the repository as well as the live app, then work
+   `maps/<site>/capabilities.json` until every capability is `mapped` or
+   explicitly `excluded`. `--require-complete` is the gate.
+6. Add the `portolan mcp` server to your client config with absolute `MAPS_DIR`,
+   `DATABASE_PATH`, `TRACES_DIR`, and (for authenticated apps)
+   `PORTOLAN_STORAGE_STATE`.
+7. Ask you to restart the session so the tools load.
+8. Use `open_site`, `call`, `view`, `act`, and `read` for the actual work.
 
-The prompt tells the agent to ask before writing files and before irreversible
-operations. It never retries a write with an unknown outcome.
+The prompt tells the agent to ask before destructive or irreversible operations.
+It never retries a write with an unknown outcome, and it does not claim a map is
+complete while the capability ledger has gaps.
+
+## Coverage is part of setup
+
+A map is not "done" when the first crawl succeeds. The agent must:
+
+```bash
+portolan map coverage --site <site> --maps ./portolan/maps --json
+```
+
+For every `missing` or `stale` entry, it records a run through Portolan's
+browser tools or excludes the capability with a reason, then reruns the build
+with `--require-complete`. A run in a separate browser tool is not recorded by
+Portolan and cannot become an op.
 
 ## After setup
 

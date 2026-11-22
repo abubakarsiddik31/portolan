@@ -84,6 +84,8 @@ These are read in addition to the config file:
 | `GEMINI_API_KEY` | unset | Gemini provider. |
 | `OLLAMA_HOST` | unset | Local Ollama endpoint. |
 | `DATABASE_PATH` | `portolan.db` | Used by `start.ts` (the bare server process), not `portolan serve`. |
+| `TRACES_DIR` | `traces` | Recorded traces for `mcp`, `serve`, and `map`. |
+| `PORTOLAN_STORAGE_STATE` | unset | Playwright storage-state file for authenticated pages. |
 | `PORT` / `HOST` | `4200` / `127.0.0.1` | Used by `start.ts`, not `portolan serve`. |
 
 `portolan doctor` reports which provider variables are set without printing
@@ -102,6 +104,7 @@ These are programmatic options, passed to `createServer` by a host:
 | `browsers` | new registry | `BrowserRegistry` for session-owned engines. |
 | `substrateFactory` | unset | Creates the browser substrate for `view`, `act`, and `read`. |
 | `ledger` | the store's SQLite ledger | The write idempotency ledger. |
+| `traceStore` | unset | A `TraceStore` for fallback and explore traces. |
 | `logger` | `false` | Fastify's request log. |
 | `log` | unset | A structured `Logger` for lifecycle events. |
 

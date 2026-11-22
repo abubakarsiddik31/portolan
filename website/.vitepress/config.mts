@@ -76,6 +76,7 @@ export default defineConfig({
             { text: "Security", link: "/project/security" },
             { text: "Benchmark", link: "/project/benchmark" },
             { text: "Licensing", link: "/project/licensing" },
+            { text: "Releasing", link: "/project/releasing" },
           ],
         },
       ],

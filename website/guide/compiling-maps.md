@@ -50,7 +50,31 @@ portolan map build --site careerkor \
 
 The same file works for `portolan verify`, `portolan compile`, and the MCP
 runtime (`PORTOLAN_STORAGE_STATE` or `storageState` in the config). A different
-account or an expired session means a new file.
+account means a new file.
+
+#### Unattended sign-in, for CI and long builds
+
+A build can outlast a 15 to 60 minute token, and CI has no one to type a password.
+Describe the sign-in once and Portolan replays it headless:
+
+```bash
+APP_USER=ada APP_PASSWORD=... portolan auth login \
+  --url https://careerkor.com/sign-in --out ./.portolan/state/auth.json \
+  --fill "textbox:Username or email=APP_USER" --fill "Password=APP_PASSWORD" \
+  --submit "Sign in"
+```
+
+- Values come from the environment variable, or from the file named by `APP_USER_FILE`.
+  They are never printed and never written to a config file or the recipe.
+- A field is found by role and name, then by a partial name, then by its order on the
+  page, so a label with no accessible name still works. For a sign-in that needs more,
+  `--script login.mjs` exports `default async (page) => {...}` and leaves the page signed in.
+- The recipe is saved beside the session as `auth.json.recipe.json` (variable names only).
+  `portolan auth refresh --out ./.portolan/state/auth.json`, or `--env local`, replays it.
+- With that `--storage-state`, `map build --verify` replaces a session that is about to
+  expire before it starts, and signs in once more and retries an op that failed because the
+  session lapsed.
+- `portolan auth status --storage-state auth.json` shows when the token expires.
 
 ## Update the map when the app changes
 

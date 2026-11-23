@@ -37,19 +37,32 @@ Serve MCP over stdio, for an MCP client to spawn.
 Options:
 ${CONFIG_FLAG}`,
 
-  auth: `portolan auth <login|status> [options]
+  auth: `portolan auth <login|refresh|status> [options]
 
-login   open a browser, sign in, and save the session for --storage-state
-status  list environment profiles and whether a session is saved
+login    sign in and save the session for --storage-state: with a person at a
+         browser, or unattended with --fill/--script
+refresh  replay the recipe saved by an unattended login and replace the session
+status   list environment profiles and whether a session is saved, with the
+         token's expiry when one can be read (--storage-state <file> for one file)
 
 Options (login):
   --url <url>            sign-in page
   --out <file>           where to save the session
   --env <name>           use a named environment from the config
   --profile <name>       profile within that environment
-  --timeout-ms <n>       how long to wait for sign-in (default 300000)
+  --fill "role:Label=ENV"  fill a field from an environment variable (repeatable);
+                         the value is read from ENV or the file ENV_FILE points to,
+                         and is never printed or stored
+  --submit "<button>"    the submit button's name (default: a button that reads like one)
+  --script <file.mjs>    instead of --fill: a module whose default export is
+                         async (page) => void and leaves the page signed in
+  --timeout-ms <n>       how long to wait for a person to sign in (default 300000)
   --chrome <path>        Chrome binary
-${CONFIG_FLAG}`,
+${CONFIG_FLAG}
+
+A recipe is saved beside the session as <file>.recipe.json (env var names only).
+map build and verify with that --storage-state refresh the session once and retry
+an op that failed because the session lapsed.`,
 
   map: `portolan map <build|update|coverage|record|capability> [traces...] [options]
 

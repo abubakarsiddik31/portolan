@@ -891,3 +891,99 @@ describe("entry points and routes", () => {
     expect(result.discovery?.visited).toContain("http://app.test/cart");
   });
 });
+
+describe("session refresh during a build", () => {
+  const build = (dir: string, extra: Record<string, unknown> = {}) => ({
+    site: "app",
+    mapsDir: dir,
+    url: "http://app.test/",
+    verify: true,
+    verifyWrites: false,
+    publish: false,
+    appVersion: "build-1",
+    ...extra,
+  });
+
+  it("signs in again once and retries an op that failed because the session lapsed", async () => {
+    let refreshed = 0;
+    const calls = new Map<string, number>();
+    const lapsing: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => {
+      const n = (calls.get(options.op.name) ?? 0) + 1;
+      calls.set(options.op.name, n);
+      if (options.op.name === "open_cart" && refreshed === 0) {
+        return {
+          op: "open_cart",
+          verified: false,
+          impls: [],
+          reason: 'op "open_cart" needs home, found login',
+        } satisfies VerifyReport;
+      }
+      return { op: options.op.name, verified: true, impls: [] } satisfies VerifyReport;
+    };
+
+    const result = await runMapBuild(build(tempDir()), {
+      substrate,
+      verify: lapsing,
+      refreshAuth: async () => {
+        refreshed += 1;
+      },
+    });
+
+    expect(refreshed).toBe(1);
+    expect(calls.get("open_cart")).toBe(2);
+    expect(result.verified).toContain("open_cart");
+  });
+
+  it("does not sign in again for an op that is simply broken", async () => {
+    let refreshed = 0;
+    const broken: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) =>
+      ({
+        op: options.op.name,
+        verified: false,
+        impls: [],
+        reason: "locator did not resolve",
+      }) satisfies VerifyReport;
+
+    await expect(
+      runMapBuild(build(tempDir(), { publish: true }), {
+        substrate,
+        verify: broken,
+        refreshAuth: async () => {
+          refreshed += 1;
+        },
+      }),
+    ).rejects.toThrow(/nothing verified/);
+    expect(refreshed).toBe(0);
+  });
+
+  it("replaces a session that is about to expire before verifying", async () => {
+    const dir = tempDir();
+    const exp = Math.floor(Date.now() / 1000) + 60;
+    const token = `${Buffer.from(`{"alg":"HS256"}`).toString("base64url")}.${Buffer.from(JSON.stringify({ exp })).toString("base64url")}.signature`;
+    const storageState = join(dir, "auth.json");
+    writeFileSync(
+      storageState,
+      JSON.stringify({
+        cookies: [],
+        origins: [{ origin: "http://app.test", localStorage: [{ name: "t", value: token }] }],
+      }),
+    );
+
+    const order: string[] = [];
+    const recording: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => {
+      order.push("verify");
+      return { op: options.op.name, verified: true, impls: [] } satisfies VerifyReport;
+    };
+
+    await runMapBuild(build(join(dir, "maps"), { storageState }), {
+      substrate,
+      verify: recording,
+      refreshAuth: async () => {
+        order.push("refresh");
+      },
+    });
+
+    expect(order[0]).toBe("refresh");
+    expect(order.filter((step) => step === "refresh")).toHaveLength(1);
+  });
+});

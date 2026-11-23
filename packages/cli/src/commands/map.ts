@@ -48,6 +48,8 @@ import {
   Substrate,
 } from "@abubakarsiddiik/substrate";
 
+import { readRecipe, runAuthRefresh } from "./auth.js";
+import { looksLikeAuthFailure, sessionExpiry } from "./auth-recipe.js";
 import { paramSetsFor } from "./param-sets.js";
 import { riskOf } from "./risk.js";
 import { appFingerprint, opHash, readVerification, writeVerification } from "./verification.js";
@@ -116,6 +118,8 @@ export type MapBuildInput = {
 export type MapBuildDeps = {
   substrate?: Substrate;
   closeSubstrate?: () => Promise<void>;
+  /** Sign in again and replace the session. Default: replay the recipe saved beside --storage-state. */
+  refreshAuth?: () => Promise<void>;
   verify?: typeof verifyOp;
   publish?: typeof publishMap;
   now?: string;
@@ -518,7 +522,36 @@ export async function runMapBuild(
         });
       }
 
-      const run = async (job: Job): Promise<VerifyReport> => {
+      const refresh =
+        deps.refreshAuth ??
+        (input.storageState !== undefined && readRecipe(input.storageState) !== undefined
+          ? async () => {
+              await runAuthRefresh({
+                out: input.storageState as string,
+                ...(input.chrome !== undefined ? { chrome: input.chrome } : {}),
+              });
+            }
+          : undefined);
+      // Concurrent runs that all see the lapse share one sign-in.
+      let refreshing: Promise<void> | undefined;
+      const refreshOnce = async (): Promise<void> => {
+        refreshing ??= refresh?.().finally(() => {
+          refreshing = undefined;
+        });
+        await refreshing;
+      };
+
+      // A session that will not outlast the build is replaced before it starts.
+      if (refresh !== undefined && input.storageState !== undefined && jobs.length > 0) {
+        try {
+          const expiresAt = sessionExpiry(JSON.parse(readFileSync(input.storageState, "utf8")));
+          if (expiresAt !== undefined && expiresAt - Date.now() < 5 * 60_000) await refreshOnce();
+        } catch {
+          // An unreadable session is left to fail on its own.
+        }
+      }
+
+      const attempt = async (job: Job): Promise<VerifyReport> => {
         try {
           return await (deps.verify ?? verifyOp)({
             map: draftMap(draft),
@@ -541,6 +574,29 @@ export async function runMapBuild(
             }`,
           };
         }
+      };
+
+      const run = async (job: Job): Promise<VerifyReport> => {
+        const report = await attempt(job);
+        if (report.verified || refresh === undefined) return report;
+
+        const said = [
+          report.reason ?? "",
+          ...report.impls.flatMap((impl) => impl.runs.map((r) => r.message ?? "")),
+        ];
+        if (!said.some(looksLikeAuthFailure)) return report;
+
+        try {
+          await refreshOnce();
+        } catch (error) {
+          return {
+            ...report,
+            reason: `${report.reason ?? "every impl failed"}; the session lapsed and signing in again failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          };
+        }
+        return attempt(job);
       };
 
       // Reads run side by side, each in its own context. A write runs alone, so

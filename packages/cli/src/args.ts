@@ -8,6 +8,7 @@ export type ParsedArgs = {
 /** Flags that never take a value, so `--publish trace.json` leaves the trace positional. */
 const BOOLEAN_FLAGS = new Set([
   "allow-cost",
+  "explore",
   "force",
   "headed",
   "json",

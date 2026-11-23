@@ -21,13 +21,17 @@ import {
   type CapabilityLedger,
   coverageOf,
   createDraft,
+  DEFAULT_RULES,
   type DomDiscovery,
   type DraftTask,
   discoverDom,
   formatCoverage,
   type MapDraft,
+  mineRoutes,
   type OpProposal,
+  type RouteFramework,
   readCapabilities,
+  readRoutesFile,
   uniqueName,
   upgradeVerified,
   writeCapabilities,
@@ -39,6 +43,8 @@ import {
   findChrome,
   loadPolicy,
   PlaywrightEngine,
+  type PolicyRule,
+  ruleMatchesLabel,
   Substrate,
 } from "@abubakarsiddiik/substrate";
 
@@ -85,6 +91,16 @@ export type MapBuildInput = {
   allowCost?: boolean;
   /** Keep a layout control seen on many pages as one capability per page. */
   noDedupe?: boolean;
+  /** More entry points, crawled in the same discovery as `url`. */
+  urls?: string[];
+  /** A file of routes (one path per line, or a JSON array) the app is known to have. */
+  routesPath?: string;
+  /** Read the route table from source: react-router, next, or sveltekit. */
+  routesFrom?: RouteFramework;
+  /** Source directory for `routesFrom`. Default `src`. */
+  src?: string;
+  /** Click safe buttons during discovery to find routes only a button reaches. */
+  explore?: boolean;
   /** Do not propose postconditions from recorded runs. */
   noInferPost?: boolean;
   /** An op with no postcondition is not verified unless `no_post` marks it deliberate. */
@@ -193,6 +209,24 @@ export async function runMapBuild(
     );
     const entry = input.url ?? stateUrls[0];
 
+    const routes = [
+      ...(input.routesPath !== undefined ? readRoutesFile(input.routesPath) : []),
+      ...(input.routesFrom !== undefined ? mineRoutes(input.routesFrom, input.src ?? "src") : []),
+    ];
+    // A route with no parameters can be opened as it is; a parameterized one
+    // is crawled only if a link leads there, and reported if none does.
+    const extraUrls = [
+      ...(input.urls ?? []),
+      ...routes
+        .filter((route) => !route.includes(":"))
+        .map((route) => new URL(route, origin).toString()),
+    ];
+    const exploreBlocked: PolicyRule[] = [
+      ...DEFAULT_RULES,
+      ...policyRules,
+      ...(input.exclude ?? []).map((label) => ({ category: "manual", label })),
+    ];
+
     if (entry !== undefined) {
       let substrate = deps.substrate;
       if (substrate === undefined) {
@@ -207,6 +241,17 @@ export async function runMapBuild(
         substrate,
         ...(stateUrls.length > 0
           ? { urls: input.url === undefined ? stateUrls.slice(1) : stateUrls, follow: false }
+          : extraUrls.length > 0
+            ? { urls: extraUrls }
+            : {}),
+        ...(routes.length > 0 ? { routes } : {}),
+        ...(input.explore === true
+          ? {
+              explore: {
+                safe: (name: string) =>
+                  !exploreBlocked.some((rule) => ruleMatchesLabel(rule, name)),
+              },
+            }
           : {}),
         ...(input.maxPages !== undefined ? { maxPages: input.maxPages } : {}),
         reserved: { linkTargets: reservedTargets },

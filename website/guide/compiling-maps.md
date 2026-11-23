@@ -72,6 +72,30 @@ fallback_done(scope_id)  → saves the trace
 
 Then `portolan map build --site herbie` compiles the trace into candidates.
 
+## Reaching routes a link does not
+
+Discovery follows links. A single-page app often navigates with buttons, list rows, and
+workspace switchers, so pages behind them never get crawled. Three flags close the gap:
+
+```bash
+portolan map build --site app \
+  --url http://localhost:5173/admin --url http://localhost:5173/app \
+  --routes-from react-router --src ./src \
+  --explore --verify --publish
+```
+
+- Repeat `--url` to crawl several entry points in one discovery, so a page is not marked
+  `removed` only because another entry point did not reach it.
+- `--routes <file>` (one path per line, or a JSON array) and `--routes-from
+  react-router|next|sveltekit` list the routes the app has. Routes without parameters are
+  crawled directly; at the end `N routes not reached: ...` lists the ones no page matched.
+  The react-router reader finds `path="..."` and `path: "..."` strings, so a nested
+  relative path is read as written.
+- `--explore` clicks buttons during discovery, only ones no policy rule matches (the
+  shipped rules and `policies/<site>.json`, plus `--exclude`), never one inside a form, and
+  reloads the page after each click. A click that lands on a new route is queued and
+  recorded as a `go_<button>` op.
+
 ## What "verified" proves
 
 A `ui` op that only clicks verifies as soon as the locator resolves, so a filter that

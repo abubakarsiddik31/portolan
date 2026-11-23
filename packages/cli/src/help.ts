@@ -64,7 +64,11 @@ capability add|set   record a capability manually (--page --name --kind
 Options (build, update):
   --site <name>          site name (default: from config)
   --maps <dir>           maps directory
-  --url <url>            entry URL for DOM discovery
+  --url <url>            entry URL for DOM discovery; repeat for several entry points
+  --routes <file>        routes the app has (one path per line, or a JSON array)
+  --routes-from <fw>     read the route table from source: react-router, next, sveltekit
+  --src <dir>            source directory for --routes-from (default src)
+  --explore              click safe buttons to find routes only a button reaches
   --base-url <url>       origin to verify against (default: --url origin)
   --max-pages <n>        pages to crawl
   --state <id>           (update) re-crawl and re-verify only this state (repeatable;

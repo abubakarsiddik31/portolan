@@ -40,10 +40,10 @@ can therefore look like this:
 
 | Package | Version |
 |---|---|
-| `@abubakarsiddiik/portolan` | 0.2.0 |
-| `@abubakarsiddiik/sources` | 0.2.0 |
-| `@abubakarsiddiik/qa` | 0.1.2 |
-| `@abubakarsiddiik/runtime` | 0.1.1 |
+| `@abubakarsiddiik/portolan` | 0.2.2 |
+| `@abubakarsiddiik/sources` | 0.2.2 |
+| `@abubakarsiddiik/qa` | 0.1.4 |
+| `@abubakarsiddiik/runtime` | 0.1.3 |
 | `@abubakarsiddiik/model` | 0.1.0 (unchanged) |
 
 The umbrella tag follows `packages/cli/package.json`, not the highest version
@@ -72,7 +72,7 @@ gh release create "v$(node -p "require('./packages/cli/package.json').version")"
 ## Troubleshooting
 
 - **`npm view` shows an old version.** The registry and npm CLI cache lag.
-  Check the exact version instead: `curl -sS https://registry.npmjs.org/@abubakarsiddiik%2fportolan/0.2.0`.
+  Check the exact version instead: `curl -sS https://registry.npmjs.org/@abubakarsiddiik%2fportolan/0.2.2`.
 - **A release page is missing but the tag exists.** The umbrella release was
   created manually in earlier releases. From v0.2.0, the release workflow
   creates it. Backfill with `gh release create vX.Y.Z --verify-tag`.

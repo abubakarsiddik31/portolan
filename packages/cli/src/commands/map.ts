@@ -70,6 +70,8 @@ export type MapBuildInput = {
   outcomeChecksPath?: string;
   /** Refuse to publish while any capability is missing. */
   requireComplete?: boolean;
+  /** With requireComplete, also refuse while a control is unavailable. */
+  strict?: boolean;
 };
 
 export type MapBuildDeps = {
@@ -280,7 +282,11 @@ export async function runMapBuild(
     // Without verification a draft proposal is the best evidence there is, so
     // the gate can run now. With it, only verified ops count, and the gate
     // moves after the verify loop.
-    if (!input.verify && input.requireComplete === true && coverage.missing + coverage.stale > 0) {
+    if (
+      !input.verify &&
+      input.requireComplete === true &&
+      coverage.missing + coverage.stale + (input.strict === true ? coverage.unavailable : 0) > 0
+    ) {
       throw new Error(
         `${formatCoverage(coverage)}; resolve the gaps in ${capabilitiesPath} or mark them excluded`,
       );
@@ -388,7 +394,10 @@ export async function runMapBuild(
       coverage = coverageOf(capabilities);
       writeCapabilities(mapDir, capabilities);
 
-      if (input.requireComplete === true && coverage.missing + coverage.stale > 0) {
+      if (
+        input.requireComplete === true &&
+        coverage.missing + coverage.stale + (input.strict === true ? coverage.unavailable : 0) > 0
+      ) {
         upgradeVerified(draft, verified);
         writeDraft(mapDir, draft);
         throw new Error(

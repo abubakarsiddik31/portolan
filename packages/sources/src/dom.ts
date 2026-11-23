@@ -92,7 +92,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
   const visited: string[] = [];
   const pages = new Set<string>();
   const surface: SurfaceAction[] = [];
-  const surfaceSeen = new Set<string>();
+  const surfaceSeen = new Map<string, SurfaceAction>();
   const seenPages = new Set<string>();
   const usedNames = new Set<string>(options.reserved?.names ?? []);
   const linkTargets = new Set<string>(options.reserved?.linkTargets ?? []);
@@ -135,8 +135,13 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
         action.kind === "link" && action.target !== undefined
           ? `link\u0000${action.target}`
           : `${action.page}\u0000${action.kind}\u0000${action.name.toLowerCase()}`;
-      if (surfaceSeen.has(key)) return;
-      surfaceSeen.add(key);
+      const seen = surfaceSeen.get(key);
+      if (seen !== undefined) {
+        // Enabled on any visit of the state means the control can be used.
+        if (seen.disabled === true && action.disabled !== true) delete seen.disabled;
+        return;
+      }
+      surfaceSeen.set(key, action);
       surface.push(action);
     };
 
@@ -243,7 +248,12 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
     for (const node of snapshot.nodes) {
       if (node.role !== "button" || !node.visible || node.name.length === 0) continue;
       if (insideForms.has(node.nodeId)) continue;
-      recordSurface({ page: from.id, kind: "button", name: node.name });
+      recordSurface({
+        page: from.id,
+        kind: "button",
+        name: node.name,
+        ...(isDisabled(node) ? { disabled: true } : {}),
+      });
     }
   }
 
@@ -706,4 +716,8 @@ function formLabel(form: SemanticNode): string {
   const label =
     form.attributes?.["aria-label"] ?? form.attributes?.["name"] ?? form.attributes?.["id"];
   return label !== undefined && label.length > 0 ? label : "unnamed";
+}
+
+function isDisabled(node: SemanticNode): boolean {
+  return node.properties.disabled === true;
 }

@@ -10,6 +10,7 @@ import {
   gapsOf,
   makeCapabilityId,
   readCapabilities,
+  unavailableOf,
   writeCapabilities,
 } from "@abubakarsiddiik/sources";
 
@@ -324,11 +325,26 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           }
           const coverage = coverageOf(ledger);
           if (booleanFlag(args, "json")) {
-            out(JSON.stringify({ coverage, gaps: gapsOf(ledger), ledger }, null, 2));
+            out(
+              JSON.stringify(
+                { coverage, gaps: gapsOf(ledger), unavailable: unavailableOf(ledger), ledger },
+                null,
+                2,
+              ),
+            );
           } else {
             out(`${site}: ${formatCoverage(coverage)}`);
             for (const gap of gapsOf(ledger)) {
               out(`  ${gap.status.padEnd(7)} ${gap.id} :: ${gap.reason ?? gap.trigger.name}`);
+            }
+            const unavailable = unavailableOf(ledger);
+            if (unavailable.length > 0) {
+              out(
+                `${unavailable.length} unavailable (disabled in the data the crawl saw): seed data or open from another state to make them testable, or \`map capability set --status excluded --reason ...\``,
+              );
+              for (const item of unavailable) {
+                out(`  unavailable ${item.id} :: ${item.precondition ?? item.trigger.name}`);
+              }
             }
           }
           return 0;
@@ -366,6 +382,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           verifyWrites: booleanFlag(args, "verify-writes"),
           publish: booleanFlag(args, "publish"),
           requireComplete: booleanFlag(args, "require-complete"),
+          strict: booleanFlag(args, "strict"),
           ...(listFlag(args, "exclude").length > 0 ? { exclude: listFlag(args, "exclude") } : {}),
           ...(stringFlag(args, "start") !== undefined
             ? { start: stringFlag(args, "start") }

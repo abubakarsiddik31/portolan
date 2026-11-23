@@ -17,9 +17,9 @@ A release can bump only a few packages. For example:
 
 | Package | Version |
 |---|---|
-| `@abubakarsiddiik/portolan` | 0.2.0 |
-| `@abubakarsiddiik/sources` | 0.2.0 |
-| `@abubakarsiddiik/qa` | 0.1.2 |
+| `@abubakarsiddiik/portolan` | 0.2.2 |
+| `@abubakarsiddiik/sources` | 0.2.2 |
+| `@abubakarsiddiik/qa` | 0.1.4 |
 | `@abubakarsiddiik/model` | 0.1.0 (unchanged) |
 
 The umbrella tag always follows `packages/cli/package.json`.

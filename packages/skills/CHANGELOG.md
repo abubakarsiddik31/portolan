@@ -1,5 +1,12 @@
 # @abubakarsiddiik/skills
 
+## 0.1.6
+
+### Patch Changes
+
+- @abubakarsiddiik/compiler@0.2.5
+  - @abubakarsiddiik/runtime@0.1.6
+
 ## 0.1.5
 
 ### Patch Changes

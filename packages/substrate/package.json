@@ -1,6 +1,6 @@
 {
   "name": "@abubakarsiddiik/substrate",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Browser substrate: semantic capture, refs, and actions.",
   "license": "Apache-2.0",
   "type": "module",

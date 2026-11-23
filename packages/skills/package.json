@@ -1,6 +1,6 @@
 {
   "name": "@abubakarsiddiik/skills",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Skill exporter for Portolan maps.",
   "license": "Apache-2.0",
   "type": "module",

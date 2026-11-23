@@ -1,5 +1,12 @@
 # @abubakarsiddiik/runtime
 
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [af07fa8]
+  - @abubakarsiddiik/substrate@0.2.1
+
 ## 0.1.5
 
 ### Patch Changes

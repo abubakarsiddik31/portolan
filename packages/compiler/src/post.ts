@@ -44,7 +44,7 @@ export function inferPost(actions: TraceAct[], map: SiteMap): PostCheck[] {
           ...(changed.length > 0
             ? {
                 search: changed
-                  .map(([key, value]) => `(^|&)${escape(key)}=${escape(value)}(&|$)`)
+                  .map(([key, value]) => `(^|&)${escapeRegex(key)}=${escapeRegex(value)}(&|$)`)
                   .join("|"),
               }
             : {}),
@@ -87,7 +87,7 @@ function parse(url: string): URL | undefined {
   }
 }
 
-function escape(value: string): string {
+function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
@@ -96,7 +96,7 @@ function pathRegex(pathname: string): string {
   return pathname
     .split("/")
     .map((segment) =>
-      /^\d+$/.test(segment) || /^[0-9a-f]{8,}$/i.test(segment) ? "[^/]+" : escape(segment),
+      /^\d+$/.test(segment) || /^[0-9a-f]{8,}$/i.test(segment) ? "[^/]+" : escapeRegex(segment),
     )
     .join("/");
 }

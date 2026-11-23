@@ -2,7 +2,12 @@ import type { SiteMap } from "@abubakarsiddiik/protocol";
 import type { Trace } from "@abubakarsiddiik/runtime";
 import type { SubstrateView } from "@abubakarsiddiik/substrate";
 
-import { type CompiledCandidate, type CompileTrace, compileCandidates } from "./compile.js";
+import {
+  type CompiledCandidate,
+  type CompileTrace,
+  compileCandidates,
+  isWriteEffect,
+} from "./compile.js";
 import { type SegmentLabel, segmentTrace, type TraceSegment } from "./segment.js";
 
 export type BootstrapOptions = {
@@ -112,7 +117,14 @@ export function labelTraces(traces: Trace[], map: SiteMap): SegmentLabel[][] {
 export function nameFromSegment(segment: TraceSegment): string {
   // A button or link names the intent ("Search", "Add to cart"); a field name
   // alone is usually just the noun. Prefer the last click, then a field.
+  // A write is named for the click that made it, not the "Done" on the
+  // confirmation dialog that follows.
   const clicks = segment.actions.filter((action) => action.do === "click");
+  const writer = clicks.find((action) => action.effects.some(isWriteEffect));
+  if (writer?.locator !== undefined && opName(writer.locator.name) !== "op") {
+    return opName(writer.locator.name);
+  }
+
   for (const action of clicks.reverse()) {
     const label = action.locator?.name;
     if (label !== undefined && opName(label) !== "op") return opName(label);

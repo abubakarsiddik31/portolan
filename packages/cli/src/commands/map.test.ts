@@ -126,6 +126,34 @@ describe("runMapBuild", () => {
     ]);
   });
 
+  it("closes the discovery browser before verification starts", async () => {
+    const events: string[] = [];
+    const recording: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => {
+      events.push(`verify ${options.op.name}`);
+      return { op: options.op.name, verified: true, impls: [] } satisfies VerifyReport;
+    };
+
+    await runMapBuild(
+      {
+        site: "app",
+        mapsDir: tempDir(),
+        url: "http://app.test/",
+        verify: true,
+        verifyWrites: false,
+        publish: false,
+      },
+      {
+        substrate,
+        verify: recording,
+        closeSubstrate: async () => void events.push("close discovery"),
+      },
+    );
+
+    expect(events[0]).toBe("close discovery");
+    expect(events.filter((event) => event === "close discovery")).toHaveLength(1);
+    expect(events.length).toBeGreaterThan(1);
+  });
+
   it("keeps going when one op crashes verification", async () => {
     const dir = tempDir();
     const flaky: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => {

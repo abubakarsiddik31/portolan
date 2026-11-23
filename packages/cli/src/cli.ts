@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 
 import { loadQaConfig } from "@abubakarsiddiik/qa";
@@ -16,7 +16,15 @@ import {
 } from "@abubakarsiddiik/sources";
 
 import { booleanFlag, listFlag, numberFlag, parseArgs, stringFlag } from "./args.js";
-import { authStatusLines, resolveLoginTarget, runAuthLogin } from "./commands/auth.js";
+import {
+  authStatusLines,
+  expiryOf,
+  readRecipe,
+  resolveLoginTarget,
+  runAuthLogin,
+  runAuthRefresh,
+} from "./commands/auth.js";
+import { type AuthRecipe, parseFill } from "./commands/auth-recipe.js";
 import { runBench } from "./commands/bench.js";
 import { runCompile } from "./commands/compile.js";
 import { runExportSkills } from "./commands/export-skills.js";
@@ -76,6 +84,7 @@ export type CliDeps = {
   map?: typeof runMapBuild;
   record?: typeof runRecordGaps;
   auth?: typeof runAuthLogin;
+  authRefresh?: typeof runAuthRefresh;
   verify?: typeof runVerify;
   exportSkills?: typeof runExportSkills;
   bench?: typeof runBench;
@@ -160,14 +169,48 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
 
       case "auth": {
         const sub = args.positional[0];
-        if (sub !== undefined && sub !== "login" && sub !== "status") {
-          throw new Error(`unknown auth command "${sub}"; expected "login" or "status"`);
+        if (sub !== undefined && sub !== "login" && sub !== "status" && sub !== "refresh") {
+          throw new Error(`unknown auth command "${sub}"; expected "login", "refresh" or "status"`);
         }
 
         if (sub === "status") {
+          const stored = stringFlag(args, "storage-state");
+          if (stored !== undefined) {
+            out(
+              existsSync(stored)
+                ? `${stored}: saved${expiryOf(stored, Date.now())}${readRecipe(stored) !== undefined ? ", refreshable" : ""}`
+                : `${stored}: no session`,
+            );
+            return 0;
+          }
           const qa = loadQaConfig(stringFlag(args, "config"), process.env, { warn: err }).config;
           const lines = authStatusLines(qa.environments, qa.root);
           out(lines.length === 0 ? "no environments are configured" : lines.join("\n"));
+          return 0;
+        }
+
+        if (sub === "refresh") {
+          let target = stringFlag(args, "out") ?? stringFlag(args, "storage-state");
+          const refreshEnv = stringFlag(args, "env");
+          if (refreshEnv !== undefined) {
+            const qa = loadQaConfig(stringFlag(args, "config"), process.env, { warn: err }).config;
+            target = resolveLoginTarget(
+              qa.environments,
+              qa.root,
+              refreshEnv,
+              stringFlag(args, "profile"),
+            ).out;
+          }
+          if (target === undefined) {
+            throw new Error("auth refresh needs --env <name>, or --out <session file>");
+          }
+          const refreshed = await (deps.authRefresh ?? runAuthRefresh)({
+            out: target,
+            ...(stringFlag(args, "chrome") !== undefined
+              ? { chrome: stringFlag(args, "chrome") }
+              : {}),
+          });
+          out(`refreshed ${refreshed.out}`);
           return 0;
         }
 
@@ -176,13 +219,18 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         let url = stringFlag(args, "url");
         let outPath = stringFlag(args, "out");
         let confirm: (() => Promise<void>) | undefined;
+        const fills = listFlag(args, "fill");
+        const scriptPath = stringFlag(args, "script");
+        let recipe: AuthRecipe | undefined;
 
         if (envName !== undefined) {
           if (url !== undefined || outPath !== undefined) {
             throw new Error("--env takes its sign-in page and session path from the config");
           }
-          if (!process.stdin.isTTY) {
-            throw new Error("auth login --env needs a terminal: a person must confirm the sign-in");
+          if (!process.stdin.isTTY && recipe === undefined) {
+            throw new Error(
+              "auth login --env needs a terminal for a person to confirm the sign-in, or --fill/--script to sign in unattended",
+            );
           }
           const qa = loadQaConfig(stringFlag(args, "config"), process.env, { warn: err }).config;
           const target = resolveLoginTarget(
@@ -204,8 +252,20 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         }
 
         if (url === undefined) throw new Error("auth login needs --url <sign-in page> or --env");
+        if (fills.length > 0 || scriptPath !== undefined) {
+          recipe = {
+            url,
+            ...(fills.length > 0 ? { fills: fills.map(parseFill) } : {}),
+            ...(stringFlag(args, "submit") !== undefined
+              ? { submit: stringFlag(args, "submit") }
+              : {}),
+            ...(scriptPath !== undefined ? { script: resolve(scriptPath) } : {}),
+          };
+          confirm = undefined;
+        }
         const result = await (deps.auth ?? runAuthLogin)({
           url,
+          ...(recipe !== undefined ? { recipe } : {}),
           ...(confirm !== undefined ? { confirm } : {}),
           ...(outPath !== undefined ? { out: outPath } : {}),
           ...(stringFlag(args, "chrome") !== undefined

@@ -281,6 +281,14 @@ export class PlaywrightEngine implements Engine {
     return engine;
   }
 
+  /**
+   * Run a script against the Playwright page itself. This is the escape hatch
+   * for a sign-in the semantic verbs cannot drive; nothing else uses it.
+   */
+  async withPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
+    return fn(this.page);
+  }
+
   /** Save the signed-in session so another run can reuse it. */
   /** The current main-frame URL, without a snapshot. */
   url(): string {

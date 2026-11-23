@@ -10,7 +10,8 @@ portolan <command> [options]
 |---|---|
 | `portolan init [dir]` | Initialize `<dir>/.portolan/` (config, policy, maps, skills, and the `portolan-map` / `portolan` skills). |
 | `portolan migrate [dir]` | Move a legacy root layout (`portolan.config.json`, `qa/`, `maps/`, …) into `.portolan/`. |
-| `portolan auth login` | Open a visible browser, sign in, and save a Playwright storage state. |
+| `portolan auth login` | Open a visible browser, sign in, and save a Playwright storage state; with `--fill`/`--script`, sign in unattended and save a recipe. |
+| `portolan auth refresh` | Replay a saved recipe and replace the session. |
 | `portolan map build` | Discover a URL and/or traces into a draft, verify, and publish. |
 | `portolan map update` | Refresh an existing map and keep capabilities discovery did not see. |
 | `portolan map record --gaps` | Record a one-click run for each missing capability, tagged with its capability id. Flags: `--kind`, `--only`, `--max`, `--writes`. |

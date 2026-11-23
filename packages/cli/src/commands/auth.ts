@@ -2,6 +2,7 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   renameSync,
   rmSync,
   statSync,
@@ -10,7 +11,9 @@ import {
 import { dirname, join, resolve } from "node:path";
 
 import { authStatePath, loginCommand, type QaEnvironment } from "@abubakarsiddiik/qa";
-import { findChrome, PlaywrightEngine } from "@abubakarsiddiik/substrate";
+import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
+
+import { type AuthRecipe, describeExpiry, replayRecipe, sessionExpiry } from "./auth-recipe.js";
 
 export type AuthLoginInput = {
   /** The app's sign-in page. */
@@ -26,10 +29,17 @@ export type AuthLoginInput = {
    * set it replaces the URL heuristic.
    */
   confirm?: () => Promise<void>;
+  /**
+   * Sign in headless by replaying this recipe instead of waiting for a person.
+   * The recipe is saved next to the session so `auth refresh` can replay it.
+   */
+  recipe?: AuthRecipe;
 };
 
 export type AuthLoginDeps = {
   launch?: typeof PlaywrightEngine.launch;
+  /** The substrate that drives a recipe. Default: one over the launched engine. */
+  substrateFor?: (engine: PlaywrightEngine) => Substrate;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
   log?: (line: string) => void;
@@ -62,10 +72,22 @@ export async function runAuthLogin(
 
   const engine = await (deps.launch ?? PlaywrightEngine.launch)({
     executablePath: executablePath ?? "chrome",
-    headless: false,
+    headless: input.recipe !== undefined,
   });
 
   try {
+    if (input.recipe !== undefined) {
+      await replayRecipe(
+        input.recipe,
+        engine,
+        deps.substrateFor?.(engine) ?? new Substrate(engine),
+      );
+      writeSessionFile(out, JSON.stringify(await engine.storageState(), null, 2));
+      writeSessionFile(recipePath(out), JSON.stringify(input.recipe, null, 2));
+      log(`saved storage state to ${out}`);
+      return { out };
+    }
+
     const start = new URL(input.url);
     await engine.navigate(input.url);
     log(`sign in in the browser window; waiting for the URL to leave ${start.pathname}`);
@@ -97,6 +119,39 @@ export async function runAuthLogin(
   } finally {
     await engine.close();
   }
+}
+
+/** Where the recipe for a session lives: beside it, holding env var names only. */
+export function recipePath(out: string): string {
+  return `${out}.recipe.json`;
+}
+
+export function readRecipe(out: string): AuthRecipe | undefined {
+  const path = recipePath(out);
+  return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as AuthRecipe) : undefined;
+}
+
+/** Sign in again with the saved recipe and replace the session. */
+export async function runAuthRefresh(
+  input: { out: string; chrome?: string },
+  deps: AuthLoginDeps = {},
+): Promise<AuthLoginResult> {
+  const recipe = readRecipe(input.out);
+  if (recipe === undefined) {
+    throw new Error(
+      `no recipe saved for ${input.out}; sign in once with \`auth login --fill ... --submit ...\` to save one`,
+    );
+  }
+
+  return runAuthLogin(
+    {
+      url: recipe.url,
+      out: input.out,
+      recipe,
+      ...(input.chrome !== undefined ? { chrome: input.chrome } : {}),
+    },
+    deps,
+  );
 }
 
 function pathOf(url: string): string {
@@ -175,8 +230,20 @@ export function authStatusLines(
         continue;
       }
       const hours = Math.floor((now() - statSync(path).mtimeMs) / 3_600_000);
-      lines.push(`${label} saved ${hours}h ago${environment.writes ? "   writes allowed" : ""}`);
+      lines.push(
+        `${label} saved ${hours}h ago${expiryOf(path, now())}${existsSync(recipePath(path)) ? "   refreshable" : ""}${environment.writes ? "   writes allowed" : ""}`,
+      );
     }
   }
   return lines;
+}
+
+/** `, expires in 12m` when the session holds a readable token. */
+export function expiryOf(path: string, now: number): string {
+  try {
+    const expiresAt = sessionExpiry(JSON.parse(readFileSync(path, "utf8")));
+    return expiresAt === undefined ? "" : `, ${describeExpiry(expiresAt, now)}`;
+  } catch {
+    return "";
+  }
 }

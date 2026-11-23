@@ -1,7 +1,7 @@
+import { templateName } from "@abubakarsiddiik/protocol";
 import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
-
-import { discoverDom, templateName } from "./dom.js";
+import { discoverDom } from "./dom.js";
 
 function node(input: Partial<SemanticNode> & { nodeId: string; role: string }): SemanticNode {
   return {

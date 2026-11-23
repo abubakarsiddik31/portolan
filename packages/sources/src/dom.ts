@@ -21,6 +21,10 @@ export type DomDiscoverOptions = {
   maxOps?: number;
   /** Follow only links on the start origin. Default true. */
   sameOrigin?: boolean;
+  /** More entry points, crawled in the same discovery as `url`. */
+  urls?: string[];
+  /** Queue the links found on a page. Default true; false visits only the entry points. */
+  follow?: boolean;
   /** Names and link targets already in the map, so an update does not duplicate them. */
   reserved?: { names?: string[]; linkTargets?: string[] };
 };
@@ -96,7 +100,14 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
   const seenPages = new Set<string>();
   const usedNames = new Set<string>(options.reserved?.names ?? []);
   const linkTargets = new Set<string>(options.reserved?.linkTargets ?? []);
-  const queue: Array<{ url: string; depth: number }> = [{ url: start.toString(), depth: 0 }];
+  const follow = options.follow ?? true;
+  const queue: Array<{ url: string; depth: number }> = [
+    { url: start.toString(), depth: 0 },
+    ...(options.urls ?? []).map((url) => ({ url: new URL(url).toString(), depth: 0 })),
+  ];
+  const enqueue = (url: string, depth: number): void => {
+    if (follow) queue.push({ url, depth });
+  };
 
   while (queue.length > 0 && visited.length < maxPages && proposals.length < maxOps) {
     const next = queue.shift();
@@ -178,7 +189,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
       });
 
       if (linkTargets.has(to.id)) {
-        queue.push({ url: target.toString(), depth: next.depth + 1 });
+        enqueue(target.toString(), next.depth + 1);
         continue;
       }
       linkTargets.add(to.id);
@@ -205,7 +216,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
         sample_params: Object.keys(route.values).length > 0 ? [route.values] : [{}],
       });
 
-      queue.push({ url: target.toString(), depth: next.depth + 1 });
+      enqueue(target.toString(), next.depth + 1);
     }
 
     for (const form of formNodes(snapshot.nodes)) {
@@ -232,7 +243,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
       if (result.queueUrl !== undefined) {
         try {
           if (new URL(result.queueUrl).origin === start.origin) {
-            queue.push({ url: result.queueUrl, depth: next.depth + 1 });
+            enqueue(result.queueUrl, next.depth + 1);
           }
         } catch {
           // A malformed action is a task, not a crawl target.

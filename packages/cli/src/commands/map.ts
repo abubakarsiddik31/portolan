@@ -55,6 +55,8 @@ export type MapBuildInput = {
   maxPages?: number;
   /** Existing map is required (the `update` subcommand). */
   update?: boolean;
+  /** Re-crawl and re-verify only these states (needs `update`). */
+  states?: string[];
   verify: boolean;
   verifyWrites: boolean;
   publish: boolean;
@@ -118,8 +120,13 @@ export async function runMapBuild(
     );
   }
 
+  if (input.states !== undefined && input.states.length > 0 && input.update !== true) {
+    throw new Error("--state needs `map update`: it re-checks states of an existing map");
+  }
+
   const traces = readTraces(input);
-  if (input.url === undefined && traces.length === 0) {
+  const onlyStates = input.states ?? [];
+  if (input.url === undefined && traces.length === 0 && onlyStates.length === 0) {
     throw new Error(
       "map build needs --url for DOM discovery, or a trace file / traces directory to compile",
     );
@@ -128,7 +135,7 @@ export async function runMapBuild(
   const origin =
     input.url !== undefined
       ? new URL(input.url).origin
-      : (input.baseUrl ?? originFromTraces(traces));
+      : (input.baseUrl ?? existing?.origins[0] ?? originFromTraces(traces));
   if (origin === undefined) {
     throw new Error("map build needs --url (DOM discovery) or --base-url (traces)");
   }
@@ -163,7 +170,12 @@ export async function runMapBuild(
   try {
     if (input.start !== undefined) app = await startApp(input.start, baseUrl);
 
-    if (input.url !== undefined) {
+    const stateUrls = onlyStates.map((id) =>
+      stateStartUrl(id, existing, readParams(input.paramsPath), origin),
+    );
+    const entry = input.url ?? stateUrls[0];
+
+    if (entry !== undefined) {
       let substrate = deps.substrate;
       if (substrate === undefined) {
         const launched = await launchSubstrate(input);
@@ -173,11 +185,21 @@ export async function runMapBuild(
 
       discovery = await discoverDom({
         site: input.site,
-        url: input.url,
+        url: entry,
         substrate,
+        ...(stateUrls.length > 0
+          ? { urls: input.url === undefined ? stateUrls.slice(1) : stateUrls, follow: false }
+          : {}),
         ...(input.maxPages !== undefined ? { maxPages: input.maxPages } : {}),
         reserved: { linkTargets: reservedTargets },
       });
+
+      // A per-state update leaves everything outside those states alone.
+      if (onlyStates.length > 0) {
+        discovery.proposals = discovery.proposals.filter((proposal) =>
+          proposal.op.from.some((id) => onlyStates.includes(id)),
+        );
+      }
 
       for (const state of discovery.states) {
         if (!draft.states.some((candidate) => candidate.id === state.id)) {
@@ -284,7 +306,7 @@ export async function runMapBuild(
         ],
         ...(previous !== undefined ? { previous } : {}),
         ...(input.exclude !== undefined ? { exclude: input.exclude } : {}),
-        ...(unverified !== undefined ? { unverified } : {}),
+        ...(unverified !== undefined ? { unverified, verified: new Set(verified) } : {}),
         ...(policyRules.length > 0 ? { rules: policyRules } : {}),
       });
     let capabilities = ledgerFor();
@@ -298,7 +320,11 @@ export async function runMapBuild(
     if (
       !input.verify &&
       input.requireComplete === true &&
-      coverage.missing + coverage.stale + (input.strict === true ? coverage.unavailable : 0) > 0
+      coverage.missing +
+        coverage.stale +
+        coverage.removed +
+        (input.strict === true ? coverage.unavailable : 0) >
+        0
     ) {
       throw new Error(
         `${formatCoverage(coverage)}; resolve the gaps in ${capabilitiesPath} or mark them excluded`,
@@ -422,7 +448,11 @@ export async function runMapBuild(
 
       if (
         input.requireComplete === true &&
-        coverage.missing + coverage.stale + (input.strict === true ? coverage.unavailable : 0) > 0
+        coverage.missing +
+          coverage.stale +
+          coverage.removed +
+          (input.strict === true ? coverage.unavailable : 0) >
+          0
       ) {
         upgradeVerified(draft, verified);
         writeDraft(mapDir, draft);
@@ -510,6 +540,38 @@ function draftMap(draft: MapDraft): SiteMap {
     compiled_from: draft.sources,
     verified_at: new Date().toISOString(),
   };
+}
+
+/**
+ * The URL to re-crawl for a state: its template filled from the first param
+ * set the params file holds for an op that opens it.
+ */
+function stateStartUrl(
+  id: string,
+  map: SiteMap | undefined,
+  params: Record<string, Array<Record<string, unknown>>>,
+  origin: string,
+): string {
+  const state = map?.states.find((candidate) => candidate.id === id);
+  if (state === undefined) throw new Error(`no state "${id}" in the map; see its states list`);
+  if (state.url === undefined) throw new Error(`state "${id}" has no URL to re-crawl`);
+
+  const opener = map?.ops.find(
+    (op) => op.to.includes(id) && op.effect === "read" && params[op.name]?.[0] !== undefined,
+  );
+  const values = opener === undefined ? {} : (params[opener.name]?.[0] ?? {});
+
+  const path = state.url.replace(/:([a-zA-Z0-9_]+)/g, (_, name: string) => {
+    const value = values[name];
+    if (value === undefined) {
+      throw new Error(
+        `state "${id}" is ${state.url}; add a param set with "${name}" for the op that opens it to --params`,
+      );
+    }
+    return encodeURIComponent(String(value));
+  });
+
+  return new URL(path, origin).toString();
 }
 
 function mergeStates(existing: StateDef[], discovered: StateDef[]): StateDef[] {

@@ -577,6 +577,32 @@ describe("mcp surface", () => {
     }
   });
 
+  it("releases the browser of the session an open_site replaces", async () => {
+    const released: string[] = [];
+    const extra = await connect({
+      substrateFactory: async () => fakeSubstrate(),
+      releaseSubstrate: (sid) => {
+        released.push(sid);
+      },
+    });
+
+    try {
+      const first = JSON.parse(
+        textOf(await extra.client.callTool({ name: "open_site", arguments: { site: "store" } })),
+      ) as { sid: string };
+      await extra.client.callTool({ name: "fallback_begin", arguments: { intent: "look" } });
+      await extra.client.callTool({ name: "view", arguments: {} });
+      expect(released).toEqual([]);
+
+      await extra.client.callTool({ name: "open_site", arguments: { site: "store" } });
+      expect(released).toEqual([first.sid]);
+      expect(sessions.get(first.sid)?.closed_at).toBeDefined();
+    } finally {
+      await extra.client.close();
+      await extra.server.close();
+    }
+  });
+
   it("persists a closed scope as jsonl and har", async () => {
     const dir = await mkdtemp(join(tmpdir(), "portolan-trace-"));
     const store = new TraceStore(dir);

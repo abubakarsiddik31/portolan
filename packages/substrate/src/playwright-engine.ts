@@ -128,6 +128,16 @@ type CallResult = {
   exceptionDetails?: { text?: string };
 };
 
+/** Background work an automated session never needs; each Chrome costs memory. */
+const LEAN_ARGS = [
+  "--disable-extensions",
+  "--disable-background-networking",
+  "--disable-component-update",
+  "--disable-sync",
+  "--mute-audio",
+  "--no-first-run",
+];
+
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export class PlaywrightEngine implements Engine {
@@ -156,7 +166,7 @@ export class PlaywrightEngine implements Engine {
   }
 
   static async launch(options: PlaywrightEngineOptions): Promise<PlaywrightEngine> {
-    const args = [...(options.launchArgs ?? [])];
+    const args = [...LEAN_ARGS, ...(options.launchArgs ?? [])];
     if (options.instanceId !== undefined) {
       args.push(`--portolan-instance=${options.instanceId}`);
     }
@@ -167,20 +177,30 @@ export class PlaywrightEngine implements Engine {
       args,
     });
 
-    const context = await browser.newContext({
-      acceptDownloads: true,
-      ...(options.storageState !== undefined ? { storageState: options.storageState } : {}),
-    });
-    if (options.readOnly === true) {
-      await context.route("**/*", (route) =>
-        SAFE_METHODS.has(route.request().method())
-          ? route.continue()
-          : route.abort("blockedbyclient"),
-      );
+    let context: BrowserContext;
+    let page: Page;
+    let cdp: CDPSession;
+    let downloadDir: string;
+    try {
+      context = await browser.newContext({
+        acceptDownloads: true,
+        ...(options.storageState !== undefined ? { storageState: options.storageState } : {}),
+      });
+      if (options.readOnly === true) {
+        await context.route("**/*", (route) =>
+          SAFE_METHODS.has(route.request().method())
+            ? route.continue()
+            : route.abort("blockedbyclient"),
+        );
+      }
+      page = await context.newPage();
+      cdp = await context.newCDPSession(page);
+      downloadDir = await mkdtemp(join(tmpdir(), "portolan-download-"));
+    } catch (error) {
+      // A bad storage state or a failed page must not leave Chrome running.
+      await browser.close().catch(() => {});
+      throw error;
     }
-    const page = await context.newPage();
-    const cdp = await context.newCDPSession(page);
-    const downloadDir = await mkdtemp(join(tmpdir(), "portolan-download-"));
 
     const engine = new PlaywrightEngine(browser, context, page, cdp, options.timeoutMs ?? 30_000);
 

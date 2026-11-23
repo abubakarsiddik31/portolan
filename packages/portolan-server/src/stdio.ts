@@ -21,6 +21,10 @@ export type StdioServerOptions = {
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
   /** Browsers owned by sessions; closed with the server. */
   browsers?: BrowserRegistry;
+  /** Idle time after which a session's browser is closed. Default 30 minutes. */
+  sessionTtlMs?: number;
+  /** How often idle sessions are swept. Default 60 seconds. */
+  cleanupIntervalMs?: number;
   /** Write ledger. Defaults to the session store's SQLite ledger. */
   ledger?: WriteLedger;
   /** Persists fallback and explore traces as JSONL and HAR. */
@@ -56,14 +60,26 @@ export async function startStdioServer(
     ...(options.substrateFactory !== undefined
       ? { substrateFactory: options.substrateFactory }
       : {}),
+    ...(options.browsers !== undefined
+      ? { releaseSubstrate: (sid: string) => options.browsers?.close(sid) }
+      : {}),
   });
 
   await server.connect(options.transport ?? new StdioServerTransport());
+
+  // Nothing else ends a session whose agent has gone quiet, so its Chrome
+  // would hold memory until the process exits.
+  const sweep = setInterval(() => {
+    const swept = sessions.sweepExpired(options.sessionTtlMs ?? 30 * 60 * 1000);
+    void Promise.allSettled(swept.map((sid) => options.browsers?.close(sid)));
+  }, options.cleanupIntervalMs ?? 60_000);
+  sweep.unref();
 
   return {
     server,
     sessions,
     close: async () => {
+      clearInterval(sweep);
       await server.close();
       await options.browsers?.closeAll();
       sessions.closeDatabase();

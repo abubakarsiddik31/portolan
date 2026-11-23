@@ -2,8 +2,9 @@ import { join } from "node:path";
 import { buildRefMap, type SemanticNode, type Snapshot } from "@abubakarsiddiik/substrate";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { BrowserRegistry } from "./browsers.js";
 import { type StdioServerHandle, startStdioServer } from "./stdio.js";
 
 const MAPS = join(import.meta.dirname, "../../../maps");
@@ -81,6 +82,34 @@ describe("startStdioServer", () => {
 
     expect(body.untrusted).toBe(true);
     expect(body.affordances).toContainEqual(expect.objectContaining({ name: "Go" }));
+
+    await client.close();
+  });
+
+  it("closes the browser of a session that has gone idle", async () => {
+    const closed: string[] = [];
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const browsers = new BrowserRegistry();
+    const handle = await startStdioServer({
+      mapsDir: MAPS,
+      databasePath: ":memory:",
+      transport: serverTransport,
+      browsers,
+      sessionTtlMs: 0,
+      cleanupIntervalMs: 10,
+    });
+    handles.push(handle);
+
+    const client = new Client({ name: "stdio-idle", version: "0.0.1" });
+    await client.connect(clientTransport);
+    const opened = await client.callTool({ name: "open_site", arguments: { site: "store" } });
+    const { sid } = JSON.parse((opened.content as Array<{ text: string }>)[0]?.text ?? "{}") as {
+      sid: string;
+    };
+    browsers.register(sid, { close: () => void closed.push(sid) });
+
+    await vi.waitFor(() => expect(closed).toEqual([sid]));
+    expect(browsers.size()).toBe(0);
 
     await client.close();
   });

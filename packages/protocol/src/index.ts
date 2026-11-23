@@ -1,5 +1,6 @@
 export * from "./envelope.js";
 export * from "./errors.js";
+export * from "./id-like.js";
 export * from "./map/lint.js";
 export * from "./map/load.js";
 export * from "./map/schema.js";

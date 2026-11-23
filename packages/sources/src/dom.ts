@@ -6,7 +6,7 @@ import type {
   StateDef,
   UiStep,
 } from "@abubakarsiddiik/protocol";
-import { templateName } from "@abubakarsiddiik/protocol";
+import { isIdLike, templateName } from "@abubakarsiddiik/protocol";
 import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substrate";
 
 import { slug, uniqueName } from "./draft.js";
@@ -762,15 +762,6 @@ function routeTemplate(
 
 function propertiesFrom(params: Record<string, JsonSchema>): JsonSchema {
   return { type: "object", properties: params };
-}
-
-function isIdLike(segment: string): boolean {
-  return (
-    /^\d+$/.test(segment) ||
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment) ||
-    /^[0-9a-f]{8,}$/i.test(segment) ||
-    (/[0-9]/.test(segment) && segment.length >= 12)
-  );
 }
 
 function pageKey(url: string): string {

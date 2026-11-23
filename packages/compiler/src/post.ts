@@ -1,5 +1,5 @@
 import type { Locator, PostCheck, SiteMap } from "@abubakarsiddiik/protocol";
-import { templateName, templateRegex } from "@abubakarsiddiik/protocol";
+import { isIdLike, templateName, templateRegex } from "@abubakarsiddiik/protocol";
 import type { TraceAct } from "@abubakarsiddiik/runtime";
 
 /** Roles whose appearance after an action is evidence the action did something. */
@@ -95,8 +95,6 @@ function escapeRegex(value: string): string {
 function pathRegex(pathname: string): string {
   return pathname
     .split("/")
-    .map((segment) =>
-      /^\d+$/.test(segment) || /^[0-9a-f]{8,}$/i.test(segment) ? "[^/]+" : escapeRegex(segment),
-    )
+    .map((segment) => (isIdLike(segment) ? "[^/]+" : escapeRegex(segment)))
     .join("/");
 }

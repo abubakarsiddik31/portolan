@@ -76,6 +76,9 @@ Options (build, update):
   --params <file>        parameter sets per op, three or more each
   --start "<cmd>"        command that starts the app before the build
   --verify               run every op on a fresh session
+  --concurrency <n>      reads verified at once, each in its own context (default 4)
+  --reverify             re-verify ops already verified against this app build
+  --app-version <v>      the app build (default: a hash of the HTML at --base-url)
   --verify-writes        also verify writes (they run for real)
   --allow-cost           also verify ops whose run fired a cost or destructive request
   --no-dedupe            keep a layout control seen on many pages as one entry per page

@@ -72,6 +72,16 @@ fallback_done(scope_id)  → saves the trace
 
 Then `portolan map build --site herbie` compiles the trace into candidates.
 
+## Verification speed
+
+`map build --verify` runs each op in its own browser context inside one shared Chrome.
+
+- Identical param sets run once, and an op with no required params needs one run, not three.
+- Reads run side by side (`--concurrency 4` by default). A write always runs alone.
+- Ops that verified against the same app build are skipped. The build is `--app-version <v>`,
+  or a hash of the HTML served at the base URL, and the record is `verified.json` next to the
+  map. `--reverify` runs them again.
+
 ## Coverage: the capability ledger
 
 A crawl finds pages, not every capability. `map build` therefore writes

@@ -1,5 +1,30 @@
 # @abubakarsiddiik/qa
 
+## 0.3.0
+
+### Minor Changes
+
+- 71f3e62: This release adds `map sync`, `map status`, `map record --gaps`, `policy allow`, `auth refresh` and unattended sign-in, and in QA `expect_failure` and waiting checks, so the CLI and QA move to a new minor version.
+  
+  A path segment like `p_101`, `ord_1` or `usr_9f3a` is now an id, so `/p/p_101` and `/p/p_102` are one state and one parameterized op. Every flag the CLI reads as a boolean (`--dry-run`, `--all`, `--allow-unverified`, `--changed`, `--mcp`, `--include-quarantined` were missing) no longer swallows the next argument.
+
+### Patch Changes
+
+- a219edd: A write case's `map.op` is now checked: the map version must exist, the op must be in it with the case's `effect`, and an irreversible op's step needs `confirm: true`. It is enforced at `qa case write`, reported by `qa sync`, and a case with a wrong link is not run (it returns an `invalid_request` error). `map: { site, pending: "<why>" }` marks a write that has no op yet, and `qa sync` lists those.
+- 9c2c103: Redaction no longer rewrites case ids. `auth/wrong-password-shows-error` stays that in run results, evidence and the commands the result suggests, so results still match their case files; secrets and secret-looking keys are redacted as before.
+- effd6d1: A case for a known bug can be marked `expect_failure: { reason, issue? }`. `qa verify` promotes it when it fails with the same code and step on every replay, and `qa run` reports it as `known_failure` (the run stays green) instead of skipping it as unverified. When it starts passing the run reports `fixed` and says to remove the marker. A different failure is still a `fail`.
+- 3f78adf: QA checks retry until the run's timeout instead of judging the first view, so an async page passes without a manual `await` and `absent` cannot pass before the page renders. `await` also takes `visible`, `absent` and `value`. The `url` check and `await url` can assert a query or fragment (`"/analytics\?range=30d"`, or `{ pathname, query, hash }`). A failure's evidence folder gains `text.txt` with the full page text, `page.png` when screenshots are on, and `read_scope` in `result.json` when a dialog scoped the read.
+- Updated dependencies [1692e2e]
+- Updated dependencies [9862d0a]
+- Updated dependencies [05435df]
+- Updated dependencies [71f3e62]
+- Updated dependencies [282b1c5]
+- Updated dependencies [3e3e5f2]
+- Updated dependencies [fe40c0f]
+  - @abubakarsiddiik/protocol@0.2.2
+  - @abubakarsiddiik/runtime@0.1.7
+  - @abubakarsiddiik/substrate@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

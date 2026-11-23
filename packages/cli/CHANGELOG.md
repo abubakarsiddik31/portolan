@@ -1,5 +1,70 @@
 # @abubakarsiddiik/portolan
 
+## 0.4.0
+
+### Minor Changes
+
+- 71f3e62: This release adds `map sync`, `map status`, `map record --gaps`, `policy allow`, `auth refresh` and unattended sign-in, and in QA `expect_failure` and waiting checks, so the CLI and QA move to a new minor version.
+  
+  A path segment like `p_101`, `ord_1` or `usr_9f3a` is now an id, so `/p/p_101` and `/p/p_102` are one state and one parameterized op. Every flag the CLI reads as a boolean (`--dry-run`, `--all`, `--allow-unverified`, `--changed`, `--mcp`, `--include-quarantined` were missing) no longer swallows the next argument.
+
+### Patch Changes
+
+- 11edef4: `portolan <command> --help` lists that command's flags. `init --url` seeds the site policy's `allow` list, and `map build` falls back to its `--url` host when the policy's `allow` is empty, so the first build is no longer blocked by `egress blocked ... (not_allowed)`. `map build` now shares one verification Chrome across all ops, as 0.3.2 intended.
+- 8be02ae: `map build` closes the discovery browser before verification starts, so a build keeps one Chrome open, not two.
+- d0b420d: `portolan compile` now verifies each candidate before it publishes, as the docs always said. Reads use the recorded values plus variants; a write runs only with `--verify-writes` and a `--params` file of at least three sets. A step the map does not cover is named from its recorded actions instead of failing with "no candidate ops", and a new write compiles to a `ui` op unless `--outcome-checks` names the read that proves it. `map build` takes `--outcome-checks` too.
+- 1944c88: `map build` says when the crawl stopped at `--max-pages` or the op limit with pages still queued, and records it in `draft.json`. When nothing verifies, the error lists each op's failure reason.
+- 96ed037: A layout control that sits in a landmark on three or more pages (account menu, "Back to workspace") is one capability with `pages`, and its op is valid from all of them. Data in a control's name is templated (`Active {count}`, `Delete {email}`), so filter tabs and row actions are one entry each. `--no-dedupe` keeps the per-page entries. `--strict`, `--allow-cost` and `--no-dedupe` no longer swallow the next argument.
+- 7b21b90: Verification is faster. Identical param sets run once and an op with no required params needs one run. `map build --verify` runs reads side by side (`--concurrency`, default 4) while writes stay serial, and skips ops already verified against the same app build (`--app-version`, or a hash of the served HTML; `--reverify` to force). A `map update` that finds nothing new now says so instead of failing with "nothing verified".
+- c922276: Count only verified ops as mapped in `capabilities.json`. A proposal that fails verification now leaves its trigger `missing` with the failure as the reason, and `--require-complete` checks that result.
+- 1692e2e: `map build` proposes postconditions from what a recorded run showed (a changed path or query, a new state, a dialog that appeared), so "verified" means the effect happened, not only that the click did not throw. The `url` check gains an optional `search`, an op can set `no_post`, a `ui` op with no postcondition gets an `add_postcondition` task, and `--require-post` refuses to verify it.
+- fc8094f: `map build` keeps what it learned:
+  - `--traces-dir` is read alongside `--url`.
+  - A traces-only build, or a crawl that never reached a page, no longer marks that page's capabilities `stale`. A trace op that covers a missing capability now marks it mapped.
+  - When nothing verifies, `draft.json` and `tasks.json` are written first so the `did not verify` reasons survive.
+- 2976560: `portolan map status` shows where the mapping loop stands (version, coverage, recorded runs not yet compiled, the last build's failures grouped by reason, auth expiry, and the next command), and every build is journaled to `.portolan/state/builds.jsonl`. `portolan mcp` adds `map_status`, `map_gaps`, `capability_set`, `map_record_gaps`, `map_build` and `map_job`, so an MCP-only client can finish a map; the two that run a browser need `confirm: true`.
+- d90680a: `portolan map sync --since <git-ref>` keeps a map in step with the code: it maps the changed files to the pages they affect (config globs, plus a route table read from source), updates and verifies only those states, repairs an op whose control was renamed to a clearly closest match, and marks one it cannot repair stale. `portolan map coverage --diff <v3|git-ref>` lists new missing, stale and mapped capabilities, exits 1 on `--fail-on` regressions, and writes a pull request comment with `--markdown`. The guide has a GitHub Actions recipe.
+- 9862d0a: Verification no longer launches a Chrome per run. `verifyOp` opens one browser and an isolated context per run, and `map build` shares a single browser across every op it verifies, so a build stops spawning dozens of Chrome processes.
+- d3ae878: Boolean flags no longer swallow the next positional, so `--verify --publish trace.json` keeps the trace.
+- 05435df: Exclusion rules move into `policies/<site>.json` as categorized `rules`, matched on a control's label and/or the request its recorded run fired. Excluded capabilities carry a generated `category: reason`, a notifications bell and a trailing `?` are no longer excluded, and an op whose run fired a `cost` or `destructive` request is held back from verification unless `--allow-cost` is passed. `portolan policy allow --site x host` edits the allow list, and a build that was blocked prints the hosts to allow.
+- bc409a2: Discovery reaches routes that links do not. `--url` can be repeated to crawl several entry points in one build, `--routes <file>` and `--routes-from react-router|next|sveltekit` read the route table (static routes are crawled, and the ones nothing reached are listed), and `--explore` clicks buttons that policy allows to find routes only a button leads to, recording each as a navigation op.
+- 282b1c5: `portolan map record --gaps` records a one-click run for every missing button without an agent loop, writing traces tagged with the capability id. A build then covers exactly that capability, so matching no longer depends on a label two pages may share. `open_url` and `fallback_begin` accept an optional `capability` for the same link.
+- b37ec2f: Staleness is scoped to what a run observed. Capabilities carry `last_seen` and `last_verified`; a control gone from a page the crawl reached is `removed`, and `stale` is kept for an op that used to verify and now fails. `map update --state <id>` re-crawls and re-verifies only that state, `map coverage --older-than 7d` lists what nothing has seen lately, and `discoverDom` accepts several entry points.
+- b829173: `map build --verify` now opens a parameterized start state (such as `/orgs/:id`) with the read op that leads there, so a ui op recorded on that page can verify.
+- fe40c0f: `portolan auth login` can sign in without a person: `--fill "textbox:Label=ENV_VAR"` and `--submit` (or `--script file.mjs`) replay a headless sign-in from environment variables, and `auth refresh` replays the recipe saved beside the session. A build with that `--storage-state` replaces a session that is about to expire and signs in again once when an op fails because the session lapsed. `auth status` shows the token's expiry.
+- 3eebde3: A control that is disabled everywhere the crawl saw it is recorded as `unavailable` with a precondition, not `missing`. `map coverage` lists these separately, and `--require-complete` ignores them unless `--strict` is passed.
+- Updated dependencies [d0b420d]
+- Updated dependencies [1944c88]
+- Updated dependencies [96ed037]
+- Updated dependencies [7b21b90]
+- Updated dependencies [c922276]
+- Updated dependencies [1692e2e]
+- Updated dependencies [fc8094f]
+- Updated dependencies [2976560]
+- Updated dependencies [d90680a]
+- Updated dependencies [9862d0a]
+- Updated dependencies [05435df]
+- Updated dependencies [71f3e62]
+- Updated dependencies [a219edd]
+- Updated dependencies [9c2c103]
+- Updated dependencies [effd6d1]
+- Updated dependencies [3f78adf]
+- Updated dependencies [bc409a2]
+- Updated dependencies [282b1c5]
+- Updated dependencies [b37ec2f]
+- Updated dependencies [3e3e5f2]
+- Updated dependencies [fe40c0f]
+- Updated dependencies [3eebde3]
+- Updated dependencies [0eed231]
+  - @abubakarsiddiik/compiler@0.2.6
+  - @abubakarsiddiik/sources@0.2.6
+  - @abubakarsiddiik/protocol@0.2.2
+  - @abubakarsiddiik/runtime@0.1.7
+  - @abubakarsiddiik/server@0.2.6
+  - @abubakarsiddiik/substrate@0.2.2
+  - @abubakarsiddiik/qa@0.3.0
+  - @abubakarsiddiik/skills@0.1.7
+
 ## 0.3.1
 
 ### Patch Changes

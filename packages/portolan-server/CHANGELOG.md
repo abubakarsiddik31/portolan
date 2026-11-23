@@ -1,5 +1,22 @@
 # @abubakarsiddiik/server
 
+## 0.2.6
+
+### Patch Changes
+
+- 2976560: `portolan map status` shows where the mapping loop stands (version, coverage, recorded runs not yet compiled, the last build's failures grouped by reason, auth expiry, and the next command), and every build is journaled to `.portolan/state/builds.jsonl`. `portolan mcp` adds `map_status`, `map_gaps`, `capability_set`, `map_record_gaps`, `map_build` and `map_job`, so an MCP-only client can finish a map; the two that run a browser need `confirm: true`.
+- 282b1c5: `portolan map record --gaps` records a one-click run for every missing button without an agent loop, writing traces tagged with the capability id. A build then covers exactly that capability, so matching no longer depends on a label two pages may share. `open_url` and `fallback_begin` accept an optional `capability` for the same link.
+- Updated dependencies [1692e2e]
+- Updated dependencies [9862d0a]
+- Updated dependencies [05435df]
+- Updated dependencies [71f3e62]
+- Updated dependencies [282b1c5]
+- Updated dependencies [3e3e5f2]
+- Updated dependencies [fe40c0f]
+  - @abubakarsiddiik/protocol@0.2.2
+  - @abubakarsiddiik/runtime@0.1.7
+  - @abubakarsiddiik/substrate@0.2.2
+
 ## 0.2.5
 
 ### Patch Changes

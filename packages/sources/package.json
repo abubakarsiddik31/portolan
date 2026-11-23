@@ -1,6 +1,6 @@
 {
   "name": "@abubakarsiddiik/sources",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Map source adapters: discover a site from its live DOM, traces, or specs.",
   "license": "Apache-2.0",
   "type": "module",

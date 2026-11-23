@@ -1,5 +1,13 @@
 # @abubakarsiddiik/substrate
 
+## 0.2.2
+
+### Patch Changes
+
+- 9862d0a: Verification no longer launches a Chrome per run. `verifyOp` opens one browser and an isolated context per run, and `map build` shares a single browser across every op it verifies, so a build stops spawning dozens of Chrome processes.
+- 05435df: Exclusion rules move into `policies/<site>.json` as categorized `rules`, matched on a control's label and/or the request its recorded run fired. Excluded capabilities carry a generated `category: reason`, a notifications bell and a trailing `?` are no longer excluded, and an op whose run fired a `cost` or `destructive` request is held back from verification unless `--allow-cost` is passed. `portolan policy allow --site x host` edits the allow list, and a build that was blocked prints the hosts to allow.
+- fe40c0f: `portolan auth login` can sign in without a person: `--fill "textbox:Label=ENV_VAR"` and `--submit` (or `--script file.mjs`) replay a headless sign-in from environment variables, and `auth refresh` replays the recipe saved beside the session. A build with that `--storage-state` replaces a session that is about to expire and signs in again once when an op fails because the session lapsed. `auth status` shows the token's expiry.
+
 ## 0.2.1
 
 ### Patch Changes

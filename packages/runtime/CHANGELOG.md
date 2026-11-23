@@ -1,5 +1,20 @@
 # @abubakarsiddiik/runtime
 
+## 0.1.7
+
+### Patch Changes
+
+- 1692e2e: `map build` proposes postconditions from what a recorded run showed (a changed path or query, a new state, a dialog that appeared), so "verified" means the effect happened, not only that the click did not throw. The `url` check gains an optional `search`, an op can set `no_post`, a `ui` op with no postcondition gets an `add_postcondition` task, and `--require-post` refuses to verify it.
+- 282b1c5: `portolan map record --gaps` records a one-click run for every missing button without an agent loop, writing traces tagged with the capability id. A build then covers exactly that capability, so matching no longer depends on a label two pages may share. `open_url` and `fallback_begin` accept an optional `capability` for the same link.
+- Updated dependencies [1692e2e]
+- Updated dependencies [9862d0a]
+- Updated dependencies [05435df]
+- Updated dependencies [71f3e62]
+- Updated dependencies [3e3e5f2]
+- Updated dependencies [fe40c0f]
+  - @abubakarsiddiik/protocol@0.2.2
+  - @abubakarsiddiik/substrate@0.2.2
+
 ## 0.1.6
 
 ### Patch Changes

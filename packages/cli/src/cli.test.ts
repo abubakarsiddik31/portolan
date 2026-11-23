@@ -64,6 +64,13 @@ describe("parseArgs", () => {
     expect(args.flags).toMatchObject({ site: "store", force: true, port: "42" });
     expect(args.lists.op).toEqual(["x", "y"]);
   });
+
+  it("keeps the token after a boolean flag as a positional", () => {
+    const args = parseArgs(["--verify", "--publish", "trace-1.json", "trace-2.json"]);
+
+    expect(args.flags).toMatchObject({ verify: true, publish: true });
+    expect(args.positional).toEqual(["trace-1.json", "trace-2.json"]);
+  });
 });
 
 describe("map capability", () => {

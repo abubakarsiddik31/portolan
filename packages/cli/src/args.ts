@@ -5,6 +5,18 @@ export type ParsedArgs = {
   lists: Record<string, string[]>;
 };
 
+/** Flags that never take a value, so `--publish trace.json` leaves the trace positional. */
+const BOOLEAN_FLAGS = new Set([
+  "force",
+  "headed",
+  "json",
+  "list",
+  "publish",
+  "require-complete",
+  "verify",
+  "verify-writes",
+]);
+
 /**
  * A tiny argument parser: `--key value`, `--flag`, and positionals.
  *
@@ -40,7 +52,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
     if (inline !== undefined) {
       value = inline;
-    } else {
+    } else if (!BOOLEAN_FLAGS.has(key)) {
       const next = argv[index + 1];
       if (next !== undefined && !next.startsWith("--")) {
         value = next;

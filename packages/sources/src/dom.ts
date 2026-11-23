@@ -33,6 +33,8 @@ export type DomDiscovery = {
   /** Every interactive element seen, for the capability ledger. */
   surface: SurfaceAction[];
   visited: string[];
+  /** State ids of the pages this crawl reached, so a partial crawl can tell stale from unvisited. */
+  pages: string[];
 };
 
 const INPUT_ROLES = new Set([
@@ -86,6 +88,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
   const proposals: OpProposal[] = [];
   const tasks: DraftTask[] = [];
   const visited: string[] = [];
+  const pages = new Set<string>();
   const surface: SurfaceAction[] = [];
   const surfaceSeen = new Set<string>();
   const seenPages = new Set<string>();
@@ -123,6 +126,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
     visited.push(snapshot.url);
     const index = indexNodes(snapshot.nodes);
     const from = stateFor(snapshot.url, states);
+    pages.add(from.id);
 
     const recordSurface = (action: SurfaceAction): void => {
       const key =
@@ -248,6 +252,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
     tasks,
     surface,
     visited,
+    pages: [...pages],
   };
 }
 

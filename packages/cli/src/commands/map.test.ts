@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,7 +8,7 @@ import type { OpProposal } from "@abubakarsiddiik/sources";
 import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substrate";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runMapBuild, setupFor } from "./map.js";
+import { runMapBuild, seedPolicy, setupFor } from "./map.js";
 
 const dirs: string[] = [];
 
@@ -196,6 +196,83 @@ describe("runMapBuild", () => {
     expect(cart?.reason).toContain("open_cart did not verify: verification crashed");
   });
 
+  it("reads --traces-dir alongside --url", async () => {
+    const dir = tempDir();
+    const tracesDir = join(dir, "traces");
+    mkdirSync(tracesDir);
+    const at = "2026-11-17T00:00:00.000Z";
+    const trace = {
+      scope_id: "run-1",
+      sid: "sid-1",
+      intent: "export",
+      effect: "read",
+      started_at: at,
+      ended_at: at,
+      entries: [
+        {
+          kind: "act",
+          at,
+          ref: "e1",
+          do: "click",
+          locator: { role: "button", name: "Export", ordinal: 0 },
+          doc: 1,
+          v: 1,
+          url: "http://app.test/",
+          effects: [],
+          delta: { navigation: false, entries: [] },
+        },
+      ],
+    };
+    writeFileSync(join(tracesDir, "traces.jsonl"), `${JSON.stringify(trace)}\n`);
+
+    const result = await runMapBuild(
+      {
+        site: "app",
+        mapsDir: join(dir, "maps"),
+        url: "http://app.test/",
+        tracesDir,
+        verify: false,
+        verifyWrites: false,
+        publish: false,
+      },
+      { substrate },
+    );
+
+    expect(result.draft.sources).toEqual(expect.arrayContaining(["dom", "traces"]));
+    expect(result.draft.proposals.some((proposal) => proposal.source === "traces")).toBe(true);
+  });
+
+  it("keeps the verify failures in the draft when nothing verifies", async () => {
+    const dir = tempDir();
+    const failing: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => ({
+      op: options.op.name,
+      verified: false,
+      impls: [],
+      reason: "every impl failed",
+    });
+
+    await expect(
+      runMapBuild(
+        {
+          site: "app",
+          mapsDir: dir,
+          url: "http://app.test/",
+          verify: true,
+          verifyWrites: false,
+          publish: true,
+        },
+        { substrate, verify: failing },
+      ),
+    ).rejects.toThrow(/nothing verified/);
+
+    const tasks = JSON.parse(readFileSync(join(dir, "app", "tasks.json"), "utf8")) as {
+      tasks: Array<{ message: string }>;
+    };
+    expect(
+      tasks.tasks.some((task) => task.message.includes("did not verify: every impl failed")),
+    ).toBe(true);
+  });
+
   it("passes the storage state to verification", async () => {
     const seen: Array<string | undefined> = [];
     const capture: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => {
@@ -310,5 +387,20 @@ describe("setupFor", () => {
 
     expect(setupFor(draft([open, staticClick]), staticClick)).toBeUndefined();
     expect(setupFor(draft([click]), click)).toBeUndefined();
+  });
+});
+
+describe("seedPolicy", () => {
+  it("allows the build's host when init left the allow list empty", () => {
+    expect(seedPolicy({ site: "app", allow: [] }, "http://localhost:5173/admin")).toEqual({
+      site: "app",
+      allow: ["localhost:5173"],
+    });
+  });
+
+  it("leaves a policy that lists hosts exactly as written", () => {
+    const policy = { site: "app", allow: ["app.example.com"] };
+    expect(seedPolicy(policy, "http://localhost:5173/")).toBe(policy);
+    expect(seedPolicy(undefined, "http://localhost:5173/")).toBeUndefined();
   });
 });

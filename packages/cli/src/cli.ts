@@ -27,6 +27,7 @@ import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
 import { loadConfig } from "./config.js";
 import { formatDoctor, runDoctor } from "./doctor.js";
+import { COMMAND_HELP } from "./help.js";
 
 const packageJson = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
@@ -93,7 +94,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
   }
 
   if (command !== "qa" && (rest.includes("--help") || rest.includes("-h"))) {
-    out(USAGE);
+    out(COMMAND_HELP[command] ?? USAGE);
     return 0;
   }
 
@@ -105,6 +106,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         const result = (deps.init ?? runInit)({
           ...(args.positional[0] !== undefined ? { dir: args.positional[0] } : {}),
           ...(stringFlag(args, "site") !== undefined ? { site: stringFlag(args, "site") } : {}),
+          ...(stringFlag(args, "url") !== undefined ? { url: stringFlag(args, "url") } : {}),
           force: booleanFlag(args, "force"),
         });
         out(`initialized ${result.dir}`);
@@ -337,13 +339,19 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         const url = stringFlag(args, "url");
         const baseUrl = stringFlag(args, "base-url") ?? config.baseUrl;
         const traces = [...positional, ...listFlag(args, "trace"), ...listFlag(args, "traces")];
+        const tracesDir =
+          stringFlag(args, "traces-dir") ??
+          process.env.TRACES_DIR ??
+          (url === undefined ? config.traces : undefined);
         const result = await (deps.map ?? runMapBuild)({
           site,
           mapsDir,
           ...(url !== undefined ? { url } : {}),
           ...(baseUrl !== undefined ? { baseUrl } : {}),
           ...(traces.length > 0 ? { traces } : {}),
-          tracesDir: stringFlag(args, "traces-dir") ?? process.env.TRACES_DIR ?? config.traces,
+          // The configured default only applies to a traces-only build; with
+          // --url, a directory is read only when it was asked for.
+          ...(tracesDir !== undefined ? { tracesDir } : {}),
           ...(stringFlag(args, "params") !== undefined
             ? { paramsPath: stringFlag(args, "params") }
             : {}),

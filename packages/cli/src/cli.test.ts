@@ -140,6 +140,16 @@ describe("config", () => {
 });
 
 describe("init", () => {
+  it("seeds the policy allow list from --url", () => {
+    const dir = tempDir();
+    runInit({ dir, site: "store", url: "http://localhost:5173/admin" });
+
+    const policy = JSON.parse(
+      readFileSync(join(dir, ".portolan", "policies", "store.json"), "utf8"),
+    );
+    expect(policy).toEqual({ site: "store", allow: ["localhost:5173"] });
+  });
+
   it("writes the config, policy, and directories", () => {
     const dir = tempDir();
     const result = runInit({ dir, site: "store" });
@@ -523,6 +533,25 @@ describe("main", () => {
     ]) {
       expect(text).toContain(command);
     }
+  });
+
+  it("prints a command's own flags for <command> --help", async () => {
+    const sink = capture();
+    expect(await main(["map", "--help"], sink)).toBe(0);
+    const text = sink.lines.join("\n");
+    for (const flag of [
+      "--verify-writes",
+      "--exclude",
+      "--max-pages",
+      "--base-url",
+      "--traces-dir",
+    ]) {
+      expect(text).toContain(flag);
+    }
+
+    const verify = capture();
+    expect(await main(["verify", "-h"], verify)).toBe(0);
+    expect(verify.lines.join("\n")).toContain("--params");
   });
 
   it("prints the version for --version and -v", async () => {

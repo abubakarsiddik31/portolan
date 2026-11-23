@@ -64,11 +64,13 @@ A recipe is saved beside the session as <file>.recipe.json (env var names only).
 map build and verify with that --storage-state refresh the session once and retry
 an op that failed because the session lapsed.`,
 
-  map: `portolan map <build|update|coverage|record|capability> [traces...] [options]
+  map: `portolan map <build|update|status|coverage|record|capability> [traces...] [options]
 
 build     discover --url and/or compile traces into a draft map; --verify and
           --publish turn verified ops into a new map version
 update    same as build, reconciled against the existing map
+status    where the loop stands: version, coverage, uncompiled traces, the last build's
+          failures grouped by reason, auth expiry, and the next command (--json)
 record    --gaps: record a one-click run for each missing capability, without an agent loop
           (--kind button,link  --only id,id  --max N  --writes; needs --base-url or a map)
 coverage  print mapped vs missing capabilities (--json for machine output;

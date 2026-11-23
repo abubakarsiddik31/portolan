@@ -8,6 +8,7 @@ import {
 
 import { createBrowserFactory } from "../browser.js";
 import type { CliConfig } from "../config.js";
+import { createMappingTools } from "./mapping.js";
 
 export type McpInput = {
   config: CliConfig;
@@ -38,5 +39,6 @@ export async function runMcp(input: McpInput, deps: McpDeps = {}): Promise<Stdio
     sessionTtlMs: input.config.sessionTtlMs,
     cleanupIntervalMs: input.config.cleanupIntervalMs,
     ...(factory !== undefined ? { substrateFactory: factory } : {}),
+    mapping: createMappingTools(input.config),
   });
 }

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 
 import { loadQaConfig } from "@abubakarsiddiik/qa";
@@ -36,6 +36,7 @@ import { blockedHosts, runPolicyAllow } from "./commands/policy.js";
 import { runQa } from "./commands/qa.js";
 import { runRecordGaps } from "./commands/record.js";
 import { runServe } from "./commands/serve.js";
+import { formatStatus, mapStatus } from "./commands/status.js";
 import { runVerify } from "./commands/verify.js";
 import { loadConfig } from "./config.js";
 import { formatDoctor, runDoctor } from "./doctor.js";
@@ -58,6 +59,7 @@ Commands:
   serve                  start the HTTP and MCP server
   mcp                    serve MCP over stdio (for a client to spawn)
   map <build|update>     discover a URL and/or traces into a map draft, verify, publish
+  map status             where the mapping loop stands, and the next command
   map record --gaps      record a one-click run for each missing capability
   map coverage           report mapped vs missing app capabilities
   map capability         add or set a capability manually (add|set)
@@ -384,6 +386,24 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           return 0;
         }
 
+        if (explicit === "status") {
+          const status = await mapStatus({
+            site,
+            mapsDir,
+            tracesDir: stringFlag(args, "traces-dir") ?? process.env.TRACES_DIR ?? config.traces,
+            journalDir: dirname(config.traces),
+            ...(stringFlag(args, "storage-state") !== undefined || config.storageState !== undefined
+              ? { storageState: stringFlag(args, "storage-state") ?? config.storageState }
+              : {}),
+          });
+          out(
+            booleanFlag(args, "json")
+              ? JSON.stringify(status, null, 2)
+              : formatStatus(status).join("\n"),
+          );
+          return 0;
+        }
+
         if (explicit === "record") {
           if (!booleanFlag(args, "gaps")) {
             throw new Error(
@@ -527,6 +547,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
             ? { maxPages: numberFlag(args, "max-pages") }
             : {}),
           update,
+          journalDir: dirname(config.traces),
           ...(listFlag(args, "state").length > 0 ? { states: listFlag(args, "state") } : {}),
           verify: booleanFlag(args, "verify"),
           verifyWrites: booleanFlag(args, "verify-writes"),

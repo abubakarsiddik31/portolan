@@ -6,7 +6,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { BrowserRegistry } from "./browsers.js";
 import type { OpExecutor } from "./executor.js";
 import { MapStore } from "./maps.js";
-import { createMcpServer, type FallbackSubstrate } from "./mcp.js";
+import { createMcpServer, type FallbackSubstrate, type MappingTools } from "./mcp.js";
 import { SessionStore } from "./store.js";
 
 export type StdioServerOptions = {
@@ -29,6 +29,8 @@ export type StdioServerOptions = {
   ledger?: WriteLedger;
   /** Persists fallback and explore traces as JSONL and HAR. */
   traceStore?: TraceStore;
+  /** Tools for the mapping loop, so an MCP-only client can finish a map. */
+  mapping?: MappingTools;
 };
 
 export type StdioServerHandle = {
@@ -56,6 +58,7 @@ export async function startStdioServer(
     sessions,
     ledger: options.ledger ?? sessions.writeLedger(),
     ...(options.traceStore !== undefined ? { traceStore: options.traceStore } : {}),
+    ...(options.mapping !== undefined ? { mapping: options.mapping } : {}),
     ...(options.executor !== undefined ? { executor: options.executor } : {}),
     ...(options.substrateFactory !== undefined
       ? { substrateFactory: options.substrateFactory }

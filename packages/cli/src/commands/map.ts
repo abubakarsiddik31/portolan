@@ -50,6 +50,7 @@ import {
 
 import { readRecipe, runAuthRefresh } from "./auth.js";
 import { looksLikeAuthFailure, sessionExpiry } from "./auth-recipe.js";
+import { appendBuild, type BuildEntry } from "./journal.js";
 import { paramSetsFor } from "./param-sets.js";
 import { riskOf } from "./risk.js";
 import { appFingerprint, opHash, readVerification, writeVerification } from "./verification.js";
@@ -93,6 +94,8 @@ export type MapBuildInput = {
   allowCost?: boolean;
   /** Keep a layout control seen on many pages as one capability per page. */
   noDedupe?: boolean;
+  /** Where the build journal (`builds.jsonl`) is appended. Omit to keep none. */
+  journalDir?: string;
   /** More entry points, crawled in the same discovery as `url`. */
   urls?: string[];
   /** A file of routes (one path per line, or a JSON array) the app is known to have. */
@@ -149,6 +152,63 @@ export async function runMapBuild(
   input: MapBuildInput,
   deps: MapBuildDeps = {},
 ): Promise<MapBuildResult> {
+  const started = Date.now();
+  const before = readCapabilities(join(input.mapsDir, input.site));
+  const args = {
+    ...(input.url !== undefined ? { url: input.url } : {}),
+    ...(input.urls !== undefined ? { urls: input.urls } : {}),
+    update: input.update === true,
+    ...(input.states !== undefined ? { states: input.states } : {}),
+    traces: input.traces?.length ?? 0,
+    verify: input.verify,
+    verifyWrites: input.verifyWrites,
+    publish: input.publish,
+    explore: input.explore === true,
+    requireComplete: input.requireComplete === true,
+  };
+  const entry = (rest: Partial<BuildEntry>): BuildEntry => ({
+    at: new Date(started).toISOString(),
+    site: input.site,
+    duration_ms: Date.now() - started,
+    args,
+    ...(before !== undefined ? { coverage_before: coverageOf(before) } : {}),
+    verified: [],
+    failed: {},
+    ...rest,
+  });
+
+  try {
+    const result = await buildMap(input, deps);
+    if (input.journalDir !== undefined) {
+      const failed: Record<string, string> = {};
+      for (const task of result.draft.tasks) {
+        if (task.op !== undefined && FAILURE_TASKS.has(task.kind)) failed[task.op] = task.message;
+      }
+      appendBuild(
+        input.journalDir,
+        entry({
+          coverage_after: result.coverage,
+          verified: result.verified,
+          failed,
+          ...(result.published !== undefined ? { published: result.published.version } : {}),
+        }),
+      );
+    }
+    return result;
+  } catch (error) {
+    if (input.journalDir !== undefined) {
+      appendBuild(
+        input.journalDir,
+        entry({ error: error instanceof Error ? error.message : String(error) }),
+      );
+    }
+    throw error;
+  }
+}
+
+const FAILURE_TASKS = new Set(["restore_op", "confirm_effect", "add_params", "add_postcondition"]);
+
+async function buildMap(input: MapBuildInput, deps: MapBuildDeps): Promise<MapBuildResult> {
   const maps = new MapStore(input.mapsDir);
   const existing = maps.get(input.site);
 

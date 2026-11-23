@@ -987,3 +987,46 @@ describe("session refresh during a build", () => {
     expect(order.filter((step) => step === "refresh")).toHaveLength(1);
   });
 });
+
+describe("build journal", () => {
+  it("records a build, and one that threw", async () => {
+    const dir = tempDir();
+    const journal = join(dir, "state");
+    const base = {
+      site: "app",
+      mapsDir: join(dir, "maps"),
+      url: "http://app.test/",
+      journalDir: journal,
+      verify: true,
+      verifyWrites: false,
+      publish: false,
+      appVersion: "b1",
+    };
+
+    const ok = await runMapBuild(base, { substrate, verify });
+    await expect(
+      runMapBuild(
+        { ...base, publish: true, reverify: true },
+        {
+          substrate,
+          verify: async (options) =>
+            ({
+              op: options.op.name,
+              verified: false,
+              impls: [],
+              reason: "nope",
+            }) satisfies VerifyReport,
+        },
+      ),
+    ).rejects.toThrow(/nothing verified/);
+
+    const lines = readFileSync(join(journal, "builds.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({ site: "app", verified: ok.verified });
+    expect(lines[0].coverage_after.mapped).toBeGreaterThan(0);
+    expect(lines[1].error).toContain("nothing verified");
+  });
+});

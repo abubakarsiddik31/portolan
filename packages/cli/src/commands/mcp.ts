@@ -35,6 +35,8 @@ export async function runMcp(input: McpInput, deps: McpDeps = {}): Promise<Stdio
     databasePath: process.env.DATABASE_PATH ?? input.config.database,
     traceStore: new TraceStore(process.env.TRACES_DIR ?? input.config.traces),
     browsers,
+    sessionTtlMs: input.config.sessionTtlMs,
+    cleanupIntervalMs: input.config.cleanupIntervalMs,
     ...(factory !== undefined ? { substrateFactory: factory } : {}),
   });
 }

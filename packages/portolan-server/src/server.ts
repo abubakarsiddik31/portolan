@@ -74,7 +74,10 @@ export function createServer(options: ServerOptions): FastifyInstance {
 
   const sweep = setInterval(() => {
     const swept = options.store.sweepExpired(ttl);
-    if (swept.length > 0) options.log?.info("session.swept", { count: swept.length });
+    if (swept.length === 0) return;
+    options.log?.info("session.swept", { count: swept.length });
+    // An expired session's browser would otherwise run until shutdown.
+    void Promise.allSettled(swept.map((sid) => browsers.close(sid)));
   }, options.cleanupIntervalMs ?? 60_000);
   sweep.unref();
 
@@ -238,6 +241,7 @@ export function createServer(options: ServerOptions): FastifyInstance {
         ...(options.substrateFactory !== undefined
           ? { substrateFactory: options.substrateFactory }
           : {}),
+        releaseSubstrate: (sid) => browsers.close(sid),
       });
 
       await mcp.connect(created);

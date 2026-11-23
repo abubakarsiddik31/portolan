@@ -24,3 +24,4 @@ const shutdown = async (): Promise<void> => {
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
+process.stdin.once("end", shutdown);

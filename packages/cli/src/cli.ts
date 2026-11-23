@@ -145,7 +145,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
       case "mcp": {
         const config = loadConfig(stringFlag(args, "config"));
         const handle = await (deps.mcp ?? runMcp)({ config });
-        installShutdown(deps.mcp === undefined, handle);
+        installShutdown(deps.mcp === undefined, handle, { stdin: true });
         return 0;
       }
 
@@ -508,7 +508,11 @@ function required(args: ReturnType<typeof parseArgs>, name: string): string {
   return value;
 }
 
-function installShutdown(real: boolean, handle: { close: () => Promise<void> }): void {
+function installShutdown(
+  real: boolean,
+  handle: { close: () => Promise<void> },
+  options: { stdin?: boolean } = {},
+): void {
   if (!real) return;
 
   const shutdown = async (): Promise<void> => {
@@ -518,4 +522,7 @@ function installShutdown(real: boolean, handle: { close: () => Promise<void> }):
 
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
+  // A client that exits without signalling closes our stdin. Chrome keeps the
+  // event loop alive, so without this the process and its browser are orphaned.
+  if (options.stdin === true) process.stdin.once("end", shutdown);
 }

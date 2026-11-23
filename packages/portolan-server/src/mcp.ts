@@ -51,6 +51,8 @@ export type McpDeps = {
   traceStore?: TraceStore;
   /** Creates the substrate used by view, act, and read. */
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
+  /** Releases what the factory created for a session, e.g. its browser. */
+  releaseSubstrate?: (sid: string) => Promise<void> | void;
 };
 
 export type FallbackSubstrate = Pick<Substrate, "view" | "act" | "state" | "read"> & {
@@ -86,6 +88,24 @@ export function createMcpServer(deps: McpDeps): McpServer {
   let nativeTools: RegisteredTool[] = [];
   /** Raw entry URL for a mapless explore session, keyed by sid. */
   const exploreUrls = new Map<string, string>();
+  const substrates = new Map<string, Promise<FallbackSubstrate>>();
+
+  /**
+   * Close a session and free its browser. Opening a new site replaces the
+   * current session; without this the old Chrome would run until the process
+   * exits, and an agent that opens many sites exhausts memory.
+   */
+  async function endSession(sid: string): Promise<void> {
+    deps.sessions.close(sid);
+    exploreUrls.delete(sid);
+
+    const pending = substrates.get(sid);
+    substrates.delete(sid);
+    // A launch still in flight registers its browser when it settles, so wait
+    // for it before releasing.
+    await pending?.catch(() => undefined);
+    await deps.releaseSubstrate?.(sid);
+  }
 
   async function callOp(input: CallInput) {
     if (currentSid === undefined) {
@@ -292,8 +312,6 @@ export function createMcpServer(deps: McpDeps): McpServer {
     return session;
   }
 
-  const substrates = new Map<string, Promise<FallbackSubstrate>>();
-
   async function substrateFor(): Promise<FallbackSubstrate | undefined> {
     const session = currentSession();
     if (session === undefined || deps.substrateFactory === undefined) return undefined;
@@ -445,10 +463,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
         });
       }
 
-      if (currentSid !== undefined) {
-        deps.sessions.close(currentSid);
-        exploreUrls.delete(currentSid);
-      }
+      if (currentSid !== undefined) await endSession(currentSid);
 
       const session = deps.sessions.create({ site });
       deps.sessions.pin(session.sid, map.version);
@@ -480,10 +495,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
       },
     },
     async ({ url, intent, site, effect }) => {
-      if (currentSid !== undefined) {
-        deps.sessions.close(currentSid);
-        exploreUrls.delete(currentSid);
-      }
+      if (currentSid !== undefined) await endSession(currentSid);
 
       const name = site ?? siteNameFromUrl(url);
       const session = deps.sessions.create({ site: name });

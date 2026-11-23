@@ -161,6 +161,30 @@ on the op says the empty list is on purpose. `--no-infer-post` skips the proposa
 Text that changed and the effect of a write are not inferred: a phrase varies between
 runs, and a write needs an outcome check.
 
+## Where the loop stands
+
+```bash
+portolan map status --site app
+# app: v3, 41 ops
+#   coverage: 41 mapped, 12 missing, 5 excluded, 0 stale (77% of actionable)
+#   3 recorded runs not compiled
+#   last build 2026-11-23T10:02:11Z (94s): 38 verified, published v3
+#     4 x locator did not resolve
+#   auth: expires in 11m, refreshable (.portolan/state/auth.json)
+#   next:
+#     portolan map build --site app --traces-dir ... --verify --publish  (3 recorded runs not compiled)
+#     portolan map record --gaps --site app  (12 missing)
+```
+
+`status` reads what the loop already keeps: the ledger, the traces, and a build journal
+at `.portolan/state/builds.jsonl`, one line per build with its arguments, coverage
+before and after, verified ops, failures by op, and duration. A new session, or a
+new agent, can pick the work up from it. `--json` gives the same thing as data.
+
+An MCP-only client gets the same loop as tools (`map_status`, `map_gaps`,
+`capability_set`, `map_record_gaps`, `map_build`, `map_job`); the two that run a browser
+need `confirm: true`. See [MCP tools](/reference/mcp-tools).
+
 ## Verification speed
 
 `map build --verify` runs each op in its own browser context inside one shared Chrome.

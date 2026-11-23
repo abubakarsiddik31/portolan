@@ -53,6 +53,44 @@ export type McpDeps = {
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
   /** Releases what the factory created for a session, e.g. its browser. */
   releaseSubstrate?: (sid: string) => Promise<void> | void;
+  /** Tools for the mapping loop: status, gaps, exclusions, recording, builds. */
+  mapping?: MappingTools;
+};
+
+/**
+ * What an MCP-only client needs to finish a map without a shell. The server
+ * knows nothing about browsers or the build; the CLI supplies these.
+ */
+export type MappingTools = {
+  status: (site: string) => Promise<unknown>;
+  gaps: (input: {
+    site: string;
+    status?: string;
+    offset: number;
+    limit: number;
+  }) => Promise<unknown>;
+  setCapability: (input: {
+    site: string;
+    id: string;
+    status: "missing" | "excluded";
+    reason?: string;
+  }) => Promise<unknown>;
+  recordGaps: (input: {
+    site: string;
+    only?: string[];
+    max?: number;
+    kinds?: string[];
+    writes?: boolean;
+  }) => Promise<unknown>;
+  /** Starts a build and returns at once with a job id. */
+  startBuild: (input: {
+    site: string;
+    url?: string;
+    verify: boolean;
+    publish: boolean;
+    update: boolean;
+  }) => { job: string };
+  job: (id: string) => unknown;
 };
 
 export type FallbackSubstrate = Pick<Substrate, "view" | "act" | "state" | "read"> & {
@@ -817,7 +855,145 @@ export function createMcpServer(deps: McpDeps): McpServer {
     },
   );
 
+  if (deps.mapping !== undefined) registerMappingTools(server, deps.mapping);
+
   return server;
+}
+
+function registerMappingTools(server: McpServer, mapping: MappingTools): void {
+  const json = (value: unknown) => text(JSON.stringify(untrusted({ result: value })));
+  const site = z.string().min(1).max(64);
+  const unconfirmed = (tool: string) =>
+    failure("needs_confirmation", `${tool} runs a browser and writes files; pass confirm: true`);
+
+  server.registerTool(
+    "map_status",
+    {
+      description:
+        "Where the mapping loop stands for a site: version, coverage, recorded runs not yet compiled, the last build's failures grouped by reason, auth expiry, and the next command.",
+      inputSchema: { site },
+    },
+    async ({ site: name }) => json(await mapping.status(name)),
+  );
+
+  server.registerTool(
+    "map_gaps",
+    {
+      description:
+        "The capabilities still to map, a page at a time. Filter by status (missing, stale, removed, unavailable).",
+      inputSchema: {
+        site,
+        status: z.enum(["missing", "stale", "removed", "unavailable"]).optional(),
+        offset: z.number().int().min(0).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      },
+    },
+    async ({ site: name, status, offset, limit }) =>
+      json(
+        await mapping.gaps({
+          site: name,
+          ...(status !== undefined ? { status } : {}),
+          offset: offset ?? 0,
+          limit: limit ?? 25,
+        }),
+      ),
+  );
+
+  server.registerTool(
+    "capability_set",
+    {
+      description:
+        "Mark a capability missing, or excluded with a reason. A manual decision survives rediscovery.",
+      inputSchema: {
+        site,
+        id: z.string().min(1),
+        status: z.enum(["missing", "excluded"]),
+        reason: z.string().min(1).max(300).optional(),
+      },
+    },
+    async ({ site: name, id, status, reason }) => {
+      if (status === "excluded" && reason === undefined) {
+        return failure("invalid_request", "an excluded capability needs a reason");
+      }
+      return json(
+        await mapping.setCapability({
+          site: name,
+          id,
+          status,
+          ...(reason !== undefined ? { reason } : {}),
+        }),
+      );
+    },
+  );
+
+  server.registerTool(
+    "map_record_gaps",
+    {
+      description:
+        "Record a one-click run for each missing button, without an agent loop. Skips anything that looks like a write, or matches a destructive or cost rule, unless writes is true.",
+      inputSchema: {
+        site,
+        only: z.array(z.string()).max(200).optional(),
+        max: z.number().int().min(1).max(500).optional(),
+        kinds: z.array(z.enum(["button", "link"])).optional(),
+        writes: z.boolean().optional(),
+        confirm: z.boolean().optional(),
+      },
+    },
+    async ({ site: name, only, max, kinds, writes, confirm }) => {
+      if (confirm !== true) return unconfirmed("map_record_gaps");
+      return json(
+        await mapping.recordGaps({
+          site: name,
+          ...(only !== undefined ? { only } : {}),
+          ...(max !== undefined ? { max } : {}),
+          ...(kinds !== undefined ? { kinds } : {}),
+          ...(writes !== undefined ? { writes } : {}),
+        }),
+      );
+    },
+  );
+
+  server.registerTool(
+    "map_build",
+    {
+      description:
+        "Build or update a site's map in the background and return a job id; poll it with map_job. Verification runs the ops, so it needs confirm: true.",
+      inputSchema: {
+        site,
+        url: z.string().url().optional(),
+        verify: z.boolean().optional(),
+        publish: z.boolean().optional(),
+        update: z.boolean().optional(),
+        confirm: z.boolean().optional(),
+      },
+    },
+    async ({ site: name, url, verify, publish, update, confirm }) => {
+      if (confirm !== true) return unconfirmed("map_build");
+      return json(
+        mapping.startBuild({
+          site: name,
+          ...(url !== undefined ? { url } : {}),
+          verify: verify ?? true,
+          publish: publish ?? false,
+          update: update ?? false,
+        }),
+      );
+    },
+  );
+
+  server.registerTool(
+    "map_job",
+    {
+      description:
+        "The state of a background map_build: running, done with its summary, or failed.",
+      inputSchema: { job: z.string().min(1) },
+    },
+    async ({ job }) => {
+      const found = mapping.job(job);
+      return found === undefined ? failure("invalid_request", `no job "${job}"`) : json(found);
+    },
+  );
 }
 
 function untrusted<T extends object>(value: T): T & { untrusted: true; notice: string } {

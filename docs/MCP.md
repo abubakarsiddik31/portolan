@@ -16,6 +16,20 @@ Portolan speaks MCP over stdio or streamable HTTP. The tools are the same.
 | `read` | `{ ref?, format? }` | Page text, or one ref's value. Plain text by default; `format: "json"` for the envelope. |
 | `fallback_done` | `{ scope_id, result? }` | The trace for the fallback scope. |
 
+### Mapping tools
+
+`portolan mcp` also registers the mapping loop, so an MCP-only client can finish a
+map without a shell. Results are marked untrusted, like page text.
+
+| Tool | Input | Result |
+|---|---|---|
+| `map_status` | `{ site }` | Version, coverage, recorded runs not yet compiled, the last build's failures grouped by reason, auth expiry, and the next command. |
+| `map_gaps` | `{ site, status?, offset?, limit? }` | The capabilities still to map, a page at a time. |
+| `capability_set` | `{ site, id, status, reason? }` | Mark a capability `missing`, or `excluded` with a reason. |
+| `map_record_gaps` | `{ site, only?, max?, kinds?, writes?, confirm }` | Record a one-click run per missing button. Needs `confirm: true`. |
+| `map_build` | `{ site, url?, verify?, publish?, update?, confirm }` | Start a build and return a job id. Needs `confirm: true`. |
+| `map_job` | `{ job }` | `running`, `done` with a summary, or `failed` with the error. |
+
 `open_site` also registers each map op as a native MCP tool named
 `<site>__<op>` (up to 30 per site) and sends a tool-list change. Native tools
 are a convenience: `call` still reaches every op, including ones past the

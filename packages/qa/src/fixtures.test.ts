@@ -24,7 +24,7 @@ describe("fixtures", () => {
 
   it("fails typed when a fixture or env var is missing", () => {
     expect(() => resolveValues("$" + "{fixture.user.missing}", context)).toThrow(/has no value/);
-    expect(() => resolveValues("$" + "{env.NOPE}", context)).toThrow(/is not set/);
+    expect(() => resolveValues("$" + "{env.QA_NOPE}", context)).toThrow(/is not set/);
   });
 
   it("redacts secret-like keys and values", () => {
@@ -44,5 +44,75 @@ describe("fixtures", () => {
     expect(redactText("Authorization: Bearer abc password=hunter2", context.redact)).toBe(
       "[redacted]: Bearer abc [redacted]=hunter2",
     );
+  });
+});
+
+describe("secret handling", () => {
+  const ref = (name: string) => `$` + `{env.${name}}`;
+
+  it("resolves only QA_* variables", () => {
+    const env = { QA_TOKEN: "tok_live_123", AWS_SECRET_ACCESS_KEY: "wJalrXUtnFEMI" };
+    expect(() => resolveValues(ref("AWS_SECRET_ACCESS_KEY"), { ...context, env })).toThrow(
+      /only reference QA_\* variables/,
+    );
+    expect(() => resolveValues(ref("HOME"), { ...context, env })).toThrow(/not readable/);
+  });
+
+  it("refuses an env placeholder where it would leave the machine", () => {
+    const secrets = new Set<string>();
+    const plain = { ...context, allowEnv: false, secrets };
+    expect(() => resolveValues(ref("QA_TOKEN"), plain)).toThrow(/only allowed in/);
+    expect(secrets.size).toBe(0);
+  });
+
+  it("records each resolved value and calls the origin guard first", () => {
+    const secrets = new Set<string>();
+    const calls: string[] = [];
+    resolveValues(ref("QA_TOKEN"), {
+      ...context,
+      secrets,
+      beforeEnv: () => calls.push("checked"),
+    });
+    expect([...secrets]).toEqual(["tok_live_123"]);
+    expect(calls).toEqual(["checked"]);
+
+    expect(() =>
+      resolveValues(ref("QA_TOKEN"), {
+        ...context,
+        beforeEnv: () => {
+          throw new Error("wrong origin");
+        },
+      }),
+    ).toThrow(/wrong origin/);
+  });
+
+  it("scrubs a secret value in every spelling, not only by key name", () => {
+    const secret = 'p@ss "w0rd"&1';
+    const forms = [
+      secret,
+      encodeURIComponent(secret),
+      JSON.stringify(secret).slice(1, -1),
+      Buffer.from(secret).toString("base64"),
+    ];
+
+    for (const form of forms) {
+      expect(redactText(`before ${form} after`, context.redact, [secret])).toBe(
+        "before [redacted] after",
+      );
+    }
+    expect(redactValues({ expected: secret, nested: [secret] }, [], [secret])).toEqual({
+      expected: "[redacted]",
+      nested: ["[redacted]"],
+    });
+  });
+
+  it("scrubs a secret that contains a redact token whole", () => {
+    expect(redactText("typed mypassword1 here", context.redact, ["mypassword1"])).toBe(
+      "typed [redacted] here",
+    );
+  });
+
+  it("leaves a value shorter than four characters alone", () => {
+    expect(redactText("a bob b", [], ["bob"])).toBe("a bob b");
   });
 });

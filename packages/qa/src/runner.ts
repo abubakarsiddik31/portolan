@@ -14,8 +14,15 @@ import {
 
 import { evaluateCheck } from "./checks.js";
 import type { EvidenceMode } from "./config.js";
+import type { RunEnvironment } from "./environments.js";
 import { QaError, type QaErrorCode } from "./errors.js";
-import { type Fixtures, redactText, redactValues, resolveValues } from "./fixtures.js";
+import {
+  type Fixtures,
+  type ResolveContext,
+  redactText,
+  redactValues,
+  resolveValues,
+} from "./fixtures.js";
 import type { QaCase, QaLocator, QaStep } from "./spec.js";
 import type { QaSubstrate, QaView } from "./types.js";
 
@@ -59,6 +66,10 @@ export type CreateSubstrate = (input: {
   headless: boolean;
   executablePath?: string;
   timeoutMs: number;
+  /** Signed-in session for an environment run. */
+  storageState?: string;
+  /** Refuse every request that could change server state. */
+  readOnly?: boolean;
 }) => Promise<QaSubstrate> | QaSubstrate;
 
 export type RunInput = {
@@ -81,6 +92,13 @@ export type RunInput = {
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
   runId?: string;
+  /**
+   * Run as a named environment and profile: its saved session, its origin,
+   * and its write policy. Absent means the single `baseUrl` behaviour.
+   */
+  environment?: RunEnvironment;
+  /** Internal: secret values resolved during one attempt, scrubbed on output. */
+  secretValues?: Set<string>;
 };
 
 export type RunOutcome = {
@@ -103,6 +121,18 @@ export async function runCases(input: RunInput): Promise<RunOutcome> {
   for (const spec of input.cases) {
     if (spec.status === "disabled") {
       results.push(skip(spec, "case is disabled"));
+      continue;
+    }
+
+    if (input.environment !== undefined && !input.environment.writes && spec.effect !== "read") {
+      results.push(
+        skip(
+          spec,
+          `environment "${input.environment.name}" is read-only and this case has effect "${spec.effect}"`,
+          ['an operator can set "writes": true on the environment in .portolan/config.json'],
+          "precondition_failed",
+        ),
+      );
       continue;
     }
 
@@ -141,6 +171,22 @@ export async function runCases(input: RunInput): Promise<RunOutcome> {
 async function runAttempt(
   spec: QaCase,
   attempt: number,
+  outer: RunInput,
+  evidenceMode: EvidenceMode,
+): Promise<CaseResult> {
+  const secrets = new Set<string>();
+  const result = await attemptCore(
+    spec,
+    attempt,
+    { ...outer, secretValues: secrets },
+    evidenceMode,
+  );
+  return secrets.size === 0 ? result : (redactValues(result, [], secrets) as CaseResult);
+}
+
+async function attemptCore(
+  spec: QaCase,
+  attempt: number,
   input: RunInput,
   evidenceMode: EvidenceMode,
 ): Promise<CaseResult> {
@@ -158,12 +204,20 @@ async function runAttempt(
       headless: input.headless ?? true,
       ...(input.executablePath !== undefined ? { executablePath: input.executablePath } : {}),
       timeoutMs: input.timeoutMs ?? 15_000,
+      ...(input.environment !== undefined
+        ? { storageState: input.environment.storageState, readOnly: !input.environment.writes }
+        : {}),
     });
 
-    const context = {
+    const live = substrate;
+    const context: ResolveContext = {
       fixtures: input.fixtures ?? {},
       env: input.env ?? process.env,
       redact,
+      ...(input.secretValues !== undefined ? { secrets: input.secretValues } : {}),
+      ...(input.environment !== undefined
+        ? { beforeEnv: () => assertOnOrigin(live, input.environment as RunEnvironment) }
+        : {}),
     };
 
     for (const [offset, raw] of spec.setup.entries()) {
@@ -172,6 +226,7 @@ async function runAttempt(
       try {
         await executeStep(step, substrate, {
           baseUrl: input.baseUrl,
+          ...(input.environment !== undefined ? { origin: input.environment.origin } : {}),
           timeoutMs: input.timeoutMs ?? 15_000,
           sleep: input.sleep ?? sleep,
           now,
@@ -208,6 +263,7 @@ async function runAttempt(
       try {
         await executeStep(step, substrate, {
           baseUrl: input.baseUrl,
+          ...(input.environment !== undefined ? { origin: input.environment.origin } : {}),
           timeoutMs: input.timeoutMs ?? 15_000,
           sleep: input.sleep ?? sleep,
           now,
@@ -313,30 +369,70 @@ export async function replaySteps(input: {
   fixtures?: Fixtures;
   env?: NodeJS.ProcessEnv;
   redact?: string[];
+  environment?: RunEnvironment;
   loadMap?: (site: string, version?: number) => SiteMap | undefined;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
 }): Promise<void> {
-  const context = {
+  const secrets = new Set<string>();
+  const context: ResolveContext = {
     fixtures: input.fixtures ?? {},
     env: input.env ?? process.env,
     redact: input.redact ?? [],
+    secrets,
+    ...(input.environment !== undefined
+      ? { beforeEnv: () => assertOnOrigin(input.substrate, input.environment as RunEnvironment) }
+      : {}),
   };
   const map =
     input.spec.map === undefined
       ? undefined
       : input.loadMap?.(input.spec.map.site, input.spec.map.version);
 
-  for (const steps of [input.spec.setup, input.spec.steps.slice(0, Math.max(0, input.uptoStep))]) {
-    for (const step of steps) {
-      await executeStep(resolveStep(step, context) as QaStep, input.substrate, {
-        baseUrl: input.baseUrl,
-        timeoutMs: input.timeoutMs ?? 15_000,
-        sleep: input.sleep ?? sleep,
-        now: input.now ?? (() => new Date()),
-        ...(map !== undefined ? { map } : {}),
-      });
+  try {
+    for (const steps of [
+      input.spec.setup,
+      input.spec.steps.slice(0, Math.max(0, input.uptoStep)),
+    ]) {
+      for (const step of steps) {
+        await executeStep(resolveStep(step, context) as QaStep, input.substrate, {
+          baseUrl: input.baseUrl,
+          ...(input.environment !== undefined ? { origin: input.environment.origin } : {}),
+          timeoutMs: input.timeoutMs ?? 15_000,
+          sleep: input.sleep ?? sleep,
+          now: input.now ?? (() => new Date()),
+          ...(map !== undefined ? { map } : {}),
+        });
+      }
     }
+  } catch (error) {
+    if (error instanceof QaError && secrets.size > 0) {
+      throw new QaError(
+        error.code,
+        redactText(error.message, [], secrets),
+        redactValues(error.details, [], secrets) as Record<string, unknown> | undefined,
+      );
+    }
+    throw error;
+  }
+}
+
+/** A secret may only be typed into the environment it belongs to. */
+function assertOnOrigin(substrate: QaSubstrate, environment: RunEnvironment): void {
+  const url = substrate.state()?.snapshot.url;
+  if (url === undefined || originOf(url) !== environment.origin) {
+    throw new QaError(
+      "precondition_failed",
+      `refusing to use a credential on ${url === undefined ? "a blank page" : originOf(url)}; it is bound to ${environment.origin}`,
+    );
+  }
+}
+
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
   }
 }
 
@@ -349,10 +445,18 @@ async function executeStep(
     sleep: (ms: number) => Promise<void>;
     now: () => Date;
     map?: SiteMap;
+    /** An environment run may not navigate off this origin. */
+    origin?: string;
   },
 ): Promise<void> {
   if ("goto" in step) {
     const url = new URL(step.goto, options.baseUrl).toString();
+    if (options.origin !== undefined && originOf(url) !== options.origin) {
+      throw new QaError(
+        "precondition_failed",
+        `goto ${url} leaves the environment origin ${options.origin}`,
+      );
+    }
     try {
       await substrate.goto(url);
     } catch (error) {
@@ -547,16 +651,14 @@ function stepAction(step: QaStep): {
   return { do: "click" };
 }
 
-function resolveStep(
-  step: QaStep,
-  context: { fixtures: Fixtures; env: NodeJS.ProcessEnv; redact: string[] },
-): unknown {
+function resolveStep(step: QaStep, context: ResolveContext): unknown {
   const copy = JSON.parse(JSON.stringify(step)) as Record<string, unknown>;
+  const plain = { ...context, allowEnv: false };
   if ("params" in copy) copy.params = resolveValues(copy.params, context);
   if ("value" in copy) copy.value = resolveValues(copy.value, context);
-  if ("goto" in copy) copy.goto = resolveValues(copy.goto, context);
-  if ("contains" in copy) copy.contains = resolveValues(copy.contains, context);
-  if ("pattern" in copy) copy.pattern = resolveValues(copy.pattern, context);
+  if ("goto" in copy) copy.goto = resolveValues(copy.goto, plain);
+  if ("contains" in copy) copy.contains = resolveValues(copy.contains, plain);
+  if ("pattern" in copy) copy.pattern = resolveValues(copy.pattern, plain);
   return copy;
 }
 
@@ -703,6 +805,8 @@ export function defaultCreateSubstrate(input: {
   headless: boolean;
   executablePath?: string;
   timeoutMs: number;
+  storageState?: string;
+  readOnly?: boolean;
 }): Promise<QaSubstrate> {
   const executablePath = input.executablePath ?? findChrome();
   if (executablePath === undefined) {
@@ -713,6 +817,8 @@ export function defaultCreateSubstrate(input: {
     executablePath,
     headless: input.headless,
     timeoutMs: input.timeoutMs,
+    ...(input.storageState !== undefined ? { storageState: input.storageState } : {}),
+    ...(input.readOnly === true ? { readOnly: true } : {}),
   }).then((engine) => new Substrate(engine));
 }
 
@@ -748,15 +854,19 @@ function writeEvidenceSync(input: {
     const rendered = renderAffordances(
       rankAffordances(input.view.snapshot.nodes, { refs: input.view.refs, limit: 500 }).affordances,
     );
-    writeFileSync(join(dir, "view.txt"), `${redactText(rendered.text, redact)}\n`, "utf8");
+    writeFileSync(
+      join(dir, "view.txt"),
+      `${redactText(rendered.text, redact, input.input.secretValues)}\n`,
+      "utf8",
+    );
     writeFileSync(
       join(dir, "result.json"),
-      `${JSON.stringify(redactValues(input.result, redact), null, 2)}\n`,
+      `${JSON.stringify(redactValues(input.result, redact, input.input.secretValues), null, 2)}\n`,
       "utf8",
     );
     writeFileSync(
       join(dir, "events.jsonl"),
-      `${(input.result.events ?? []).map((event) => JSON.stringify(redactValues(event, redact))).join("\n")}\n`,
+      `${(input.result.events ?? []).map((event) => JSON.stringify(redactValues(event, redact, input.input.secretValues))).join("\n")}\n`,
       "utf8",
     );
     return dir;
@@ -786,10 +896,14 @@ async function writeEvidence(input: {
     const rendered = renderAffordances(
       rankAffordances(input.view.snapshot.nodes, { refs: input.view.refs, limit: 500 }).affordances,
     );
-    writeFileSync(join(dir, "view.txt"), `${redactText(rendered.text, redact)}\n`, "utf8");
+    writeFileSync(
+      join(dir, "view.txt"),
+      `${redactText(rendered.text, redact, input.input.secretValues)}\n`,
+      "utf8",
+    );
     writeFileSync(
       join(dir, "result.json"),
-      `${JSON.stringify(redactValues(input.result, redact), null, 2)}\n`,
+      `${JSON.stringify(redactValues(input.result, redact, input.input.secretValues), null, 2)}\n`,
       "utf8",
     );
 

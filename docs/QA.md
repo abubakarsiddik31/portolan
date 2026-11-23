@@ -287,8 +287,12 @@ type Check =
   | { map_post: { op: string; params?: Record<string, unknown> } }; // reuse op post
 ```
 
-Values may use `${fixture.<name>}` and `${env.<NAME>}` placeholders. Secrets are
-resolved at run time and never written to the DB or evidence.
+Values may use `${fixture.<name>}` and `${env.QA_<NAME>}` placeholders. Only
+`QA_*` variables resolve, and only in a step's `value` or `params`; a `goto`,
+`contains`, or `pattern` rejects them, because a secret in a URL leaves the
+machine. Every resolved value is recorded for the attempt and scrubbed from the
+result, events, evidence files, and DB rows in raw, URL-encoded, JSON-escaped,
+and base64 form (values under four characters are not scrubbed).
 
 ### 5.1 Suite spec
 
@@ -551,6 +555,32 @@ Credentials are references (`${env.QA_PASSWORD}`), resolved at execution and
 never persisted. `QA_BASE_URL` overrides `baseUrl` and `QA_DATABASE` overrides
 `database`, which lets a harness point at a preview deployment or a disposable
 database without editing config.
+
+### 10.1 Environments and sessions
+
+A top-level `environments` block names the targets an agent may run against.
+Each has `baseUrl`, `profiles`, an optional `loginUrl`, and `writes` (default
+`false`). The block is parsed strictly: an unknown key or a non-boolean `writes`
+is an error.
+
+`qa_run`, `qa_verify`, and `qa_repair` (and `portolan qa run|verify|repair`)
+take `env` and `as`. The runner resolves them to the profile's saved Playwright
+storage state under `$PORTOLAN_HOME` (default `~/.portolan`), outside the
+repository, written `0600` by `portolan auth login --env NAME --profile P`.
+There is no fallback to the global `auth.json`, and `QA_BASE_URL` is refused
+with `--env`.
+
+Enforcement, in the runner and engine rather than in the agent-authored case:
+
+- a run in a read-only environment skips cases whose `effect` is not `read`, and
+  the browser context aborts every request that is not GET, HEAD, or OPTIONS;
+- a `goto` off the environment origin fails with `precondition_failed`;
+- an `${env.QA_*}` value is resolved only while the page is on that origin;
+- a missing session is `auth_missing` with the sign-in command in `details.next`.
+
+Not built yet: keychain-backed `${secret.*}` for scripted sign-in, automatic
+session refresh, and an `auth_expired` probe. Today an expired session is a
+person re-running `auth login`.
 
 ## 11. Milestones
 

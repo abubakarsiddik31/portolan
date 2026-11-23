@@ -10,6 +10,29 @@ import { parseCase } from "./spec.js";
 
 const MAX_RESULTS = 50;
 
+/** Environment and profile are chosen by name; the agent never sees a credential. */
+const ENVIRONMENT_INPUT = {
+  env: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Named environment from qa_environments (dev, qa, prod). Omit for the default base URL.",
+    ),
+  as: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Profile (account role) within env. Optional when the environment has one profile."),
+};
+
+function environmentOf(input: { env?: string | undefined; as?: string | undefined }) {
+  return {
+    ...(input.env !== undefined ? { env: input.env } : {}),
+    ...(input.as !== undefined ? { as: input.as } : {}),
+  };
+}
+
 export type QaMcpDeps = {
   service?: QaService;
 };
@@ -92,6 +115,16 @@ export function createQaMcpServer(service: QaService, deps: QaMcpDeps = {}): Mcp
   );
 
   server.registerTool(
+    "qa_environments",
+    {
+      description:
+        "List the configured environments, their profiles, whether each profile has a saved session, and whether writes are allowed. Never returns a credential or a session. A missing session is fixed by a person running the login command, not by you.",
+      inputSchema: {},
+    },
+    async () => guarded(() => qa.environments())(),
+  );
+
+  server.registerTool(
     "qa_plan",
     {
       description:
@@ -127,11 +160,13 @@ export function createQaMcpServer(service: QaService, deps: QaMcpDeps = {}): Mcp
         changed: z.boolean().optional(),
         repeat: z.number().int().min(1).max(10).optional(),
         allow_unverified: z.boolean().optional(),
+        ...ENVIRONMENT_INPUT,
       },
     },
     async (input) =>
       guarded(async () => {
         const result = await qa.run(selectionOf(input), {
+          ...environmentOf(input),
           ...(input.repeat !== undefined ? { repeat: input.repeat } : {}),
           ...(input.allow_unverified !== undefined
             ? { allowUnverified: input.allow_unverified }
@@ -238,11 +273,13 @@ export function createQaMcpServer(service: QaService, deps: QaMcpDeps = {}): Mcp
         suite: z.string().min(1).optional(),
         tag: z.string().min(1).optional(),
         repeat: z.number().int().min(1).max(10).optional(),
+        ...ENVIRONMENT_INPUT,
       },
     },
     async (input) =>
       guarded(() =>
         qa.verify(selectionOf(input), {
+          ...environmentOf(input),
           ...(input.repeat !== undefined ? { repeat: input.repeat } : {}),
         }),
       )(),
@@ -328,11 +365,13 @@ export function createQaMcpServer(service: QaService, deps: QaMcpDeps = {}): Mcp
       inputSchema: {
         case_id: z.string().min(1),
         from_run: z.string().min(1).optional(),
+        ...ENVIRONMENT_INPUT,
       },
     },
-    async ({ case_id, from_run }) =>
+    async ({ case_id, from_run, env, as }) =>
       guarded(() =>
         qa.repair({
+          ...environmentOf({ env, as }),
           caseId: case_id,
           ...(from_run !== undefined ? { fromRun: from_run } : {}),
         }),

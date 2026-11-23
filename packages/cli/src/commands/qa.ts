@@ -39,6 +39,9 @@ Commands:
 
 Selection: --changed, --suite NAME, --case ID (repeatable), --tag TAG, --all
 Common: --json, --config PATH, --repeat N, --allow-unverified, --base-url URL
+Environment: --env NAME [--as PROFILE] on run, verify, and repair runs against a
+named environment from .portolan/config.json with its saved session
+(sign in once: portolan auth login --env NAME --profile PROFILE)
 `;
 
 export type QaCommandDeps = {
@@ -184,6 +187,7 @@ export async function runQa(argv: string[], deps: QaCommandDeps = {}): Promise<n
             ? { repeat: numberFlag(args, "repeat") }
             : {}),
           allowUnverified: booleanFlag(args, "allow-unverified"),
+          ...envFlags(args),
           ...(stringFlag(args, "evidence") !== undefined
             ? { evidence: stringFlag(args, "evidence") as "failures" | "all" | "none" }
             : {}),
@@ -260,6 +264,7 @@ export async function runQa(argv: string[], deps: QaCommandDeps = {}): Promise<n
           ...(numberFlag(args, "repeat") !== undefined
             ? { repeat: numberFlag(args, "repeat") }
             : {}),
+          ...envFlags(args),
         });
 
         if (json) {
@@ -479,6 +484,7 @@ export async function runQa(argv: string[], deps: QaCommandDeps = {}): Promise<n
           ...(stringFlag(args, "from-run") !== undefined
             ? { fromRun: stringFlag(args, "from-run") }
             : {}),
+          ...envFlags(args),
         });
 
         if (json) {
@@ -535,4 +541,10 @@ function isUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function envFlags(args: ReturnType<typeof parseArgs>): { env?: string; as?: string } {
+  const env = stringFlag(args, "env");
+  const as = stringFlag(args, "as");
+  return { ...(env !== undefined ? { env } : {}), ...(as !== undefined ? { as } : {}) };
 }

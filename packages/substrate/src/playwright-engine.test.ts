@@ -197,3 +197,59 @@ describe.skipIf(!ENABLED)("playwright engine", () => {
     );
   });
 });
+
+describe.skipIf(!ENABLED)("playwright engine, read-only", () => {
+  let server: Server | undefined;
+  let baseUrl = "";
+  let engine: PlaywrightEngine | undefined;
+  const seen: string[] = [];
+
+  beforeAll(async () => {
+    const started = createServer((request, response) => {
+      seen.push(`${request.method} ${request.url}`);
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end("<!doctype html><title>ro</title><p>ok</p>");
+    });
+    server = started;
+    await new Promise<void>((resolve) => {
+      started.listen(0, "127.0.0.1", resolve);
+    });
+    const address = started.address();
+    if (address === null || typeof address === "string") throw new Error("no port");
+    baseUrl = `http://127.0.0.1:${address.port}/`;
+
+    engine = await PlaywrightEngine.launch({
+      executablePath: chromePath(),
+      readOnly: true,
+      launchArgs: process.env.CI === "true" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [],
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    if (engine !== undefined) await engine.close();
+    await new Promise<void>((resolve) => {
+      server?.close(() => resolve());
+    });
+  });
+
+  it("lets a GET through and aborts a POST before it reaches the server", async () => {
+    if (engine === undefined) throw new Error("the engine is not running");
+    await engine.navigate(baseUrl);
+
+    const get = await engine.evaluate<string | number>(
+      "fetch('/read').then((r) => r.status).catch(() => 'blocked')",
+    );
+    const post = await engine.evaluate<string | number>(
+      "fetch('/write', { method: 'POST', body: 'x' }).then((r) => r.status).catch(() => 'blocked')",
+    );
+    const del = await engine.evaluate<string | number>(
+      "fetch('/write', { method: 'DELETE' }).then((r) => r.status).catch(() => 'blocked')",
+    );
+
+    expect(get).toBe(200);
+    expect(post).toBe("blocked");
+    expect(del).toBe("blocked");
+    expect(seen).toContain("GET /read");
+    expect(seen.some((line) => line.startsWith("POST") || line.startsWith("DELETE"))).toBe(false);
+  });
+});

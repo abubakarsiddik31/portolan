@@ -10,6 +10,7 @@ export type QaErrorCode =
   | "op_failed"
   | "unknown_outcome"
   | "fixture_missing"
+  | "auth_missing"
   | "harness_error"
   | "invalid_request"
   | "unverified"

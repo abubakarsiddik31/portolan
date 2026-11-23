@@ -20,6 +20,7 @@ import {
   readTraceFile,
 } from "./generate.js";
 import { gitChangedFiles } from "./git.js";
+import { mapProblems, pendingLinks } from "./governance.js";
 import { type Plan, planCases } from "./plan.js";
 import { applyRepair, findReplacement, REPAIRABLE_CODES, type RepairChange } from "./repair.js";
 import {
@@ -152,11 +153,24 @@ export class QaService {
     this.store.close();
   }
 
-  sync(): ReturnType<QaStore["syncSpecs"]> {
-    return this.store.syncSpecs({
-      cases: loadCases(this.config.cases),
-      suites: loadSuites(this.config.suites),
-    });
+  sync(): ReturnType<QaStore["syncSpecs"]> & {
+    /** Cases whose map link is wrong, with what is wrong. */
+    invalid: Array<{ id: string; problems: string[] }>;
+    /** Write cases that say they have no op to point at yet. */
+    pending: Array<{ id: string; reason: string }>;
+  } {
+    const cases = loadCases(this.config.cases);
+    const report = this.store.syncSpecs({ cases, suites: loadSuites(this.config.suites) });
+    const specs = cases.map((item) => item.spec);
+
+    return {
+      ...report,
+      invalid: specs.flatMap((spec) => {
+        const problems = mapProblems(spec, (site, version) => this.loadMap(site, version));
+        return problems.length > 0 ? [{ id: spec.id, problems }] : [];
+      }),
+      pending: pendingLinks(specs),
+    };
   }
 
   list(filter: CaseFilter = {}): CaseRow[] {
@@ -172,6 +186,15 @@ export class QaService {
   }
 
   caseWrite(spec: QaCase): { spec: QaCase; row: CaseRow; path: string } {
+    const problems = mapProblems(spec, (site, version) => this.loadMap(site, version));
+    if (problems.length > 0) {
+      throw new QaError(
+        "invalid_request",
+        `the case's map link is wrong: ${problems.join("; ")}. Point it at a real op, or use map: { site, pending: "<why there is no op yet>" }`,
+        { problems },
+      );
+    }
+
     const path = join(this.config.cases, `${spec.id}.json`);
     const written = writeCaseFile(path, spec, { status: "draft", now: this.now() });
     const loaded = readCaseFile(path);
@@ -451,7 +474,15 @@ export class QaService {
 
   async run(selection: Selection = {}, options: RunOptions = {}): Promise<RunResult> {
     const target = this.target(options);
-    const resolved = this.select(selection);
+    const selected = this.select(selection);
+    // A case whose op link is wrong is not run: it would claim governance it lacks.
+    const broken = new Map(
+      selected.cases.flatMap((spec) => {
+        const problems = mapProblems(spec, (site, version) => this.loadMap(site, version));
+        return problems.length > 0 ? [[spec.id, problems] as const] : [];
+      }),
+    );
+    const resolved = { ...selected, cases: selected.cases.filter((spec) => !broken.has(spec.id)) };
     const run = this.store.startRun({
       base_url: target.baseUrl,
       trigger: options.trigger ?? "manual",
@@ -492,6 +523,19 @@ export class QaService {
     } catch (error) {
       this.store.finishRun(run.id, "error");
       throw error;
+    }
+
+    for (const [id, problems] of broken) {
+      outcome.results.push({
+        case_id: id,
+        status: "error",
+        attempt: 1,
+        duration_ms: 0,
+        fail_code: "invalid_request",
+        fail_reason: `the case's map link is wrong: ${problems.join("; ")}`,
+        next: [`fix the map link in the case file, or use map: { site, pending: "<reason>" }`],
+      });
+      outcome.summary.error += 1;
     }
 
     const redacted = outcome.results.map((result) =>

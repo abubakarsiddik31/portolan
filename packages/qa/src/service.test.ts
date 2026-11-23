@@ -397,7 +397,7 @@ describe("QaService environments", () => {
       loginCase({
         id: "checkout/pay",
         effect: "irreversible",
-        map: { site: "store", version: 1, op: "checkout" },
+        map: { site: "store", pending: "writes are not compiled into ops yet" },
       }),
     );
 
@@ -426,5 +426,85 @@ describe("QaService environments", () => {
       ],
     });
     expect(JSON.stringify(listed)).not.toContain(home);
+  });
+});
+
+describe("QaService map links", () => {
+  const maps = join(import.meta.dirname, "../../../maps");
+
+  function service() {
+    const root = mkdtempSync(join(tmpdir(), "portolan-qa-map-"));
+    const config = {
+      ...mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:" }),
+      maps,
+    };
+    return new QaService(config, { createSubstrate: (() => new FakeApp("Login")) as never });
+  }
+
+  const write = (overrides: Record<string, unknown>) =>
+    loginCase({ id: "cart/add", effect: "write", ...overrides });
+
+  it("accepts a write case whose op exists with the same effect", () => {
+    const qa = service();
+    expect(() =>
+      qa.caseWrite(write({ map: { site: "store", version: 1, op: "add_to_cart" } })),
+    ).not.toThrow();
+  });
+
+  it("refuses an op that does not exist, a read op, and a missing map", () => {
+    const qa = service();
+
+    expect(() => qa.caseWrite(write({ map: { site: "store", version: 1, op: "nope" } }))).toThrow(
+      /op "nope" is not in store v1/,
+    );
+    expect(() =>
+      qa.caseWrite(write({ map: { site: "store", version: 1, op: "view_cart" } })),
+    ).toThrow(/is a read op but the case says effect: write/);
+    expect(() => qa.caseWrite(write({ map: { site: "ghost", version: 1, op: "x" } }))).toThrow(
+      /map ghost v1 was not found/,
+    );
+  });
+
+  it("requires confirm on an irreversible op's step", () => {
+    const qa = service();
+    const checkout = (confirm: boolean) =>
+      write({
+        id: "cart/checkout",
+        effect: "irreversible",
+        map: { site: "store", version: 1, op: "checkout" },
+        steps: [{ op: "checkout", params: {}, ...(confirm ? { confirm: true } : {}) }],
+      });
+
+    expect(() => qa.caseWrite(checkout(false))).toThrow(/needs confirm: true/);
+    expect(() => qa.caseWrite(checkout(true))).not.toThrow();
+  });
+
+  it("allows an explicit pending link, and reports it from sync", () => {
+    const qa = service();
+    qa.caseWrite(
+      write({ id: "keys/create", map: { site: "store", pending: "writes do not compile yet" } }),
+    );
+
+    const report = qa.sync();
+    expect(report.pending).toEqual([{ id: "keys/create", reason: "writes do not compile yet" }]);
+    expect(report.invalid).toEqual([]);
+  });
+
+  it("does not run a case whose link is wrong, and says so", async () => {
+    const root = mkdtempSync(join(tmpdir(), "portolan-qa-map-"));
+    const base = { ...mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:" }), maps };
+    const qa = new QaService(base, { createSubstrate: (() => new FakeApp("Login")) as never });
+    qa.caseWrite(write({ map: { site: "store", version: 1, op: "add_to_cart" } }));
+
+    // The file is edited by hand after it was written: the op is renamed away.
+    const path = join(base.cases, "cart", "add.json");
+    const edited = JSON.parse(readFileSync(path, "utf8"));
+    edited.map.op = "renamed_op";
+    writeFileSync(path, JSON.stringify(edited));
+
+    const result = await qa.run({ ids: ["cart/add"] }, { allowUnverified: true });
+    expect(result.results[0]).toMatchObject({ status: "error", fail_code: "invalid_request" });
+    expect(result.results[0]?.fail_reason).toContain('op "renamed_op" is not in store v1');
+    expect(result.summary.error).toBe(1);
   });
 });

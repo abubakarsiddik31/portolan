@@ -89,11 +89,16 @@ export const QaCaseSchema = z
     touches: z.array(z.string().min(1)).default([]),
     routes: z.array(z.string().min(1)).default([]),
     map: z
-      .object({
-        site: z.string().min(1),
-        version: z.number().int().min(1),
-        op: z.string().min(1),
-      })
+      .union([
+        z.object({
+          site: z.string().min(1),
+          version: z.number().int().min(1),
+          op: z.string().min(1),
+        }),
+        // The write has no op to point at yet. Say why, so the placeholder is
+        // reported instead of passing for a real link.
+        z.object({ site: z.string().min(1), pending: z.string().min(1).max(300) }),
+      ])
       .optional(),
     setup: z.array(StepSchema).default([]),
     steps: z.array(StepSchema).min(1),
@@ -120,6 +125,21 @@ export const QaCaseSchema = z
       });
     }
   });
+
+export type GovernedMap = { site: string; version: number; op: string };
+
+/** The op a case is checked against, when it names one. */
+export function governedMap(spec: { map?: { site: string } }): GovernedMap | undefined {
+  const map = spec.map as Partial<GovernedMap> | undefined;
+  return map?.op !== undefined && map.version !== undefined
+    ? { site: map.site as string, version: map.version, op: map.op }
+    : undefined;
+}
+
+/** Why a write case has no op yet, when it says so. */
+export function pendingMap(spec: { map?: { site: string } }): string | undefined {
+  return (spec.map as { pending?: string } | undefined)?.pending;
+}
 
 export const SuiteSchema = z.object({
   schema: z.literal(1),

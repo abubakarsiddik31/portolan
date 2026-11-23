@@ -14,7 +14,9 @@ export function renderMarkdown(input: ReportInput): string {
   lines.push(`# QA run${input.runId === undefined ? "" : ` ${input.runId}`}`);
   lines.push("");
   lines.push(
-    `**${summary.pass} pass · ${summary.fail} fail · ${summary.skip} skip · ${summary.error} error**`,
+    `**${summary.pass} pass · ${summary.fail} fail · ${summary.skip} skip · ${summary.error} error${
+      (summary.known_failure ?? 0) > 0 ? ` · ${summary.known_failure} known failure` : ""
+    }${(summary.fixed ?? 0) > 0 ? ` · ${summary.fixed} fixed` : ""}**`,
   );
   lines.push("");
   lines.push("| Case | Status | Code | Detail | Evidence |");
@@ -47,7 +49,7 @@ export function renderJUnit(input: ReportInput): string {
 
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
   lines.push(
-    `<testsuite name="${attr(suiteName)}" tests="${input.results.length}" failures="${failures}" skipped="${summary.skip}">`,
+    `<testsuite name="${attr(suiteName)}" tests="${input.results.length}" failures="${failures}" skipped="${summary.skip + (summary.known_failure ?? 0)}">`,
   );
 
   for (const result of input.results) {
@@ -55,8 +57,14 @@ export function renderJUnit(input: ReportInput): string {
       `  <testcase classname="${attr(suiteName)}" name="${attr(result.case_id)}" time="${(result.duration_ms / 1000).toFixed(3)}">`,
     );
 
-    if (result.status === "skip") {
-      lines.push(`    <skipped message="${attr(result.fail_reason ?? "skipped")}"/>`);
+    if (result.status === "skip" || result.status === "known_failure") {
+      lines.push(
+        `    <skipped message="${attr(
+          result.status === "known_failure"
+            ? `known failure: ${result.fail_reason ?? ""}`
+            : (result.fail_reason ?? "skipped"),
+        )}"/>`,
+      );
     } else if (result.status === "fail" || result.status === "error") {
       const message = `${result.fail_code ?? result.status}: ${result.fail_reason ?? ""}`;
       lines.push(`    <failure message="${attr(message)}">${text(message)}</failure>`);
@@ -75,7 +83,7 @@ export function renderJUnit(input: ReportInput): string {
 
 function summarize(results: CaseResult[]): RunSummary {
   const summary: RunSummary = { pass: 0, fail: 0, skip: 0, error: 0 };
-  for (const result of results) summary[result.status] += 1;
+  for (const result of results) summary[result.status] = (summary[result.status] ?? 0) + 1;
   return summary;
 }
 

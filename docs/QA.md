@@ -270,6 +270,7 @@ type QaCase = {
   fixtures?: string[];              // named fixtures resolved at run time
   source?: { kind: "manual" | "trace" | "generated"; trace_id?: string; commit?: string };
   notes?: string;
+  expect_failure?: { reason: string; issue?: string }; // meant to fail until the app is fixed
 };
 
 type Step =
@@ -295,6 +296,13 @@ map version must exist, `op` must be in it with the case's `effect`, and an `irr
 op's step needs `confirm: true`. A case whose link is wrong is not run; it returns an
 `invalid_request` error that says what is wrong. Until a write compiles into an op, `pending`
 makes the placeholder explicit, and `qa sync` lists those cases.
+
+A case written to catch a known bug can never replay green, so it would stay unverified and
+every run would skip it. Mark it `expect_failure: { reason, issue? }`. `qa verify` promotes it
+when it fails with the same code and step on every replay, and records that failure on the
+case. A run then reports it as `known_failure` and stays green. When it starts passing, the
+run reports `fixed` and says to remove the marker and close the issue. A different failure is
+still a `fail`, and a case that fails inconsistently is still `broken`.
 
 Values may use `${fixture.<name>}` and `${env.QA_<NAME>}` placeholders. Only
 `QA_*` variables resolve, and only in a step's `value` or `params`; a `goto`,

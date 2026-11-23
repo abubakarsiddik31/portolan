@@ -26,6 +26,7 @@ import { applyRepair, findReplacement, REPAIRABLE_CODES, type RepairChange } fro
 import {
   type CaseResult,
   type CreateSubstrate,
+  classifyExpected,
   defaultCreateSubstrate,
   type RunOutcome,
   replaySteps,
@@ -91,6 +92,8 @@ export type VerifyReport = {
   runs: number;
   results: CaseResult[];
   reason?: string;
+  /** A case marked expect_failure that failed the same way on every replay. */
+  known_failure?: { code: string; step?: number };
 };
 
 export type GenerateReport = {
@@ -538,6 +541,18 @@ export class QaService {
       outcome.summary.error += 1;
     }
 
+    const specs = new Map(selected.cases.map((spec) => [spec.id, spec]));
+    const classified = outcome.results.map((result) => {
+      const spec = specs.get(result.case_id);
+      return spec === undefined ? result : classifyExpected(spec, result);
+    });
+    outcome.results.splice(0, outcome.results.length, ...classified);
+    const summary: RunOutcome["summary"] = { pass: 0, fail: 0, skip: 0, error: 0 };
+    for (const result of outcome.results) {
+      summary[result.status] = (summary[result.status] ?? 0) + 1;
+    }
+    outcome.summary = summary;
+
     const redacted = outcome.results.map((result) =>
       this.withSessionHint(this.redactResult(result), target.environment),
     );
@@ -592,7 +607,27 @@ export class QaService {
         results.push(...outcome.results);
       }
 
-      const failed = results.find((result) => result.status !== "pass");
+      // A case marked expect_failure is promoted when it fails the same way on
+      // every replay: that is the app being wrong, not the case being flaky.
+      let knownFailure: { code: string; step?: number } | undefined;
+      if (spec.expect_failure !== undefined && results.length > 0) {
+        const signatures = new Set(results.map((r) => `${r.status}|${r.fail_code}|${r.fail_step}`));
+        const first = results[0];
+        if (
+          signatures.size === 1 &&
+          first?.status === "fail" &&
+          first.fail_code !== undefined &&
+          first.fail_code !== "flaky"
+        ) {
+          knownFailure = {
+            code: first.fail_code,
+            ...(first.fail_step !== undefined ? { step: first.fail_step } : {}),
+          };
+        }
+      }
+
+      const failed =
+        knownFailure !== undefined ? undefined : results.find((result) => result.status !== "pass");
       // A read-only environment skips a write case; that says nothing about the case.
       const refused = results.every(
         (result) => result.status === "skip" && result.fail_code === "precondition_failed",
@@ -602,6 +637,7 @@ export class QaService {
         verified: failed === undefined,
         runs: results.length,
         results,
+        ...(knownFailure !== undefined ? { known_failure: knownFailure } : {}),
         ...(failed !== undefined
           ? { reason: `${failed.fail_code ?? failed.status}: ${failed.fail_reason ?? ""}` }
           : {}),
@@ -613,6 +649,7 @@ export class QaService {
           status: "verified",
           verifiedRuns: repeat,
           now: this.now(),
+          ...(knownFailure !== undefined ? { knownFailure } : {}),
         });
         const loaded = readCaseFile(path);
         this.store.putCase(loaded, { note: "verified", status: "verified" });

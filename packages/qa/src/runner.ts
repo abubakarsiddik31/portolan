@@ -42,7 +42,8 @@ export type StepEvent = {
 
 export type CaseResult = {
   case_id: string;
-  status: "pass" | "fail" | "skip" | "error";
+  /** `known_failure` is a case marked expect_failure failing as recorded; `fixed` is one now passing. */
+  status: "pass" | "fail" | "skip" | "error" | "known_failure" | "fixed";
   attempt: number;
   duration_ms: number;
   fail_code?: QaErrorCode;
@@ -60,6 +61,9 @@ export type RunSummary = {
   fail: number;
   skip: number;
   error: number;
+  /** Present only when a case marked expect_failure produced one. */
+  known_failure?: number;
+  fixed?: number;
 };
 
 export type CreateSubstrate = (input: {
@@ -835,9 +839,46 @@ function skip(
   };
 }
 
+/**
+ * A case marked `expect_failure` is judged against the failure verify
+ * recorded: the same one is a known failure (the run stays green, and says
+ * so), a pass means the app was fixed, and a different failure is a failure.
+ */
+export function classifyExpected(spec: QaCase, result: CaseResult): CaseResult {
+  if (spec.expect_failure === undefined) return result;
+  const issue = spec.expect_failure.issue;
+
+  if (result.status === "pass") {
+    return {
+      ...result,
+      status: "fixed",
+      fail_reason: "the failure this case expected no longer happens",
+      next: [
+        `remove expect_failure from ${spec.id}${issue !== undefined ? ` and close ${issue}` : ""}, then qa verify ${spec.id}`,
+      ],
+    };
+  }
+
+  const known = spec.known_failure;
+  if (
+    result.status === "fail" &&
+    known !== undefined &&
+    result.fail_code === known.code &&
+    (known.step === undefined || result.fail_step === known.step)
+  ) {
+    return {
+      ...result,
+      status: "known_failure",
+      fail_reason: `known failure: ${spec.expect_failure.reason}${issue !== undefined ? ` (${issue})` : ""}; ${result.fail_reason ?? ""}`,
+    };
+  }
+
+  return result;
+}
+
 function summarize(results: CaseResult[]): RunSummary {
   const summary: RunSummary = { pass: 0, fail: 0, skip: 0, error: 0 };
-  for (const result of results) summary[result.status] += 1;
+  for (const result of results) summary[result.status] = (summary[result.status] ?? 0) + 1;
   return summary;
 }
 

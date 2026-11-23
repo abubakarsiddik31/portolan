@@ -112,6 +112,17 @@ export const QaCaseSchema = z
       })
       .optional(),
     notes: z.string().optional(),
+    // The author says this case is meant to fail until the app is fixed.
+    expect_failure: z
+      .object({
+        reason: z.string().min(1).max(300),
+        issue: z.string().min(1).max(200).optional(),
+      })
+      .optional(),
+    // Written by verify: the failure the case showed on every replay.
+    known_failure: z
+      .object({ code: z.string().min(1), step: z.number().int().min(0).optional() })
+      .optional(),
     verifiedAt: z.string().min(1).optional(),
     verifyRuns: z.number().int().min(1).optional(),
     verifiedSha: z.string().min(1).optional(),
@@ -207,6 +218,7 @@ export function caseContentSha(spec: QaCase): string {
   delete copy.verifiedAt;
   delete copy.verifyRuns;
   delete copy.verifiedSha;
+  delete copy.known_failure;
   return createHash("sha256")
     .update(JSON.stringify(stable(copy)))
     .digest("hex");
@@ -273,6 +285,8 @@ export function readSuiteFile(path: string): LoadedSuite {
 export type WriteCaseOptions = {
   status?: CaseStatus;
   verifiedRuns?: number;
+  /** The failure a case with `expect_failure` showed on every replay. */
+  knownFailure?: { code: string; step?: number };
   now?: Date;
 };
 
@@ -288,7 +302,10 @@ export function writeCaseFile(path: string, input: QaCase, options: WriteCaseOpt
     spec.verifiedAt = (options.now ?? new Date()).toISOString();
     spec.verifyRuns = options.verifiedRuns ?? spec.verifyRuns ?? 3;
     spec.verifiedSha = caseContentSha({ ...spec, verifiedSha: undefined });
+    if (options.knownFailure !== undefined) spec.known_failure = options.knownFailure;
+    else delete spec.known_failure;
   } else {
+    delete spec.known_failure;
     delete spec.verifiedAt;
     delete spec.verifyRuns;
     delete spec.verifiedSha;

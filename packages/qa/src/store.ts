@@ -97,7 +97,14 @@ export type RunReport = {
   run: RunRow;
   cases: CaseResultRow[];
   evidence: EvidenceRow[];
-  summary: { pass: number; fail: number; skip: number; error: number };
+  summary: {
+    pass: number;
+    fail: number;
+    skip: number;
+    error: number;
+    known_failure?: number;
+    fixed?: number;
+  };
 };
 
 export type FlakeRow = {
@@ -460,11 +467,14 @@ export class QaStore {
       .prepare("SELECT * FROM evidence WHERE run_id = ? ORDER BY case_id, kind")
       .all(id) as EvidenceRow[];
 
-    const summary = { pass: 0, fail: 0, skip: 0, error: 0 };
+    const summary: RunReport["summary"] = { pass: 0, fail: 0, skip: 0, error: 0 };
     for (const item of cases) {
       if (item.status === "pass") summary.pass += 1;
       else if (item.status === "fail") summary.fail += 1;
       else if (item.status === "skip") summary.skip += 1;
+      else if (item.status === "known_failure")
+        summary.known_failure = (summary.known_failure ?? 0) + 1;
+      else if (item.status === "fixed") summary.fixed = (summary.fixed ?? 0) + 1;
       else summary.error += 1;
     }
 

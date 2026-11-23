@@ -69,6 +69,7 @@ Options (build, update):
   --exclude <pattern>    capability name to leave unmapped (repeatable)
   --trace <file>         a recorded trace (repeatable; or pass files directly)
   --traces-dir <dir>     directory holding traces.jsonl
+  --outcome-checks <f>   JSON {op name: read op that proves the write}
   --params <file>        parameter sets per op, three or more each
   --start "<cmd>"        command that starts the app before the build
   --verify               run every op on a fresh session
@@ -80,13 +81,17 @@ ${CONFIG_FLAG}`,
 
   compile: `portolan compile <trace...> --map <file> [options]
 
-Compile recorded traces into candidate ops and publish a new map version.
+Compile recorded traces into candidate ops, verify them, and publish the ones
+that pass as a new map version. A segment the map does not cover is named from
+its recorded actions.
 
 Options:
   --map <file>           the map to extend (required)
   --trace <file>         a recorded trace (repeatable; or pass files directly)
   --base-url <url>       origin to capture and verify against
   --outcome-checks <f>   JSON {op name: read op that proves the write}
+  --params <file>        parameter sets per op, three or more each
+  --verify-writes        also verify writes (they run for real)
 ${BROWSER_FLAGS}
 ${CONFIG_FLAG}`,
 

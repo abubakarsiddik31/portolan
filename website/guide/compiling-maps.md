@@ -180,10 +180,32 @@ version:
 portolan compile run-1.json run-2.json \
   --map .portolan/maps/store/v0.json \
   --base-url https://store.example \
+  --params store.params.json \
   --outcome-checks store.outcomes.json
 ```
 
-The compiler proposes candidates, verifies them, and publishes a new version.
+The compiler proposes candidates, verifies them, and publishes only the ones that
+pass, as a new version. A step the map does not cover is named from what was
+recorded: a write is named after the click that sent the request.
+
+Reads are verified with the values from the recording plus synthetic variants. A
+write changes data, so it runs only with `--verify-writes` and a `--params` file
+holding at least three parameter sets for it:
+
+```json
+{ "create_api_key": [{ "name": "a" }, { "name": "b" }, { "name": "c" }] }
+```
+
+`--outcome-checks` maps a write to the read op that proves it took effect:
+
+```json
+{ "create_api_key": "list_api_keys" }
+```
+
+With one, a recorded write compiles to an `http` op. Without one it compiles to a
+`ui` op that replays the clicks. `map build` takes the same `--outcome-checks`,
+`--params`, and `--verify-writes` flags.
+
 The map is versioned: a session pins one version, so a publish never changes the
 meaning of a call in flight.
 

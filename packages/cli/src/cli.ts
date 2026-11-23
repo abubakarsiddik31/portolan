@@ -355,6 +355,9 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           ...(stringFlag(args, "params") !== undefined
             ? { paramsPath: stringFlag(args, "params") }
             : {}),
+          ...(stringFlag(args, "outcome-checks") !== undefined
+            ? { outcomeChecksPath: stringFlag(args, "outcome-checks") }
+            : {}),
           ...(numberFlag(args, "max-pages") !== undefined
             ? { maxPages: numberFlag(args, "max-pages") }
             : {}),
@@ -415,6 +418,10 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           tracePaths: traces,
           ...(baseUrl !== undefined ? { baseUrl } : {}),
           ...(outcomeChecksPath !== undefined ? { outcomeChecksPath } : {}),
+          ...(stringFlag(args, "params") !== undefined
+            ? { paramsPath: stringFlag(args, "params") }
+            : {}),
+          verifyWrites: booleanFlag(args, "verify-writes"),
           ...(chrome !== undefined ? { chrome } : {}),
           ...(compileStorageState !== undefined ? { storageState: compileStorageState } : {}),
           headless: booleanFlag(args, "headed") ? false : config.headless,
@@ -422,6 +429,11 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         out(
           `published v${result.published.version} at ${result.published.path} (${result.candidates.length} candidates)`,
         );
+        for (const report of result.reports) {
+          out(
+            `${report.verified ? "ok  " : "FAIL"} ${report.op}${report.reason !== undefined ? ` — ${report.reason}` : ""}`,
+          );
+        }
         out(
           `  added ${result.published.diff.added.length}, changed ${result.published.diff.changed.length}, unchanged ${result.published.diff.unchanged.length}, held ${result.published.diff.held.length}, rejected ${result.published.diff.rejected.length}`,
         );

@@ -388,6 +388,7 @@ describe("compile", () => {
       { mapPath, tracePaths: [tracePath] },
       {
         compileCandidates: async () => [candidate],
+        verifyOp: async (options) => ({ op: options.op.name, verified: true, impls: [] }),
         publishMap: async (options) => {
           publishedCandidates = options.candidates;
           return {
@@ -402,6 +403,107 @@ describe("compile", () => {
 
     expect(result.published.version).toBe(2);
     expect(publishedCandidates).toHaveLength(1);
+  });
+
+  describe("a recorded write the map does not name", () => {
+    const at = "2026-11-17T00:00:00.000Z";
+    const act = (name: string, v: number, effects: unknown[] = []) => ({
+      kind: "act",
+      at,
+      ref: `e${v}`,
+      do: "click",
+      locator: { role: "button", name, ordinal: 0 },
+      doc: 1,
+      v,
+      url: "http://store.test/keys",
+      effects,
+      delta: { navigation: false, entries: [] },
+    });
+
+    function setup() {
+      const dir = tempDir();
+      const mapPath = join(dir, "v1.json");
+      const tracePath = join(dir, "trace.json");
+      writeFileSync(mapPath, readFileSync(STORE_MAP, "utf8"));
+      writeFileSync(
+        tracePath,
+        JSON.stringify({
+          scope_id: "run-1",
+          sid: "s",
+          intent: "create a key",
+          effect: "write",
+          started_at: at,
+          ended_at: at,
+          entries: [
+            act("Create API Key", 1, [
+              {
+                kind: "network",
+                method: "POST",
+                url: "http://store.test/api/keys",
+                status: 200,
+                request_body: { name: "k" },
+                response_body: { id: 1 },
+              },
+            ]),
+            act("Done", 2),
+          ],
+        }),
+      );
+      return { dir, mapPath, tracePath };
+    }
+
+    it("names it after the write and holds it until --verify-writes with params", async () => {
+      const { mapPath, tracePath } = setup();
+
+      await expect(
+        runCompile(
+          { mapPath, tracePaths: [tracePath] },
+          { verifyOp: async (o) => ({ op: o.op.name, verified: true, impls: [] }) },
+        ),
+      ).rejects.toThrow(/create_api_key is a write; verify it explicitly with --verify-writes/);
+    });
+
+    it("publishes it as a ui write once verified with explicit params", async () => {
+      const { dir, mapPath, tracePath } = setup();
+      const paramsPath = join(dir, "params.json");
+      writeFileSync(
+        paramsPath,
+        JSON.stringify({ create_api_key: [{ name: "a" }, { name: "b" }, { name: "c" }] }),
+      );
+
+      const result = await runCompile(
+        { mapPath, tracePaths: [tracePath], paramsPath, verifyWrites: true },
+        { verifyOp: async (o) => ({ op: o.op.name, verified: true, impls: [] }) },
+      );
+
+      const op = result.published.map.ops.find((candidate) => candidate.name === "create_api_key");
+      expect(op).toMatchObject({ effect: "write" });
+      expect(op?.impls[0]?.tier).toBe("ui");
+      expect(result.reports).toHaveLength(1);
+    });
+
+    it("does not publish a candidate that failed verification", async () => {
+      const { dir, mapPath, tracePath } = setup();
+      const paramsPath = join(dir, "params.json");
+      writeFileSync(
+        paramsPath,
+        JSON.stringify({ create_api_key: [{ name: "a" }, { name: "b" }, { name: "c" }] }),
+      );
+
+      await expect(
+        runCompile(
+          { mapPath, tracePaths: [tracePath], paramsPath, verifyWrites: true },
+          {
+            verifyOp: async (o) => ({
+              op: o.op.name,
+              verified: false,
+              impls: [],
+              reason: "every impl failed",
+            }),
+          },
+        ),
+      ).rejects.toThrow(/nothing verified[\s\S]*create_api_key: every impl failed/);
+    });
   });
 
   it("rejects a file that is not a trace", async () => {

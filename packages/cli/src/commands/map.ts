@@ -10,7 +10,7 @@ import {
   type VerifyReport,
   verifyOp,
 } from "@abubakarsiddiik/compiler";
-import type { OpDef, SiteMap, StateDef } from "@abubakarsiddiik/protocol";
+import type { SiteMap, StateDef } from "@abubakarsiddiik/protocol";
 import type { Trace } from "@abubakarsiddiik/runtime";
 import { MapStore } from "@abubakarsiddiik/server";
 import {
@@ -39,6 +39,8 @@ import {
   Substrate,
 } from "@abubakarsiddiik/substrate";
 
+import { paramSetsFor } from "./param-sets.js";
+
 export type MapBuildInput = {
   site: string;
   mapsDir: string;
@@ -64,6 +66,8 @@ export type MapBuildInput = {
   storageState?: string;
   /** Extra patterns for capabilities that must never be auto-run. */
   exclude?: string[];
+  /** JSON object: op name to the read op that proves a recorded write. */
+  outcomeChecksPath?: string;
   /** Refuse to publish while any capability is missing. */
   requireComplete?: boolean;
 };
@@ -179,11 +183,16 @@ export async function runMapBuild(
     }
 
     if (traces.length > 0) {
+      const outcomeChecks =
+        input.outcomeChecksPath === undefined
+          ? undefined
+          : (JSON.parse(readFileSync(input.outcomeChecksPath, "utf8")) as Record<string, string>);
       const boot = await bootstrapFromTraces({
         site: input.site,
         origins: [origin],
         traces,
         capture: async () => undefined,
+        ...(outcomeChecks !== undefined ? { outcomeChecks } : {}),
       });
 
       for (const state of boot.map.states) {
@@ -302,7 +311,7 @@ export async function runMapBuild(
           continue;
         }
 
-        const sets = paramSetsFor(op, proposal, params);
+        const sets = paramSetsFor(op, proposal.sample_params, params[op.name]);
         if (sets === undefined) {
           const message = `add at least three parameter sets for ${op.name} in a params file`;
           unverified.set(op.name, message);
@@ -504,73 +513,6 @@ export function setupFor(
   }
 
   return undefined;
-}
-
-function paramSetsFor(
-  op: OpDef,
-  proposal: OpProposal,
-  params: Record<string, Array<Record<string, unknown>>>,
-): Array<Record<string, unknown>> | undefined {
-  const explicit = params[op.name];
-  if (explicit !== undefined) return explicit.length >= 3 ? explicit : undefined;
-
-  const sample = proposal.sample_params ?? [];
-  const required = requiredParams(op);
-  if (required.length === 0) return [{}, {}, {}];
-
-  if (op.effect !== "read") {
-    return sample.length >= 3 ? sample : undefined;
-  }
-
-  // A read can be probed with synthetic values: a wrong search term or a
-  // missing id fails verification instead of changing data.
-  const seeds = sample.length > 0 ? sample : [defaults(op)];
-  const filled = seeds.map((set) => fillMissing(op, set));
-
-  while (filled.length < 3) {
-    filled.push(variant(op, filled[filled.length - 1] ?? {}, filled.length + 1));
-  }
-
-  return filled;
-}
-
-function defaults(op: OpDef): Record<string, unknown> {
-  const properties = op.params.properties;
-  if (typeof properties !== "object" || properties === null) return {};
-
-  const out: Record<string, unknown> = {};
-  for (const [name, schema] of Object.entries(properties as Record<string, unknown>)) {
-    const type = (schema as { type?: string }).type;
-    if (type === "number" || type === "integer") out[name] = 1;
-    else if (type === "boolean") continue;
-    else out[name] = "test";
-  }
-  return out;
-}
-
-function fillMissing(op: OpDef, sample: Record<string, unknown>): Record<string, unknown> {
-  const next = { ...defaults(op), ...sample };
-  return next;
-}
-
-function variant(
-  op: OpDef,
-  sample: Record<string, unknown>,
-  index: number,
-): Record<string, unknown> {
-  const next: Record<string, unknown> = { ...sample };
-  for (const name of requiredParams(op)) {
-    const value = next[name];
-    if (typeof value === "number") next[name] = value + index;
-    else if (typeof value === "string") next[name] = `${value}${index}`;
-  }
-  return next;
-}
-
-function requiredParams(op: OpDef): string[] {
-  const required = op.params.required;
-  if (!Array.isArray(required)) return [];
-  return required.filter((name): name is string => typeof name === "string");
 }
 
 function readParams(path: string | undefined): Record<string, Array<Record<string, unknown>>> {

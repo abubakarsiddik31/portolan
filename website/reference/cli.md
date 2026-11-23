@@ -17,7 +17,7 @@ portolan <command> [options]
 | `portolan map capability` | Add a capability manually or set its status/reason (`add` / `set`). |
 | `portolan mcp` | Serve MCP over stdio for a client to spawn. |
 | `portolan serve` | Start the HTTP and MCP server. |
-| `portolan compile <trace...>` | Compile traces into a new map version. |
+| `portolan compile <trace...>` | Compile traces into candidates, verify them, and publish the ones that pass as a new map version. Flags: `--map`, `--base-url`, `--outcome-checks`, `--params`, `--verify-writes`. |
 | `portolan verify` | Verify a map's operations on a fresh session. |
 | `portolan export-skills` | Export a `portolan-<site>` skill from a map. |
 | `portolan qa <command>` | Agent-first QA: generate, run, repair, and verify test cases. |
@@ -46,7 +46,7 @@ Command flags beat the config file, which beats the default.
 
 Map flags: `--site`, `--maps`, `--url`, `--base-url`, `--traces-dir`, `--params`,
 `--max-pages`, `--storage-state`, `--start "<cmd>"`, `--verify`,
-`--verify-writes`, `--publish`, `--require-complete`, `--exclude <pattern>`,
+`--verify-writes`, `--outcome-checks`, `--publish`, `--require-complete`, `--exclude <pattern>`,
 `--headed`, `--chrome`.
 
 `--require-complete` refuses to publish while any capability is `missing` or

@@ -98,7 +98,7 @@ export async function bootstrapFromTraces(options: BootstrapOptions): Promise<Bo
 
 /** Name every segment of every trace, keeping names unique across the site. */
 export function labelTraces(traces: Trace[], map: SiteMap): SegmentLabel[][] {
-  const used = new Set<string>();
+  const used = new Set<string>(map.ops.map((op) => op.name));
 
   return traces.map((trace) =>
     segmentTrace(trace, map).map((segment) => {

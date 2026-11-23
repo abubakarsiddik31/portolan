@@ -58,30 +58,30 @@ Setup
 1. Check Node version and Chrome/Chromium. Require Node >= 22.12. If either is missing, tell me what to install and stop.
 2. Install the Portolan CLI: npm install -g @abubakarsiddiik/portolan. If global installs are blocked, use npx @abubakarsiddiik/portolan for every command.
 3. Run portolan doctor and report the result.
-4. Ask me for the site name. Then run: portolan init ./portolan --site <site>. This installs ./portolan/skills/portolan-map/SKILL.md (how to build and keep the map complete) and ./portolan/skills/portolan/SKILL.md (how to use it).
-5. Read ./portolan/skills/portolan-map/SKILL.md and follow it until the map is complete and in sync. Do not ask me to write JSON.
-   - Ask me only for the app URL (or read baseUrl from portolan.config.json) and the dev-server command, if they are not obvious.
-   - Build from the live app: portolan map build --maps ./portolan/maps --site <site> --url <url> --verify --publish [--start "<dev command>"]
-   - For pages behind auth, run portolan auth login --url <sign-in page> --out ./portolan/auth.json, add --storage-state ./portolan/auth.json to every map command, and use the signed-in URL (e.g. /dashboard) as --url.
+4. Ask me for the site name. Then run: portolan init --site <site>. This installs ./.portolan/skills/portolan-map/SKILL.md (how to build and keep the map complete) and ./.portolan/skills/portolan/SKILL.md (how to use it).
+5. Read ./.portolan/skills/portolan-map/SKILL.md and follow it until the map is complete and in sync. Do not ask me to write JSON.
+   - Ask me only for the app URL (or read baseUrl from .portolan/config.json) and the dev-server command, if they are not obvious.
+   - Build from the live app: portolan map build --maps ./.portolan/maps --site <site> --url <url> --verify --publish [--start "<dev command>"]
+   - For pages behind auth, run portolan auth login --url <sign-in page> --out ./.portolan/state/auth.json, add --storage-state ./.portolan/state/auth.json to every map command, and use the signed-in URL (e.g. /dashboard) as --url.
    - Inventory the app from BOTH the repository and the live app. Read routes, API handlers, forms, buttons, menus, and existing tests. If you have no repository access, browse the app itself and treat every page, link, form, and button you find as a capability.
    - You may use your own browser tool for reconnaissance. That does not record a Portolan trace. When a capability must become an op, record one run through Portolan's MCP browser tools: open_url(url, intent) or open_site(site) -> fallback_begin -> view/act/read -> fallback_done. Then rebuild with --traces-dir. A run in your own browser tool cannot become an op.
-   - Add capabilities the crawl cannot see: portolan map capability add --maps ./portolan/maps --site <site> --page <page> --kind button --name "<label>" --source code. Omit --source for capabilities you found by browsing.
-   - Read the gaps: portolan map coverage --maps ./portolan/maps --site <site> --json
+   - Add capabilities the crawl cannot see: portolan map capability add --maps ./.portolan/maps --site <site> --page <page> --kind button --name "<label>" --source code. Omit --source for capabilities you found by browsing.
+   - Read the gaps: portolan map coverage --maps ./.portolan/maps --site <site> --json
    - For every missing or stale capability, either record one Portolan run as above and rebuild, or exclude it with a reason:
-     portolan map capability set --maps ./portolan/maps --site <site> --id <id> --status excluded --reason "<why>"
-   - Repeat until this passes: portolan map build --maps ./portolan/maps --site <site> --url <url> --require-complete --verify --publish
-   - Keep the map in sync after every app change: portolan map update --maps ./portolan/maps --site <site> --url <url> --verify --publish, then rebuild from traces for anything the crawl cannot see and re-check coverage.
-   - Commit ./portolan/maps/<site>/capabilities.json, draft.json, tasks.json, and v*.json with the app.
+     portolan map capability set --maps ./.portolan/maps --site <site> --id <id> --status excluded --reason "<why>"
+   - Repeat until this passes: portolan map build --maps ./.portolan/maps --site <site> --url <url> --require-complete --verify --publish
+   - Keep the map in sync after every app change: portolan map update --maps ./.portolan/maps --site <site> --url <url> --verify --publish, then rebuild from traces for anything the crawl cannot see and re-check coverage.
+   - Commit ./.portolan/maps/<site>/capabilities.json, draft.json, tasks.json, and v*.json with the app.
    - Only ask me to help when discovery finds nothing to start from or a capability needs a decision only I can make.
    - Use the demo store only if I ask to try Portolan without my app.
 6. Configure my MCP client for this harness to spawn:
    command: portolan
    args: ["mcp"]
    env:
-     MAPS_DIR: <absolute path to ./portolan/maps>
-     DATABASE_PATH: <absolute path to ./portolan/portolan.db>
-     TRACES_DIR: <absolute path to ./portolan/traces>
-     PORTOLAN_STORAGE_STATE: <absolute path to ./portolan/auth.json>   # only for authenticated apps
+     MAPS_DIR: <absolute path to ./.portolan/maps>
+     DATABASE_PATH: <absolute path to ./.portolan/state/portolan.db>
+     TRACES_DIR: <absolute path to ./.portolan/state/traces>
+     PORTOLAN_STORAGE_STATE: <absolute path to ./.portolan/state/auth.json>   # only for authenticated apps
    Detect my harness (OpenCode, Claude Code, Claude Desktop, Codex CLI, Cursor, Gemini CLI, or VS Code) and use its config format. If you cannot safely edit the config, print the exact file path and snippet.
 7. Tell me to restart or reload this session so the Portolan MCP tools load.
 
@@ -131,13 +131,13 @@ and `--require-complete` refuses to publish until every entry is mapped or
 excluded with a reason:
 
 ```bash
-portolan map coverage --site herbie --maps ./portolan/maps
+portolan map coverage --site herbie --maps ./.portolan/maps
 ```
 
 The `portolan-map` skill tells a coding agent how to work that queue from the
 codebase and the live app.
 
-For pages behind auth, sign in once with `portolan auth login --url <sign-in page> --out ./portolan/auth.json`, then pass `--storage-state ./portolan/auth.json` (and set `PORTOLAN_STORAGE_STATE` for the MCP server). Portolan never sees the password.
+For pages behind auth, sign in once with `portolan auth login --url <sign-in page> --out ./.portolan/state/auth.json`, then pass `--storage-state ./.portolan/state/auth.json` (and set `PORTOLAN_STORAGE_STATE` for the MCP server). Portolan never sees the password.
 
 If a site has no link or form to start from, record one run instead: call
 `open_url(url, intent)` over MCP, finish the task with `view`/`act`/`read`, then
@@ -211,8 +211,9 @@ Claude Code, Claude Desktop, Codex CLI, Cursor, Gemini CLI, or VS Code.
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       }
     }
   }
@@ -230,8 +231,11 @@ deterministically (no model in the run path), reads typed failures with
 evidence, and repairs broken locators after a UI change.
 
 ```bash
-portolan qa init           # config, qa/cases, skill, MCP snippet
+portolan qa init           # .portolan/ config, cases, skill, MCP snippet
 ```
+
+Already using the old root layout? `portolan migrate` moves
+`portolan.config.json`, `qa/`, `maps/`, and the databases into `.portolan/`.
 
 Then let the agent work the loop: `qa_plan` after a diff, `qa_run` the
 affected cases, `qa_repair` on a moved target, `qa_verify` to promote a case

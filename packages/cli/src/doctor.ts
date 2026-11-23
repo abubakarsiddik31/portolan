@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join, resolve } from "node:path";
 
+import { LEGACY_CONFIG, PORTOLAN_DIR } from "@abubakarsiddiik/protocol";
 import { findChrome } from "@abubakarsiddiik/substrate";
 
 export type CheckStatus = "ok" | "warn" | "fail";
@@ -172,14 +173,18 @@ function checkConfig(
   exists: (path: string) => boolean,
   readFile: (path: string) => string,
 ): DoctorCheck {
-  const path = env.PORTOLAN_CONFIG ?? join(cwd, "portolan.config.json");
+  const current = join(cwd, PORTOLAN_DIR, "config.json");
+  const legacy = join(cwd, LEGACY_CONFIG);
+  const explicit = env.PORTOLAN_CONFIG;
+  const path = explicit ?? (exists(current) ? current : exists(legacy) ? legacy : current);
+  const isLegacy = basename(resolve(path)) === LEGACY_CONFIG;
 
   if (!exists(path)) {
     return {
       name: "config",
       status: "warn",
       detail: `no config file at ${path}; defaults are in use`,
-      fix: "create portolan.config.json or set PORTOLAN_CONFIG",
+      fix: `create ${join(PORTOLAN_DIR, "config.json")} (for example with portolan init) or set PORTOLAN_CONFIG`,
     };
   }
 
@@ -199,6 +204,15 @@ function checkConfig(
       status: "fail",
       detail: `${path} is not valid JSON: ${(error as Error).message}`,
       fix: "fix the JSON or delete the file",
+    };
+  }
+
+  if (isLegacy) {
+    return {
+      name: "config",
+      status: "warn",
+      detail: `${path} is legacy; expected ${join(PORTOLAN_DIR, "config.json")}`,
+      fix: "run portolan migrate",
     };
   }
 

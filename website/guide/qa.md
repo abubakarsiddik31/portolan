@@ -1,9 +1,9 @@
 # QA your app
 
 Portolan QA turns your coding agent into the test author. Cases are JSON files
-under `qa/`, reviewed in git. Runs are deterministic — no model in the run
-path — with typed results, evidence, and a local SQLite history under
-`.portolan/`.
+under `.portolan/qa/`, reviewed in git. Runs are deterministic — no model in
+the run path — with typed results, evidence, and a local SQLite history under
+`.portolan/state/`.
 
 The agent authors and repairs the tests; the runner replays them.
 
@@ -15,12 +15,14 @@ Inside your project (the app under test):
 portolan qa init --base-url http://127.0.0.1:3000
 ```
 
-This writes `portolan.config.json`, the `qa/cases` and `qa/suites`
-directories, `skills/portolan-qa/SKILL.md`, and `.mcp.json` when Claude Code is
-detected. For any other harness it prints the MCP snippet to add to that
-harness's own config. Ask the agent to read the skill, then restart the harness
-so the QA tools load. `portolan qa doctor` (CLI) checks config, database, and
-the browser; there is no `qa_doctor` MCP tool.
+This writes `.portolan/config.json`, the `.portolan/qa/cases` and
+`.portolan/qa/suites` directories, `.portolan/skills/portolan-qa/SKILL.md`,
+and `.portolan/.gitignore` (which ignores `state/`). It prints the MCP snippet
+for your harness and the root `.mcp.json` path; pass `--mcp` to write or merge
+that file. It never modifies the root `.gitignore`. Ask the agent to read the
+skill, then restart the harness so the QA tools load. `portolan qa doctor`
+(CLI) checks config, database, and the browser; there is no `qa_doctor` MCP
+tool.
 
 ## The loop
 
@@ -37,7 +39,7 @@ the browser; there is no `qa_doctor` MCP tool.
 
 ## Authoring
 
-One case per file, `qa/cases/<id>.json`, the id matching the path:
+One case per file, `.portolan/qa/cases/<id>.json`, the id matching the path:
 
 ```json
 {
@@ -60,8 +62,8 @@ recorded trace file (`from_trace`). Generate fills the defaults, and replaces
 secret-looking fill values with `${env.QA_*}` references — a recorded
 password never lands in a case file.
 
-Fixtures resolve at run time from `qa/fixtures.json`; secrets are env
-references. Evidence is redacted before it is written.
+Fixtures resolve at run time from `.portolan/qa/fixtures.json`; secrets are
+env references. Evidence is redacted before it is written.
 
 ## Trust
 

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -94,8 +94,22 @@ describe("loadConfig", () => {
   it("reads the new options from a file", () => {
     const dir = tempDir();
     const path = join(dir, CONFIG_FILE);
+    mkdirSync(join(dir, ".portolan"), { recursive: true });
     writeFileSync(path, JSON.stringify({ site: "store", maxOpenSessions: 7, headless: false }));
 
     expect(loadConfig(path)).toMatchObject({ site: "store", maxOpenSessions: 7, headless: false });
+  });
+
+  it("treats an explicit config outside .portolan as a project config, not legacy", () => {
+    const dir = tempDir();
+    const custom = join(dir, "custom");
+    mkdirSync(custom, { recursive: true });
+    const path = join(custom, "config.json");
+    writeFileSync(path, JSON.stringify({ site: "store" }));
+
+    const loaded = loadConfig(path, { warn: false });
+
+    expect(loaded.site).toBe("store");
+    expect(loaded.database).toBe(join(custom, ".portolan/state/portolan.db"));
   });
 });

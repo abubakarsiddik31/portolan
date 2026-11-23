@@ -1,14 +1,16 @@
 # Configuration
 
-Portolan reads one JSON file, `portolan.config.json`. Every option has a
+Portolan reads one JSON file, `.portolan/config.json`. Every option has a
 default, so an empty file is valid. The file is read by the `portolan` CLI;
 the server and compiler libraries take typed options directly.
 
 ## Where the file is found
 
 1. `--config <path>` on the command.
-2. `PORTOLAN_CONFIG` in the environment.
-3. `./portolan.config.json`.
+2. `PORTOLAN_CONFIG` (or `QA_CONFIG` for the QA runner) in the environment.
+3. `./.portolan/config.json`.
+4. `./portolan.config.json`, the pre-`.portolan/` layout, with a deprecation
+   notice. `portolan migrate` moves it.
 
 A missing file means the defaults. A file that is not a JSON object, or an
 option with the wrong type, is an error with the file path and the key.
@@ -20,12 +22,12 @@ older one.
 
 | Key | Type | Default | Used by | Meaning |
 |---|---|---|---|---|
-| `site` | string | `"site"` | `init`, `compile`, `export-skills` | Site name; `init` writes `policies/<site>.json` and `maps/<site>/`. |
-| `maps` | string | `"maps"` | `serve`, `init` | Directory containing `maps/<site>/v<n>.json`. |
-| `skills` | string | `"skills"` | `export-skills`, `init` | Output directory for `portolan-<site>` skills. |
-| `policies` | string | `"policies"` | `init` | Directory containing `<site>.json` egress policies. |
-| `database` | string | `"portolan.db"` | `serve` | SQLite path. `:memory:` gives an ephemeral store. |
-| `traces` | string | `"traces"` | `mcp`, `serve`, `map` | Directory for recorded traces (JSONL + HAR). `TRACES_DIR` overrides it. |
+| `site` | string | `"site"` | `init`, `compile`, `export-skills` | Site name; `init` writes `.portolan/policies/<site>.json` and `.portolan/maps/<site>/`. |
+| `maps` | string | `".portolan/maps"` | `serve`, `init` | Directory containing `maps/<site>/v<n>.json`. |
+| `skills` | string | `".portolan/skills"` | `export-skills`, `init` | Output directory for `portolan-<site>` skills. |
+| `policies` | string | `".portolan/policies"` | `init` | Directory containing `<site>.json` egress policies. |
+| `database` | string | `".portolan/state/portolan.db"` | `serve` | SQLite path. `:memory:` gives an ephemeral store. |
+| `traces` | string | `".portolan/state/traces"` | `mcp`, `serve`, `map` | Directory for recorded traces (JSONL + HAR). `TRACES_DIR` overrides it. |
 | `host` | string | `"127.0.0.1"` | `serve` | Listen address. |
 | `port` | integer ≥ 0 | `4200` | `serve` | Listen port. `0` asks the OS for one. |
 | `baseUrl` | string | unset | `map`, `compile`, `verify` | Live site origin, used when `--url` or `--base-url` is not passed. |
@@ -44,11 +46,11 @@ older one.
 ```json
 {
   "site": "store",
-  "maps": "maps",
-  "skills": "skills",
-  "policies": "policies",
-  "database": "portolan.db",
-  "traces": "traces",
+  "maps": ".portolan/maps",
+  "skills": ".portolan/skills",
+  "policies": ".portolan/policies",
+  "database": ".portolan/state/portolan.db",
+  "traces": ".portolan/state/traces",
   "host": "127.0.0.1",
   "port": 4200,
   "headless": true,
@@ -60,7 +62,8 @@ older one.
 }
 ```
 
-`portolan init` writes this file with the defaults for the chosen site.
+`portolan init` writes `.portolan/config.json` with the defaults for the
+chosen site.
 
 ## Precedence
 
@@ -73,7 +76,8 @@ These are read in addition to the config file:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PORTOLAN_CONFIG` | `./portolan.config.json` | Config file, when `--config` is absent. |
+| `PORTOLAN_CONFIG` | `./.portolan/config.json` | Config file, when `--config` is absent. |
+| `QA_CONFIG` | `./.portolan/config.json` | Config file for the QA runner, when `--config` is absent. |
 | `CHROME_PATH` | auto-detect | Chrome binary, when `chrome` is unset. |
 | `PORTOLAN_INSTANCE_ID` | unset | Stable id used to reap a hard-killed predecessor's browsers. |
 | `PORTOLAN_AUTH_TOKEN` | unset | Bearer token for `serve`; required for a non-loopback bind unless `PORTOLAN_ALLOW_REMOTE=1`. |
@@ -83,8 +87,8 @@ These are read in addition to the config file:
 | `OPENAI_API_KEY` | unset | OpenAI provider for compile and repair. |
 | `GEMINI_API_KEY` | unset | Gemini provider. |
 | `OLLAMA_HOST` | unset | Local Ollama endpoint. |
-| `DATABASE_PATH` | `portolan.db` | Used by `start.ts` (the bare server process), not `portolan serve`. |
-| `TRACES_DIR` | `traces` | Recorded traces for `mcp`, `serve`, and `map`. |
+| `DATABASE_PATH` | `.portolan/state/portolan.db` | Used by `start.ts` (the bare server process), not `portolan serve`. |
+| `TRACES_DIR` | `.portolan/state/traces` | Recorded traces for `mcp`, `serve`, and `map`. |
 | `PORTOLAN_STORAGE_STATE` | unset | Playwright storage-state file for authenticated pages. |
 | `PORT` / `HOST` | `4200` / `127.0.0.1` | Used by `start.ts`, not `portolan serve`. |
 

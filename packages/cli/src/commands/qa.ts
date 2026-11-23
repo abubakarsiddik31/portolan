@@ -5,6 +5,7 @@ import {
   type CaseResult,
   loadQaConfig,
   parseCase,
+  QA_MCP_CLI,
   type QaConfig,
   QaService,
   qaInit,
@@ -19,7 +20,8 @@ import { booleanFlag, listFlag, numberFlag, parseArgs, stringFlag } from "../arg
 export const QA_USAGE = `portolan qa <command> [options]
 
 Commands:
-  init                   write config, dirs, skill, and harness wiring
+  init                   write .portolan/config.json, dirs, and the skill
+                         (--mcp writes or merges the root .mcp.json)
   list                   list cases and their status
   plan                   choose cases affected by the git diff
   run                    run cases (deterministic; no model)
@@ -45,12 +47,25 @@ export type QaCommandDeps = {
   createService?: (config: QaConfig) => QaService;
 };
 
+type QaDoctorCheck = {
+  name: string;
+  status: "ok" | "info" | "warn";
+  ok: boolean;
+  detail: string;
+  fix?: string;
+};
+
 export async function runQa(argv: string[], deps: QaCommandDeps = {}): Promise<number> {
   const out = deps.out ?? ((line: string) => process.stdout.write(`${line}\n`));
   const err = deps.err ?? ((line: string) => process.stderr.write(`${line}\n`));
   const [sub, ...rest] = argv;
 
   if (sub === undefined || sub === "--help" || sub === "-h" || sub === "help") {
+    out(QA_USAGE);
+    return 0;
+  }
+
+  if (rest.includes("--help") || rest.includes("-h")) {
     out(QA_USAGE);
     return 0;
   }
@@ -65,6 +80,8 @@ export async function runQa(argv: string[], deps: QaCommandDeps = {}): Promise<n
       root,
       ...(baseUrl !== undefined ? { baseUrl } : {}),
       force: booleanFlag(args, "force"),
+      mcp: booleanFlag(args, "mcp"),
+      mcpCommand: QA_MCP_CLI,
     });
 
     if (json) {
@@ -76,13 +93,19 @@ export async function runQa(argv: string[], deps: QaCommandDeps = {}): Promise<n
     for (const file of result.files) out(`  wrote ${file}`);
     for (const file of result.skipped) out(`  kept  ${file}`);
     out(`  harness: ${result.harnesses.join(", ")}`);
-    out("  MCP entry:");
+    out(
+      result.mcpWritten
+        ? `  MCP entry written or merged into ${result.mcpPath}`
+        : `  MCP entry for ${result.mcpPath} (pass --mcp to write it):`,
+    );
     for (const line of result.mcpSnippet.trimEnd().split("\n")) out(`    ${line}`);
-    out("next: read skills/portolan-qa/SKILL.md, restart your coding harness, then run qa_plan");
+    out(
+      "next: read .portolan/skills/portolan-qa/SKILL.md, restart your coding harness, then run qa_plan",
+    );
     return 0;
   }
 
-  const loaded = loadQaConfig(stringFlag(args, "config"));
+  const loaded = loadQaConfig(stringFlag(args, "config"), process.env, { warn: err });
   const service = (deps.createService ?? ((config) => new QaService(config)))(loaded.config);
 
   try {
@@ -315,24 +338,66 @@ export async function runQa(argv: string[], deps: QaCommandDeps = {}): Promise<n
       }
 
       case "doctor": {
-        const checks = [
-          { name: "config", ok: true, detail: loaded.file ?? "defaults" },
-          { name: "cases", ok: existsSync(loaded.config.cases), detail: loaded.config.cases },
-          { name: "database", ok: true, detail: service.store.location() },
-          { name: "base_url", ok: isUrl(loaded.config.baseUrl), detail: loaded.config.baseUrl },
+        const browserPinned =
+          loaded.config.chrome !== undefined || process.env.CHROME_PATH !== undefined;
+        const integrity = service.store.integrity();
+        const checks: QaDoctorCheck[] = [
+          {
+            name: "config",
+            status: loaded.legacy === undefined ? "ok" : "warn",
+            ok: loaded.legacy === undefined,
+            detail: loaded.file ?? "defaults (.portolan/config.json)",
+            ...(loaded.legacy !== undefined
+              ? { fix: `run portolan migrate (move it to ${loaded.legacy.replacement})` }
+              : {}),
+          },
+          {
+            name: "cases",
+            status: existsSync(loaded.config.cases) ? "ok" : "warn",
+            ok: existsSync(loaded.config.cases),
+            detail: loaded.config.cases,
+            ...(existsSync(loaded.config.cases)
+              ? {}
+              : { fix: "run portolan qa init (or portolan migrate), then rerun" }),
+          },
+          { name: "database", status: "ok", ok: true, detail: service.store.location() },
+          {
+            name: "base_url",
+            status: isUrl(loaded.config.baseUrl) ? "ok" : "warn",
+            ok: isUrl(loaded.config.baseUrl),
+            detail: loaded.config.baseUrl,
+            ...(isUrl(loaded.config.baseUrl)
+              ? {}
+              : { fix: "set qa.baseUrl in .portolan/config.json or QA_BASE_URL" }),
+          },
           {
             name: "browser",
-            ok: loaded.config.chrome !== undefined || process.env.CHROME_PATH !== undefined,
+            status: browserPinned ? "ok" : "info",
+            ok: true,
             detail: loaded.config.chrome ?? process.env.CHROME_PATH ?? "auto-detect",
+            ...(browserPinned
+              ? {}
+              : { fix: "set chrome in config or CHROME_PATH to pin a specific binary" }),
           },
-          { name: "integrity", ok: service.store.integrity().ok, detail: "sqlite + spec hashes" },
+          {
+            name: "integrity",
+            status: integrity.ok ? "info" : "warn",
+            ok: integrity.ok,
+            detail: integrity.ok
+              ? "sqlite + spec hashes (nothing to do)"
+              : "sqlite or spec hashes differ",
+            ...(integrity.ok ? {} : { fix: "run portolan qa sync, then rerun" }),
+          },
         ];
 
         if (json) {
           out(JSON.stringify(checks, null, 2));
         } else {
-          for (const check of checks)
-            out(`${check.ok ? "ok  " : "WARN"} ${check.name}: ${check.detail}`);
+          for (const check of checks) {
+            const label = check.status === "warn" ? "WARN" : check.status;
+            out(`${label.padEnd(4)} ${check.name}: ${check.detail}`);
+            if (check.fix !== undefined && !check.ok) out(`     → ${check.fix}`);
+          }
         }
 
         return checks.every((check) => check.ok) ? 0 : 3;

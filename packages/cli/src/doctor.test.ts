@@ -6,7 +6,7 @@ import { formatDoctor, runDoctor } from "./doctor.js";
 
 const HOME = "/home/ada";
 const CWD = "/work/site";
-const CONFIG = join(CWD, "portolan.config.json");
+const CONFIG = join(CWD, ".portolan/config.json");
 const CURSOR = join(HOME, ".cursor/mcp.json");
 const CLAUDE = join(HOME, ".claude.json");
 
@@ -83,6 +83,13 @@ describe("runDoctor", () => {
 
   it("warns when the config file is absent", () => {
     expect(status(doctor(), "config")).toBe("warn");
+  });
+
+  it("warns when only a legacy root config exists", () => {
+    const report = doctor({ files: { [join(CWD, "portolan.config.json")]: "{}" } });
+    const config = report.checks.find((check) => check.name === "config");
+
+    expect(config).toMatchObject({ status: "warn", fix: "run portolan migrate" });
   });
 
   it("lists configured providers without printing their values", () => {

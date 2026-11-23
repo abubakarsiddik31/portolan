@@ -6,6 +6,7 @@ export * from "./commands/compile.js";
 export * from "./commands/export-skills.js";
 export * from "./commands/init.js";
 export * from "./commands/mcp.js";
+export * from "./commands/migrate.js";
 export * from "./commands/serve.js";
 export * from "./commands/verify.js";
 export * from "./config.js";

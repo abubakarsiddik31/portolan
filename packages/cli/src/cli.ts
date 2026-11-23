@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -18,16 +19,24 @@ import { runExportSkills } from "./commands/export-skills.js";
 import { runInit } from "./commands/init.js";
 import { runMapBuild } from "./commands/map.js";
 import { runMcp } from "./commands/mcp.js";
+import { runMigrate } from "./commands/migrate.js";
 import { runQa } from "./commands/qa.js";
 import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
 import { loadConfig } from "./config.js";
 import { formatDoctor, runDoctor } from "./doctor.js";
 
+const packageJson = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+) as { version: string };
+
+export const VERSION: string = packageJson.version;
+
 export const USAGE = `portolan <command> [options]
 
 Commands:
-  init [dir]             write a config, a policy, and the maps/skills dirs
+  init [dir]             initialize .portolan/ (config, policy, maps, skills)
+  migrate [dir]          move a legacy root layout into .portolan/
   auth login             open a browser, sign in, save the session for --storage-state
   serve                  start the HTTP and MCP server
   mcp                    serve MCP over stdio (for a client to spawn)
@@ -42,12 +51,14 @@ Commands:
   doctor [--json]        diagnose the browser, config, providers, and clients
 
 Common options:
-  --config <path>        config file (default ./portolan.config.json)
+  --config <path>        config file (default ./.portolan/config.json)
+  --version, -v          print the version
   --help                 show this message
 `;
 
 export type CliDeps = {
   init?: typeof runInit;
+  migrate?: typeof runMigrate;
   serve?: typeof runServe;
   mcp?: typeof runMcp;
   compile?: typeof runCompile;
@@ -67,13 +78,17 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
 
   const [command, ...rest] = argv;
 
-  if (
-    command === undefined ||
-    command === "--help" ||
-    command === "-h" ||
-    command === "help" ||
-    rest.includes("--help")
-  ) {
+  if (command === "--version" || command === "-v" || command === "version") {
+    out(VERSION);
+    return 0;
+  }
+
+  if (command === undefined || command === "--help" || command === "-h" || command === "help") {
+    out(USAGE);
+    return 0;
+  }
+
+  if (command !== "qa" && (rest.includes("--help") || rest.includes("-h"))) {
     out(USAGE);
     return 0;
   }
@@ -91,6 +106,17 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         out(`initialized ${result.dir}`);
         for (const file of result.files) out(`  wrote ${file}`);
         for (const file of result.skipped) out(`  kept  ${file}`);
+        return 0;
+      }
+
+      case "migrate": {
+        const result = (deps.migrate ?? runMigrate)({
+          ...(args.positional[0] !== undefined ? { root: args.positional[0] } : {}),
+        });
+        if (result.moved.length === 0) out("nothing to migrate");
+        else out(`migrated ${result.root} into ${result.dir}`);
+        for (const item of result.moved) out(`  moved ${item.from} → ${item.to}`);
+        for (const path of result.updated) out(`  updated ${path}`);
         return 0;
       }
 

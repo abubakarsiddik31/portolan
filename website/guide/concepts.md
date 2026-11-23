@@ -10,7 +10,7 @@ agent can call, and the evidence that each op works. It is learned from real
 runs, verified by replay, and repaired when the site changes.
 
 ```
-maps/<site>/v<n>.json
+.portolan/maps/<site>/v<n>.json
 ```
 
 A map is versioned. A session pins one version, so a publish never changes the

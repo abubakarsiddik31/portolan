@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+
+import { LEGACY_CONFIG, PORTOLAN_DIR } from "@abubakarsiddiik/protocol";
 
 export type LogLevelName = "debug" | "info" | "warn" | "error";
 
@@ -42,11 +44,11 @@ export type CliConfig = {
 
 export const DEFAULT_CONFIG: CliConfig = {
   site: "site",
-  maps: "maps",
-  skills: "skills",
-  policies: "policies",
-  database: "portolan.db",
-  traces: "traces",
+  maps: `${PORTOLAN_DIR}/maps`,
+  skills: `${PORTOLAN_DIR}/skills`,
+  policies: `${PORTOLAN_DIR}/policies`,
+  database: `${PORTOLAN_DIR}/state/portolan.db`,
+  traces: `${PORTOLAN_DIR}/state/traces`,
   host: "127.0.0.1",
   port: 4200,
   headless: true,
@@ -57,20 +59,46 @@ export const DEFAULT_CONFIG: CliConfig = {
   logLevel: "info",
 };
 
-export const CONFIG_FILE = "portolan.config.json";
+/** Defaults for a legacy root `portolan.config.json`. */
+const LEGACY_DEFAULT_CONFIG: CliConfig = {
+  ...DEFAULT_CONFIG,
+  maps: "maps",
+  skills: "skills",
+  policies: "policies",
+  database: "portolan.db",
+  traces: "traces",
+};
+
+/** Config path relative to the project root. */
+export const CONFIG_FILE = `${PORTOLAN_DIR}/config.json`;
+
+/** The pre-`.portolan/` config path, still read with a notice. */
+export const LEGACY_CONFIG_FILE = LEGACY_CONFIG;
 
 const LOG_LEVELS: LogLevelName[] = ["debug", "info", "warn", "error"];
 
+export type LoadConfigOptions = {
+  /** Receives the one-line legacy notice; pass `false` to stay silent. */
+  warn?: ((line: string) => void) | false;
+};
+
 /**
- * Read `portolan.config.json`, merged over the defaults.
+ * Read `.portolan/config.json`, merged over the defaults.
  *
- * An unknown key is ignored, not rejected: the config is a starting point and
- * a newer CLI should not fail on a field it does not know yet. A missing file
- * is the defaults; a malformed file throws with its path.
+ * `.portolan/config.json` is tried first; a legacy root `portolan.config.json`
+ * still loads with a one-line notice. An unknown key is ignored, not rejected:
+ * the config is a starting point and a newer CLI should not fail on a field it
+ * does not know yet. A missing file is the defaults; a malformed file throws
+ * with its path. Relative paths resolve against the project root.
  */
-export function loadConfig(path?: string): CliConfig {
-  const file = path ?? process.env.PORTOLAN_CONFIG ?? CONFIG_FILE;
-  if (!existsSync(file)) return { ...DEFAULT_CONFIG };
+export function loadConfig(path?: string, options: LoadConfigOptions = {}): CliConfig {
+  const located = locateConfig(path);
+  const file = located.file;
+  const exists = existsSync(file);
+  const root = projectRoot(file);
+  const base = located.legacy ? LEGACY_DEFAULT_CONFIG : DEFAULT_CONFIG;
+
+  if (!exists) return resolvePaths(base, root);
 
   let parsed: unknown;
   try {
@@ -83,7 +111,57 @@ export function loadConfig(path?: string): CliConfig {
     throw new Error(`${file} must contain a JSON object`);
   }
 
-  return mergeConfig(DEFAULT_CONFIG, parsed as Record<string, unknown>, file);
+  if (located.legacy && options.warn !== false) {
+    const warn = options.warn ?? ((line: string) => process.stderr.write(`${line}\n`));
+    warn(
+      `warning: ${file} is deprecated; move it to ${join(root, CONFIG_FILE)} (run portolan migrate)`,
+    );
+  }
+
+  return resolvePaths(mergeConfig(base, parsed as Record<string, unknown>, file), root);
+}
+
+function locateConfig(path: string | undefined): { file: string; legacy: boolean } {
+  const explicit = path ?? process.env.PORTOLAN_CONFIG;
+  if (explicit !== undefined && explicit.length > 0) return classify(explicit);
+
+  const current = join(process.cwd(), CONFIG_FILE);
+  if (existsSync(current)) return { file: current, legacy: false };
+
+  const legacy = join(process.cwd(), LEGACY_CONFIG_FILE);
+  if (existsSync(legacy)) return { file: legacy, legacy: true };
+
+  return { file: current, legacy: false };
+}
+
+function classify(file: string): { file: string; legacy: boolean } {
+  return { file, legacy: basename(resolve(file)) === LEGACY_CONFIG_FILE };
+}
+
+/**
+ * The project root for a config file.
+ *
+ * `.portolan/config.json` lives one level below the project; a legacy root
+ * config, or an explicit path elsewhere, lives in the project directory itself.
+ */
+export function projectRoot(file: string): string {
+  const dir = dirname(resolve(file));
+  return basename(dir) === PORTOLAN_DIR ? dirname(dir) : dir;
+}
+
+function resolvePaths(config: CliConfig, root: string): CliConfig {
+  const result: CliConfig = { ...config };
+
+  for (const key of ["maps", "skills", "policies", "traces", "storageState"] as const) {
+    const value = result[key];
+    if (value !== undefined && !isAbsolute(value)) result[key] = resolve(root, value);
+  }
+
+  if (result.database !== ":memory:" && !isAbsolute(result.database)) {
+    result.database = resolve(root, result.database);
+  }
+
+  return result;
 }
 
 export function mergeConfig(

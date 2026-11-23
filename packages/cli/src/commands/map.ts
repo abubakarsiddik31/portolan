@@ -6,11 +6,12 @@ import {
   bootstrapFromTraces,
   bootstrapMap,
   type PublishResult,
+  pool,
   publishMap,
   type VerifyReport,
   verifyOp,
 } from "@abubakarsiddiik/compiler";
-import type { SiteMap, StateDef } from "@abubakarsiddiik/protocol";
+import type { OpDef, SiteMap, StateDef } from "@abubakarsiddiik/protocol";
 import type { Trace } from "@abubakarsiddiik/runtime";
 import { MapStore } from "@abubakarsiddiik/server";
 import {
@@ -20,6 +21,7 @@ import {
   coverageOf,
   createDraft,
   type DomDiscovery,
+  type DraftTask,
   discoverDom,
   formatCoverage,
   type MapDraft,
@@ -41,6 +43,9 @@ import {
 
 import { paramSetsFor } from "./param-sets.js";
 import { riskOf } from "./risk.js";
+import { appFingerprint, opHash, readVerification, writeVerification } from "./verification.js";
+
+const DEFAULT_CONCURRENCY = 4;
 
 export type MapBuildInput = {
   site: string;
@@ -79,6 +84,12 @@ export type MapBuildInput = {
   allowCost?: boolean;
   /** Keep a layout control seen on many pages as one capability per page. */
   noDedupe?: boolean;
+  /** Reads verified at once, each in its own context. Default 4. */
+  concurrency?: number;
+  /** Re-verify ops that were verified against this same app build. */
+  reverify?: boolean;
+  /** The app build, instead of a hash of the served HTML. */
+  appVersion?: string;
 };
 
 export type MapBuildDeps = {
@@ -347,77 +358,106 @@ export async function runMapBuild(
     const unverified = new Map<string, string>();
 
     if (input.verify) {
+      const store = readVerification(mapDir);
+      const fingerprint =
+        input.reverify === true ? undefined : await appFingerprint(baseUrl, input.appVersion);
+      const unchanged = (op: OpDef): string | undefined => {
+        const entry = store.ops[op.name];
+        return fingerprint !== undefined &&
+          store.fingerprint === fingerprint &&
+          entry?.hash === opHash(op)
+          ? entry.verified_at
+          : undefined;
+      };
+
+      type Job = {
+        proposal: OpProposal;
+        sets: Array<Record<string, unknown>>;
+        setup: ReturnType<typeof setupFor>;
+      };
+      const jobs: Job[] = [];
+      const hold = (proposal: OpProposal, kind: DraftTask["kind"], message: string): void => {
+        unverified.set(proposal.op.name, message);
+        draft.tasks.push({
+          id: `task_${draft.tasks.length + 1}`,
+          kind,
+          source: proposal.source,
+          op: proposal.op.name,
+          message,
+        });
+      };
+
       for (const proposal of candidates) {
         const op = proposal.op;
         if (op.effect !== "read" && !input.verifyWrites) {
-          const message = `${op.name} is a ${op.effect}; verify it explicitly with --verify-writes`;
-          unverified.set(op.name, message);
-          draft.tasks.push({
-            id: `task_${draft.tasks.length + 1}`,
-            kind: "confirm_effect",
-            source: proposal.source,
-            op: op.name,
-            message,
-          });
+          hold(
+            proposal,
+            "confirm_effect",
+            `${op.name} is a ${op.effect}; verify it explicitly with --verify-writes`,
+          );
           continue;
         }
 
         if (proposal.risk !== undefined && input.allowCost !== true) {
-          const message = `${op.name} fired a ${proposal.risk.category} request (${proposal.risk.reason}); verify it explicitly with --allow-cost`;
-          unverified.set(op.name, message);
-          draft.tasks.push({
-            id: `task_${draft.tasks.length + 1}`,
-            kind: "confirm_effect",
-            source: proposal.source,
-            op: op.name,
-            message,
-          });
+          hold(
+            proposal,
+            "confirm_effect",
+            `${op.name} fired a ${proposal.risk.category} request (${proposal.risk.reason}); verify it explicitly with --allow-cost`,
+          );
           continue;
         }
 
         const sets = paramSetsFor(op, proposal.sample_params, params[op.name]);
         if (sets === undefined) {
-          const message = `add at least three parameter sets for ${op.name} in a params file`;
-          unverified.set(op.name, message);
-          draft.tasks.push({
-            id: `task_${draft.tasks.length + 1}`,
-            kind: "add_params",
-            source: proposal.source,
+          hold(
+            proposal,
+            "add_params",
+            `add at least three parameter sets for ${op.name} in a params file`,
+          );
+          continue;
+        }
+
+        // Verified minutes ago against the same app build: nothing to learn.
+        const since = unchanged(op);
+        if (since !== undefined) {
+          op.status = "verified";
+          verified.push(op.name);
+          reports.push({
             op: op.name,
-            message,
+            verified: true,
+            impls: [],
+            reason: `unchanged since ${since}; pass --reverify to run it again`,
           });
           continue;
         }
 
-        const setup = setupFor(draft, proposal);
-        let report: VerifyReport;
-        try {
-          const executablePath = input.chrome ?? findChrome();
-          if (
-            deps.verify === undefined &&
-            verifyBrowser === undefined &&
-            executablePath !== undefined
-          ) {
-            verifyBrowser = await BrowserHandle.launch({
-              executablePath,
-              headless: input.headless ?? true,
-            });
-          }
+        jobs.push({ proposal, sets, setup: setupFor(draft, proposal) });
+      }
 
-          report = await (deps.verify ?? verifyOp)({
+      const executablePath = input.chrome ?? findChrome();
+      if (jobs.length > 0 && deps.verify === undefined && executablePath !== undefined) {
+        verifyBrowser = await BrowserHandle.launch({
+          executablePath,
+          headless: input.headless ?? true,
+        });
+      }
+
+      const run = async (job: Job): Promise<VerifyReport> => {
+        try {
+          return await (deps.verify ?? verifyOp)({
             map: draftMap(draft),
-            op,
-            paramSets: sets,
+            op: job.proposal.op,
+            paramSets: job.sets,
             baseUrl,
-            ...(setup !== undefined ? { setup } : {}),
+            ...(job.setup !== undefined ? { setup: job.setup } : {}),
             ...(verifyBrowser !== undefined ? { browser: verifyBrowser } : {}),
             ...(input.chrome !== undefined ? { executablePath: input.chrome } : {}),
             ...(input.storageState !== undefined ? { storageState: input.storageState } : {}),
             headless: input.headless ?? true,
           });
         } catch (error) {
-          report = {
-            op: op.name,
+          return {
+            op: job.proposal.op.name,
             verified: false,
             impls: [],
             reason: `verification crashed: ${
@@ -425,23 +465,42 @@ export async function runMapBuild(
             }`,
           };
         }
+      };
+
+      // Reads run side by side, each in its own context. A write runs alone, so
+      // two runs never race on the same data.
+      const done = new Map<string, VerifyReport>();
+      const reads = jobs.filter((job) => job.proposal.op.effect === "read");
+      await pool(reads, input.concurrency ?? DEFAULT_CONCURRENCY, async (job) => {
+        done.set(job.proposal.op.name, await run(job));
+      });
+      for (const job of jobs.filter((candidate) => !reads.includes(candidate))) {
+        done.set(job.proposal.op.name, await run(job));
+      }
+
+      for (const job of jobs) {
+        const report = done.get(job.proposal.op.name);
+        if (report === undefined) continue;
         reports.push(report);
 
         if (report.verified) {
-          op.status = "verified";
-          verified.push(op.name);
+          job.proposal.op.status = "verified";
+          verified.push(job.proposal.op.name);
+          store.ops[job.proposal.op.name] = {
+            hash: opHash(job.proposal.op),
+            verified_at: new Date().toISOString(),
+          };
         } else {
-          const message = `${op.name} did not verify: ${report.reason ?? "every impl failed"}`;
-          unverified.set(op.name, message);
-          draft.tasks.push({
-            id: `task_${draft.tasks.length + 1}`,
-            kind: "restore_op",
-            source: proposal.source,
-            op: op.name,
-            message,
-          });
+          hold(
+            job.proposal,
+            "restore_op",
+            `${job.proposal.op.name} did not verify: ${report.reason ?? "every impl failed"}`,
+          );
         }
       }
+
+      if (fingerprint !== undefined) store.fingerprint = fingerprint;
+      writeVerification(mapDir, store);
 
       // Only verification marks an op mapped, so recount without the
       // proposals that failed or were skipped, then gate on that.
@@ -489,7 +548,9 @@ export async function runMapBuild(
       if (!input.verify) {
         throw new Error("--publish requires --verify: an unverified map is not safe to serve");
       }
-      if (verified.length === 0) {
+      // Discovery found nothing new or changed: there is nothing to ship.
+      const nothingNew = verified.length === 0 && candidates.length === 0;
+      if (!nothingNew && verified.length === 0) {
         // Write the draft first: its tasks hold the reason each op failed.
         writeDraft(join(input.mapsDir, input.site), draft);
         const reasons = [...unverified.values()].slice(0, 10).map((reason) => `\n  ${reason}`);
@@ -498,25 +559,28 @@ export async function runMapBuild(
         );
       }
 
-      const base = existing ?? bootstrapMap(input.site, [origin]);
-      base.states = mergeStates(base.states, draft.states);
-      const result = await (deps.publish ?? publishMap)({
-        dir: join(input.mapsDir, input.site),
-        map: base,
-        candidates: verified.map((name) => {
-          const proposal = draft.proposals.find((candidate) => candidate.op.name === name);
-          const op = proposal?.op;
-          if (op === undefined) throw new Error(`verified op "${name}" disappeared from the draft`);
-          return {
-            op,
-            verified: true,
-            ...(proposal?.provenance !== undefined ? { source: proposal.provenance } : {}),
-          };
-        }),
-      });
+      if (!nothingNew) {
+        const base = existing ?? bootstrapMap(input.site, [origin]);
+        base.states = mergeStates(base.states, draft.states);
+        const result = await (deps.publish ?? publishMap)({
+          dir: join(input.mapsDir, input.site),
+          map: base,
+          candidates: verified.map((name) => {
+            const proposal = draft.proposals.find((candidate) => candidate.op.name === name);
+            const op = proposal?.op;
+            if (op === undefined)
+              throw new Error(`verified op "${name}" disappeared from the draft`);
+            return {
+              op,
+              verified: true,
+              ...(proposal?.provenance !== undefined ? { source: proposal.provenance } : {}),
+            };
+          }),
+        });
 
-      published = result;
-      draft.build = { ...draft.build, published: result.version };
+        published = result;
+        draft.build = { ...draft.build, published: result.version };
+      }
     }
 
     writeDraft(join(input.mapsDir, input.site), draft);

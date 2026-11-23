@@ -3,6 +3,8 @@ import { validateJsonSchema } from "@abubakarsiddiik/protocol";
 import { checkPost, runHttpOp, runUiOp, runUrlOp } from "@abubakarsiddiik/runtime";
 import { BrowserHandle, findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 
+import { pool } from "./pool.js";
+
 export type VerifyRun = {
   params: Record<string, unknown>;
   ok: boolean;
@@ -30,8 +32,14 @@ export type VerifyReport = {
 export type VerifyOptions = {
   map: SiteMap;
   op: OpDef;
-  /** At least three: the verifier rejects a smaller set rather than guessing. */
+  /**
+   * At least three for an op with required params, which the verifier rejects
+   * a smaller list of rather than guessing; one is enough for an op with none.
+   * Identical sets are run once.
+   */
   paramSets: Array<Record<string, unknown>>;
+  /** Param sets of a read to run at once, each in its own context. Default 1. */
+  concurrency?: number;
   baseUrl?: string;
   executablePath?: string;
   headless?: boolean;
@@ -48,6 +56,22 @@ export type VerifyOptions = {
 
 const MIN_PARAM_SETS = 3;
 
+/** An op with required params needs sets that vary them; one without needs one run. */
+export function minParamSets(op: OpDef): number {
+  const required = op.params.required;
+  return Array.isArray(required) && required.length > 0 ? MIN_PARAM_SETS : 1;
+}
+
+export function distinctSets(sets: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const seen = new Set<string>();
+  return sets.filter((set) => {
+    const key = JSON.stringify(Object.entries(set).sort(([a], [b]) => a.localeCompare(b)));
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /**
  * Verify every impl of an op on a fresh session.
  *
@@ -57,12 +81,13 @@ const MIN_PARAM_SETS = 3;
  * that broke and why.
  */
 export async function verifyOp(options: VerifyOptions): Promise<VerifyReport> {
-  if (options.paramSets.length < MIN_PARAM_SETS) {
+  const minimum = minParamSets(options.op);
+  if (options.paramSets.length < minimum) {
     return {
       op: options.op.name,
       verified: false,
       impls: [],
-      reason: `at least ${MIN_PARAM_SETS} param sets are required`,
+      reason: `at least ${minimum} param sets are required`,
     };
   }
 
@@ -87,23 +112,21 @@ export async function verifyOp(options: VerifyOptions): Promise<VerifyReport> {
 
   try {
     for (const impl of options.op.impls) {
-      const runs: VerifyRun[] = [];
-
-      for (const params of options.paramSets) {
-        runs.push(
-          await runOnce({
-            map: options.map,
-            op: options.op,
-            impl,
-            params,
-            browser,
-            executablePath,
-            setup: options.setup ?? [],
-            ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),
-            ...(options.storageState !== undefined ? { storageState: options.storageState } : {}),
-          }),
-        );
-      }
+      // A write runs one set at a time: two contexts must not race on the same data.
+      const limit = options.op.effect === "read" ? (options.concurrency ?? 1) : 1;
+      const runs: VerifyRun[] = await pool(distinctSets(options.paramSets), limit, (params) =>
+        runOnce({
+          map: options.map,
+          op: options.op,
+          impl,
+          params,
+          browser,
+          executablePath,
+          setup: options.setup ?? [],
+          ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),
+          ...(options.storageState !== undefined ? { storageState: options.storageState } : {}),
+        }),
+      );
 
       const failure = runs.find((run) => !run.ok);
 

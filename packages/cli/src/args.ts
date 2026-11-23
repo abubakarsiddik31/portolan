@@ -15,6 +15,7 @@ const BOOLEAN_FLAGS = new Set([
   "no-dedupe",
   "publish",
   "require-complete",
+  "reverify",
   "strict",
   "verify",
   "verify-writes",

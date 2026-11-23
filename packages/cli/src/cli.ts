@@ -397,6 +397,13 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           strict: booleanFlag(args, "strict"),
           allowCost: booleanFlag(args, "allow-cost"),
           noDedupe: booleanFlag(args, "no-dedupe"),
+          reverify: booleanFlag(args, "reverify"),
+          ...(numberFlag(args, "concurrency") !== undefined
+            ? { concurrency: numberFlag(args, "concurrency") }
+            : {}),
+          ...(stringFlag(args, "app-version") !== undefined
+            ? { appVersion: stringFlag(args, "app-version") }
+            : {}),
           ...(listFlag(args, "exclude").length > 0 ? { exclude: listFlag(args, "exclude") } : {}),
           ...(stringFlag(args, "start") !== undefined
             ? { start: stringFlag(args, "start") }
@@ -443,6 +450,8 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           out(`published v${result.published.version} at ${result.published.path}`);
         } else if (!booleanFlag(args, "publish")) {
           out("not published; rerun with --verify --publish");
+        } else {
+          out("nothing to publish: no new or changed ops since the published map");
         }
         return 0;
       }

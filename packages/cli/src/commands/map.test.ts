@@ -688,3 +688,66 @@ describe("map update --state", () => {
     ).rejects.toThrow(/needs `map update`/);
   });
 });
+
+describe("faster verification", () => {
+  const build = (dir: string, extra: Record<string, unknown> = {}) => ({
+    site: "app",
+    mapsDir: dir,
+    url: "http://app.test/",
+    verify: true,
+    verifyWrites: false,
+    publish: true,
+    appVersion: "build-1",
+    ...extra,
+  });
+
+  it("skips ops already verified against the same app build", async () => {
+    const dir = tempDir();
+    await runMapBuild(build(dir), { substrate, verify });
+
+    const seen: string[] = [];
+    const recording: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => {
+      seen.push(options.op.name);
+      return { op: options.op.name, verified: true, impls: [] } satisfies VerifyReport;
+    };
+
+    const again = await runMapBuild(build(dir, { update: true }), { substrate, verify: recording });
+    expect(seen).toEqual([]);
+    expect(again.verified.length).toBeGreaterThan(0);
+    expect(again.reports.every((report) => report.reason?.startsWith("unchanged since"))).toBe(
+      true,
+    );
+
+    const reverified = await runMapBuild(build(dir, { update: true, reverify: true }), {
+      substrate,
+      verify: recording,
+    });
+    expect(seen.length).toBe(reverified.verified.length);
+
+    seen.length = 0;
+    await runMapBuild(build(dir, { update: true, appVersion: "build-2" }), {
+      substrate,
+      verify: recording,
+    });
+    expect(seen.length).toBeGreaterThan(0);
+  });
+
+  it("verifies reads side by side up to the limit", async () => {
+    let active = 0;
+    let peak = 0;
+    const slow: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      active -= 1;
+      return { op: options.op.name, verified: true, impls: [] } satisfies VerifyReport;
+    };
+
+    await runMapBuild(build(tempDir(), { publish: false, concurrency: 2 }), {
+      substrate,
+      verify: slow,
+    });
+
+    expect(peak).toBe(2);
+  });
+});

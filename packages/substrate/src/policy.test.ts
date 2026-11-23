@@ -4,7 +4,15 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { EgressBlockedError, EgressGuard, isPrivateAddress, loadPolicy } from "./policy.js";
+import {
+  EgressBlockedError,
+  EgressGuard,
+  isPrivateAddress,
+  loadPolicy,
+  ruleMatchesLabel,
+  ruleMatchesRequest,
+  ruleReason,
+} from "./policy.js";
 
 const dirs: string[] = [];
 
@@ -183,5 +191,44 @@ describe("loadPolicy", () => {
     writeFileSync(join(dir, "store.json"), JSON.stringify({ site: "portal", allow: ["*"] }));
 
     expect(() => loadPolicy("store", dir)).toThrow(/cannot be loaded/);
+  });
+});
+
+describe("policy rules", () => {
+  it("loads categorized rules and rejects a malformed one", () => {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, "app.json"),
+      JSON.stringify({
+        site: "app",
+        allow: ["localhost:5173"],
+        rules: [{ category: "cost", request: "POST */ask/stream*", reason: "LLM call" }],
+      }),
+    );
+    expect(loadPolicy("app", dir)?.rules).toEqual([
+      { category: "cost", request: "POST */ask/stream*", reason: "LLM call" },
+    ]);
+
+    writeFileSync(
+      join(dir, "bad.json"),
+      JSON.stringify({ site: "bad", allow: [], rules: [{ category: "cost" }] }),
+    );
+    expect(() => loadPolicy("bad", dir)).toThrow(/needs a label or a request/);
+
+    writeFileSync(
+      join(dir, "re.json"),
+      JSON.stringify({ site: "re", allow: [], rules: [{ category: "x", label: "(" }] }),
+    );
+    expect(() => loadPolicy("re", dir)).toThrow(/not a valid regular expression/);
+  });
+
+  it("matches a request by method and URL glob, and a label by regex", () => {
+    const rule = { category: "cost", request: "POST */ask/stream*", reason: "LLM call" };
+    expect(ruleMatchesRequest(rule, "POST", "http://localhost:8000/api/ask/stream?x=1")).toBe(true);
+    expect(ruleMatchesRequest(rule, "GET", "http://localhost:8000/api/ask/stream")).toBe(false);
+    expect(ruleMatchesRequest(rule, "POST", "http://localhost:8000/api/other")).toBe(false);
+    expect(ruleMatchesLabel({ category: "dev-only", label: "^devtools$" }, "Devtools")).toBe(true);
+    expect(ruleReason(rule)).toBe("cost: LLM call");
+    expect(ruleReason({ category: "session", label: "x" })).toBe("session");
   });
 });

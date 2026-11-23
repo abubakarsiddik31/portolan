@@ -94,6 +94,34 @@ These are read in addition to the config file:
 `portolan doctor` reports which provider variables are set without printing
 their values.
 
+## Site policy
+
+`.portolan/policies/<site>.json` controls what a site may reach and what must not
+be mapped or run unattended.
+
+```json
+{
+  "site": "app",
+  "allow": ["localhost:5173", "localhost:8000"],
+  "rules": [
+    { "category": "cost", "request": "POST */ask/stream*", "reason": "LLM call" },
+    { "category": "destructive", "label": "\\bdelete\\b" },
+    { "category": "dev-only", "label": "^Open Tanstack query devtools$" }
+  ]
+}
+```
+
+- `allow` is default-deny. `portolan init --url <app>` seeds it, and
+  `portolan policy allow --site app localhost:8000` adds hosts.
+- A rule matches a control's accessible name (`label`, a regex), a request its
+  recorded run fired (`request`, a method and a URL glob), or both.
+- A control that matches is `excluded` in `capabilities.json` with the reason
+  `category: reason`. The shipped rules cover sign-out, delete, billing, and page
+  chrome; yours are added to them.
+- A recorded op whose run fired a `cost` or `destructive` request is marked
+  `write` (or `irreversible` for a `ui` op) and is not verified unless
+  `map build --allow-cost` is passed.
+
 ## Not in the config file
 
 These are programmatic options, passed to `createServer` by a host:

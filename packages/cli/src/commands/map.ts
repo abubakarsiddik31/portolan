@@ -40,6 +40,7 @@ import {
 } from "@abubakarsiddiik/substrate";
 
 import { paramSetsFor } from "./param-sets.js";
+import { riskOf } from "./risk.js";
 
 export type MapBuildInput = {
   site: string;
@@ -72,6 +73,8 @@ export type MapBuildInput = {
   requireComplete?: boolean;
   /** With requireComplete, also refuse while a control is unavailable. */
   strict?: boolean;
+  /** Verify ops whose recorded run fired a request a `cost` or `destructive` rule matches. */
+  allowCost?: boolean;
 };
 
 export type MapBuildDeps = {
@@ -148,6 +151,8 @@ export async function runMapBuild(
     }
   }
 
+  const policyRules =
+    input.policiesDir === undefined ? [] : (loadPolicy(input.site, input.policiesDir)?.rules ?? []);
   const reservedTargets = existing?.ops.flatMap((op) => op.to) ?? [];
   let discovery: DomDiscovery | undefined;
   let close = deps.closeSubstrate;
@@ -213,8 +218,15 @@ export async function runMapBuild(
           ? uniqueName(candidate.op.name, used)
           : candidate.op.name;
         used.add(name);
+        const risk = riskOf(candidate, policyRules);
+        const op = name === candidate.op.name ? candidate.op : { ...candidate.op, name };
+        if (risk !== undefined && op.effect === "read") op.effect = "write";
+        if (risk?.category === "destructive" && op.impls.every((impl) => impl.tier === "ui")) {
+          op.effect = "irreversible";
+        }
         draft.proposals.push({
-          op: name === candidate.op.name ? candidate.op : { ...candidate.op, name },
+          op,
+          ...(risk !== undefined ? { risk } : {}),
           source: "traces",
           provenance: candidate.source ?? "recorded trace",
           confidence: "medium",
@@ -273,6 +285,7 @@ export async function runMapBuild(
         ...(previous !== undefined ? { previous } : {}),
         ...(input.exclude !== undefined ? { exclude: input.exclude } : {}),
         ...(unverified !== undefined ? { unverified } : {}),
+        ...(policyRules.length > 0 ? { rules: policyRules } : {}),
       });
     let capabilities = ledgerFor();
     let coverage = coverageOf(capabilities);
@@ -309,6 +322,19 @@ export async function runMapBuild(
         const op = proposal.op;
         if (op.effect !== "read" && !input.verifyWrites) {
           const message = `${op.name} is a ${op.effect}; verify it explicitly with --verify-writes`;
+          unverified.set(op.name, message);
+          draft.tasks.push({
+            id: `task_${draft.tasks.length + 1}`,
+            kind: "confirm_effect",
+            source: proposal.source,
+            op: op.name,
+            message,
+          });
+          continue;
+        }
+
+        if (proposal.risk !== undefined && input.allowCost !== true) {
+          const message = `${op.name} fired a ${proposal.risk.category} request (${proposal.risk.reason}); verify it explicitly with --allow-cost`;
           unverified.set(op.name, message);
           draft.tasks.push({
             id: `task_${draft.tasks.length + 1}`,

@@ -23,6 +23,7 @@ import { runInit } from "./commands/init.js";
 import { runMapBuild } from "./commands/map.js";
 import { runMcp } from "./commands/mcp.js";
 import { runMigrate } from "./commands/migrate.js";
+import { blockedHosts, runPolicyAllow } from "./commands/policy.js";
 import { runQa } from "./commands/qa.js";
 import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
@@ -49,6 +50,7 @@ Commands:
   map <build|update>     discover a URL and/or traces into a map draft, verify, publish
   map coverage           report mapped vs missing app capabilities
   map capability         add or set a capability manually (add|set)
+  policy allow <host...> add hosts to a site's egress allow list
   compile <trace...>     compile traces into a new map version
   verify                 verify a map's ops on a fresh session
   export-skills          export a portolan-<site> skill from a map
@@ -383,6 +385,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           publish: booleanFlag(args, "publish"),
           requireComplete: booleanFlag(args, "require-complete"),
           strict: booleanFlag(args, "strict"),
+          allowCost: booleanFlag(args, "allow-cost"),
           ...(listFlag(args, "exclude").length > 0 ? { exclude: listFlag(args, "exclude") } : {}),
           ...(stringFlag(args, "start") !== undefined
             ? { start: stringFlag(args, "start") }
@@ -408,6 +411,12 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         out(
           `drafted ${result.draft.proposals.length} ops, ${result.draft.tasks.length} tasks at ${result.draftPath}`,
         );
+        const blocked = blockedHosts(result.draft.tasks.map((task) => task.message));
+        if (blocked.length > 0) {
+          out(
+            `egress blocked ${blocked.join(", ")}; allow with: portolan policy allow --site ${site} ${blocked.join(" ")}`,
+          );
+        }
         const cut = result.discovery?.truncated;
         if (cut !== undefined) {
           out(
@@ -424,6 +433,25 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         } else if (!booleanFlag(args, "publish")) {
           out("not published; rerun with --verify --publish");
         }
+        return 0;
+      }
+
+      case "policy": {
+        const sub = args.positional[0];
+        if (sub !== "allow") throw new Error('policy expects "allow"');
+        const config = loadConfig(stringFlag(args, "config"));
+        const site = stringFlag(args, "site") ?? config.site;
+        const result = runPolicyAllow({
+          site,
+          policiesDir: config.policies,
+          hosts: args.positional.slice(1),
+        });
+        out(
+          result.added.length === 0
+            ? `${site}: already allowed`
+            : `${site}: allowed ${result.added.join(", ")}`,
+        );
+        out(`  ${result.path}`);
         return 0;
       }
 

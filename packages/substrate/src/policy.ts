@@ -9,6 +9,21 @@ export type EgressPolicy = {
   allow: string[];
   /** Checked before `allow`. */
   deny?: string[];
+  /** What must not be mapped or run unattended, matched on label and/or request. */
+  rules?: PolicyRule[];
+};
+
+/**
+ * One exclusion rule. `label` is a regex on a control's accessible name;
+ * `request` is `METHOD url-glob` matched on a network effect the control
+ * fired. A rule needs at least one of them.
+ */
+export type PolicyRule = {
+  /** Free text; `cost` and `destructive` also gate verification and recording. */
+  category: string;
+  label?: string;
+  request?: string;
+  reason?: string;
 };
 
 export type BlockedRequest = {
@@ -143,6 +158,7 @@ export function loadPolicy(site: string, dir = "policies"): EgressPolicy | undef
     site?: unknown;
     allow?: unknown;
     deny?: unknown;
+    rules?: unknown;
   };
 
   if (parsed.site !== undefined && parsed.site !== site) {
@@ -164,7 +180,68 @@ export function loadPolicy(site: string, dir = "policies"): EgressPolicy | undef
     site,
     allow: parsed.allow as string[],
     ...(parsed.deny !== undefined ? { deny: parsed.deny as string[] } : {}),
+    ...(parsed.rules !== undefined ? { rules: parseRules(site, parsed.rules) } : {}),
   };
+}
+
+function parseRules(site: string, value: unknown): PolicyRule[] {
+  if (!Array.isArray(value)) throw new Error(`policy "${site}" rules must be an array`);
+
+  return value.map((raw, index) => {
+    const rule = raw as Partial<PolicyRule> | null;
+    const where = `policy "${site}" rule ${index + 1}`;
+    if (typeof rule !== "object" || rule === null) throw new Error(`${where} must be an object`);
+    if (typeof rule.category !== "string" || rule.category.length === 0) {
+      throw new Error(`${where} needs a category`);
+    }
+    if (rule.label === undefined && rule.request === undefined) {
+      throw new Error(`${where} needs a label or a request`);
+    }
+    for (const key of ["label", "request", "reason"] as const) {
+      if (rule[key] !== undefined && typeof rule[key] !== "string") {
+        throw new Error(`${where} ${key} must be a string`);
+      }
+    }
+    if (rule.label !== undefined) {
+      try {
+        new RegExp(rule.label, "i");
+      } catch {
+        throw new Error(`${where} label is not a valid regular expression`);
+      }
+    }
+    return {
+      category: rule.category,
+      ...(rule.label !== undefined ? { label: rule.label } : {}),
+      ...(rule.request !== undefined ? { request: rule.request } : {}),
+      ...(rule.reason !== undefined ? { reason: rule.reason } : {}),
+    };
+  });
+}
+
+/** True when a rule's `request` pattern (method, then a URL glob) matches a request. */
+export function ruleMatchesRequest(rule: PolicyRule, method: string, url: string): boolean {
+  if (rule.request === undefined) return false;
+
+  const space = rule.request.indexOf(" ");
+  const wantMethod = space === -1 ? "*" : rule.request.slice(0, space).toUpperCase();
+  const glob = space === -1 ? rule.request : rule.request.slice(space + 1).trim();
+  if (wantMethod !== "*" && wantMethod !== method.toUpperCase()) return false;
+
+  const pattern = glob
+    .split("*")
+    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+    .join(".*");
+  return new RegExp(`^${pattern}$`).test(url);
+}
+
+/** True when a rule's `label` pattern matches a control's accessible name. */
+export function ruleMatchesLabel(rule: PolicyRule, name: string): boolean {
+  return rule.label !== undefined && new RegExp(rule.label, "i").test(name);
+}
+
+/** "category: reason", so a ledger reads without hand-written reasons. */
+export function ruleReason(rule: PolicyRule): string {
+  return rule.reason === undefined ? rule.category : `${rule.category}: ${rule.reason}`;
 }
 
 /** True for an IPv4 or IPv6 literal, including a bracketed IPv6 host. */

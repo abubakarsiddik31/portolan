@@ -48,6 +48,7 @@ function discovery(): DomDiscovery {
     tasks: [],
     surface,
     visited: ["http://app.test/"],
+    pages: ["home"],
   };
 }
 
@@ -201,5 +202,60 @@ describe("buildCapabilities", () => {
     const byId = new Map(next.capabilities.map((item) => [item.id, item]));
     expect(byId.get("api.create")?.status).toBe("missing");
     expect(byId.get("home.button.legacy")?.status).toBe("stale");
+  });
+
+  const ledgerWith = (items: Array<[string, string, string]>) => ({
+    schema: 1 as const,
+    site: "app",
+    generated_at: "2026-11-17T00:00:00.000Z",
+    capabilities: items.map(([page, name, status]) => ({
+      id: `${page}.button.${name.toLowerCase()}`,
+      page,
+      trigger: { kind: "button" as const, name },
+      status: status as "mapped" | "missing",
+      source: "live" as const,
+      ...(status === "mapped" ? { op: "known" } : {}),
+    })),
+  });
+
+  it("keeps live capabilities when the run did not crawl at all", () => {
+    const next = buildCapabilities({
+      site: "app",
+      proposals: [],
+      previous: ledgerWith([
+        ["home", "Export", "mapped"],
+        ["settings", "Save", "missing"],
+      ]),
+    });
+
+    expect(next.capabilities.map((item) => item.status).sort()).toEqual(["mapped", "missing"]);
+  });
+
+  it("maps a previously missing capability when a trace op now covers it", () => {
+    const next = buildCapabilities({
+      site: "app",
+      proposals: [
+        proposal("op_export", "home", "home", { kind: "button", name: "Export", page: "home" }),
+      ],
+      previous: ledgerWith([["home", "Export", "missing"]]),
+    });
+
+    expect(next.capabilities[0]).toMatchObject({ status: "mapped", op: "op_export" });
+  });
+
+  it("does not mark pages stale that a partial crawl never reached", () => {
+    const next = buildCapabilities({
+      site: "app",
+      discovery: { ...discovery(), surface: [], pages: ["home"] },
+      proposals: [],
+      previous: ledgerWith([
+        ["home", "Legacy", "mapped"],
+        ["settings", "Save", "mapped"],
+      ]),
+    });
+
+    const byPage = new Map(next.capabilities.map((item) => [item.page, item.status]));
+    expect(byPage.get("home")).toBe("stale");
+    expect(byPage.get("settings")).toBe("mapped");
   });
 });

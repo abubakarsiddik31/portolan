@@ -384,6 +384,8 @@ export async function runMapBuild(
         throw new Error("--publish requires --verify: an unverified map is not safe to serve");
       }
       if (verified.length === 0) {
+        // Write the draft first: its tasks hold the reason each op failed.
+        writeDraft(join(input.mapsDir, input.site), draft);
         throw new Error("nothing verified; the draft and tasks were written for review");
       }
 
@@ -565,7 +567,7 @@ function readParams(path: string | undefined): Record<string, Array<Record<strin
 function readTraces(input: MapBuildInput): Trace[] {
   const paths = input.traces ?? [];
   if (paths.length > 0) return paths.map(readTrace);
-  if (input.url !== undefined || input.tracesDir === undefined) return [];
+  if (input.tracesDir === undefined) return [];
   return readTraceDir(input.tracesDir);
 }
 

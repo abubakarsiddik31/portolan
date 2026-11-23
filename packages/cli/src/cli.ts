@@ -337,13 +337,19 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         const url = stringFlag(args, "url");
         const baseUrl = stringFlag(args, "base-url") ?? config.baseUrl;
         const traces = [...positional, ...listFlag(args, "trace"), ...listFlag(args, "traces")];
+        const tracesDir =
+          stringFlag(args, "traces-dir") ??
+          process.env.TRACES_DIR ??
+          (url === undefined ? config.traces : undefined);
         const result = await (deps.map ?? runMapBuild)({
           site,
           mapsDir,
           ...(url !== undefined ? { url } : {}),
           ...(baseUrl !== undefined ? { baseUrl } : {}),
           ...(traces.length > 0 ? { traces } : {}),
-          tracesDir: stringFlag(args, "traces-dir") ?? process.env.TRACES_DIR ?? config.traces,
+          // The configured default only applies to a traces-only build; with
+          // --url, a directory is read only when it was asked for.
+          ...(tracesDir !== undefined ? { tracesDir } : {}),
           ...(stringFlag(args, "params") !== undefined
             ? { paramsPath: stringFlag(args, "params") }
             : {}),

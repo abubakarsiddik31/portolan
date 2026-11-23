@@ -113,6 +113,33 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
       continue;
     }
 
+    // Only a crawl that reached the page can say the control is gone. A run
+    // with no crawl, or one that started elsewhere, observed nothing about it,
+    // so the old entry stands, upgraded when a verified op now covers it.
+    const crawled = input.discovery?.pages?.includes(item.page) === true;
+    if (!crawled) {
+      const proposal = input.proposals.find(
+        (candidate) =>
+          !unverified.has(candidate.op.name) &&
+          covers(
+            {
+              page: item.page,
+              kind: item.trigger.kind,
+              name: item.trigger.name,
+              ...(item.trigger.target !== undefined ? { target: item.trigger.target } : {}),
+            },
+            candidate,
+          ),
+      );
+      if (item.status === "missing" && proposal !== undefined) {
+        const { reason: _gap, ...rest } = item;
+        next.set(id, { ...rest, status: "mapped", op: proposal.op.name });
+      } else {
+        next.set(id, item);
+      }
+      continue;
+    }
+
     next.set(id, {
       ...item,
       status: "stale",

@@ -4,10 +4,11 @@ import { join } from "node:path";
 
 import type { VerifyReport } from "@abubakarsiddiik/compiler";
 import { parseMap } from "@abubakarsiddiik/protocol";
+import type { OpProposal } from "@abubakarsiddiik/sources";
 import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substrate";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runMapBuild } from "./map.js";
+import { runMapBuild, setupFor } from "./map.js";
 
 const dirs: string[] = [];
 
@@ -239,5 +240,47 @@ describe("runMapBuild", () => {
         { substrate },
       ),
     ).rejects.toThrow(/no map for "missing"/);
+  });
+});
+
+describe("setupFor", () => {
+  const reads = (name: string, from: string, to: string, tier: "url" | "ui"): OpProposal =>
+    ({
+      op: {
+        name,
+        effect: "read",
+        from: [from],
+        to: [to],
+        params: { type: "object", properties: {}, additionalProperties: false },
+        impls: [tier === "url" ? { tier, route: "/orgs/:id" } : { tier, steps: [] }],
+      },
+      sample_params: tier === "url" ? [{ id: "2" }] : undefined,
+    }) as unknown as OpProposal;
+
+  const draft = (proposals: OpProposal[]) =>
+    ({
+      states: [
+        { id: "dashboard", url: "/dashboard", marks: [] },
+        { id: "org_detail", url: "/orgs/:id", marks: [] },
+      ],
+      proposals,
+    }) as unknown as Parameters<typeof setupFor>[0];
+
+  it("opens a parameterized start state with the read op that leads there", () => {
+    const open = reads("open_org_detail", "dashboard", "org_detail", "url");
+    const click = reads("op_30_days", "org_detail", "org_detail", "ui");
+
+    expect(setupFor(draft([open, click]), click)).toEqual([
+      { op: "open_org_detail", params: { id: "2" } },
+    ]);
+  });
+
+  it("needs no setup on a static state or without an opener", () => {
+    const open = reads("open_org_detail", "dashboard", "org_detail", "url");
+    const click = reads("op_30_days", "org_detail", "org_detail", "ui");
+    const staticClick = reads("op_export", "dashboard", "dashboard", "ui");
+
+    expect(setupFor(draft([open, staticClick]), staticClick)).toBeUndefined();
+    expect(setupFor(draft([click]), click)).toBeUndefined();
   });
 });

@@ -302,6 +302,7 @@ export async function runMapBuild(
           continue;
         }
 
+        const setup = setupFor(draft, proposal);
         let report: VerifyReport;
         try {
           report = await (deps.verify ?? verifyOp)({
@@ -309,6 +310,7 @@ export async function runMapBuild(
             op,
             paramSets: sets,
             baseUrl,
+            ...(setup !== undefined ? { setup } : {}),
             ...(input.chrome !== undefined ? { executablePath: input.chrome } : {}),
             ...(input.storageState !== undefined ? { storageState: input.storageState } : {}),
             headless: input.headless ?? true,
@@ -439,6 +441,39 @@ function mergeStates(existing: StateDef[], discovered: StateDef[]): StateDef[] {
   }
 
   return merged;
+}
+
+/**
+ * An op that starts on a parameterized state (`/orgs/:id`) cannot fill the
+ * placeholder from its own params, so a fresh verification session would land
+ * on the base URL and fail the precondition. Open the state first with the
+ * read op that leads there, using the params discovery observed for it.
+ */
+export function setupFor(
+  draft: MapDraft,
+  proposal: OpProposal,
+): Array<{ op: string; params: Record<string, unknown> }> | undefined {
+  const op = proposal.op;
+  const state = draft.states.find((candidate) => candidate.id === op.from[0]);
+  const placeholders = Array.from(
+    (state?.url ?? "").matchAll(/:([a-zA-Z0-9_]+)/g),
+    (match) => match[1] ?? "",
+  );
+  if (state === undefined || placeholders.length === 0) return undefined;
+
+  const own = Object.keys((op.params.properties as Record<string, unknown> | undefined) ?? {});
+  if (placeholders.every((name) => own.some((key) => key.endsWith(name)))) return undefined;
+
+  for (const candidate of draft.proposals) {
+    const sample = candidate.sample_params?.[0];
+    if (sample === undefined || candidate.op.name === op.name) continue;
+    if (candidate.op.effect !== "read" || !candidate.op.to.includes(state.id)) continue;
+    if (!candidate.op.impls.some((impl) => impl.tier === "url")) continue;
+    if (!placeholders.every((name) => sample[name] !== undefined)) continue;
+    return [{ op: candidate.op.name, params: sample }];
+  }
+
+  return undefined;
 }
 
 function paramSetsFor(

@@ -42,7 +42,15 @@ export async function runUiOp(input: UiRunInput): Promise<UiRunResult> {
   }
 
   let view = await substrate.view();
-  const initial = recognizeState(map, view.snapshot);
+  let initial = recognizeState(map, view.snapshot);
+
+  // A tier op can start on a page that navigated without settling, or whose
+  // state is still hydrating. The first capture missing the state is not
+  // proof the op cannot run, so let the page go quiet before refusing.
+  if (initial === undefined || !op.from.includes(initial.state.id)) {
+    view = await substrate.settle();
+    initial = recognizeState(map, view.snapshot);
+  }
 
   if (initial === undefined || !op.from.includes(initial.state.id)) {
     return {
@@ -60,7 +68,12 @@ export async function runUiOp(input: UiRunInput): Promise<UiRunResult> {
   for (const [index, step] of impl.steps.entries()) {
     if (step.do === "await_state") {
       view = await substrate.view();
-      const match = recognizeState(map, view.snapshot);
+      let match = recognizeState(map, view.snapshot);
+
+      if (match?.state.id !== step.state) {
+        view = await substrate.settle();
+        match = recognizeState(map, view.snapshot);
+      }
 
       if (match?.state.id !== step.state) {
         return {
@@ -83,7 +96,15 @@ export async function runUiOp(input: UiRunInput): Promise<UiRunResult> {
       };
     }
 
-    const ref = resolveRef(view, step.target);
+    let ref = resolveRef(view, step.target);
+    if (ref === undefined) {
+      // The element may arrive after the last capture, or after quiescence
+      // that precedes a fetch. Settle and look again before declaring the
+      // locator broken.
+      view = await substrate.settle();
+      ref = resolveRef(view, step.target);
+    }
+
     if (ref === undefined) {
       return {
         ok: false,
@@ -120,14 +141,20 @@ export async function runUiOp(input: UiRunInput): Promise<UiRunResult> {
 
   view = await substrate.view();
 
-  for (const check of op.post) {
-    const failure = checkPost(check, map, view);
-    if (failure !== undefined) {
-      return { ok: false, code: "op_broken", message: failure };
-    }
+  let failure = firstPostFailure(op.post, map, view);
+  if (failure !== undefined) {
+    view = await substrate.settle();
+    failure = firstPostFailure(op.post, map, view);
+  }
+  if (failure !== undefined) {
+    return { ok: false, code: "op_broken", message: failure };
   }
 
-  const extracted = extract(impl.extract, view);
+  let extracted = extract(impl.extract, view);
+  if (!extracted.ok) {
+    view = await substrate.settle();
+    extracted = extract(impl.extract, view);
+  }
   if (!extracted.ok) {
     return {
       ok: false,
@@ -155,6 +182,19 @@ export async function runUiOp(input: UiRunInput): Promise<UiRunResult> {
     state: finalState?.state.id ?? "unknown",
     effects,
   };
+}
+
+function firstPostFailure(
+  checks: OpDef["post"],
+  map: SiteMap,
+  view: SubstrateView,
+): string | undefined {
+  for (const check of checks) {
+    const failure = checkPost(check, map, view);
+    if (failure !== undefined) return failure;
+  }
+
+  return undefined;
 }
 
 function resolveRef(view: SubstrateView, locator: Locator): string | undefined {

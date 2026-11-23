@@ -177,6 +177,8 @@ Do not trust `networkidle` alone. Settle when **all** hold, or when the cap fire
 
 Track network via CDP events; track mutations with one injected observer. Cache the tier decision per domain (P1).
 
+Verification and tier executors resolve locators and states only against a settled capture. A `ui` step that misses re-settles and retries before failing, so a client-rendered shell that hydrates after `domcontentloaded` is not mistaken for a broken locator.
+
 ### 5.2 Capture and merge
 
 1. `Accessibility.getFullAXTree` → AX nodes.

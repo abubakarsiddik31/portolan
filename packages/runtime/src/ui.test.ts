@@ -69,7 +69,9 @@ function view(nodes: SemanticNode[]): SubstrateView {
 const BUTTON = view([node({ role: "button", name: "Go" })]);
 const TEXTBOX = view([node({ role: "textbox", name: "Name", backendNodeId: 2 })]);
 
-function fake(options: { result?: ActResult; initial?: SubstrateView } = {}): {
+function fake(
+  options: { result?: ActResult; initial?: SubstrateView; settled?: SubstrateView } = {},
+): {
   substrate: Substrate;
   act: ReturnType<typeof vi.fn>;
 } {
@@ -79,6 +81,10 @@ function fake(options: { result?: ActResult; initial?: SubstrateView } = {}): {
   const substrate = {
     view: async () => current,
     state: () => current,
+    settle: async () => {
+      if (options.settled !== undefined) current = options.settled;
+      return current;
+    },
     act: async (request: unknown) => {
       const result = await act(request);
       if (result.ok) current = options.initial ?? BUTTON;
@@ -109,6 +115,72 @@ describe("runUiOp", () => {
     expect(act).toHaveBeenCalledWith(
       expect.objectContaining({ ref: expect.any(String), do: "click" }),
     );
+  });
+
+  it("settles when the first capture is still the loading shell", async () => {
+    const loading = view([]);
+    const hydrated: SiteMap = {
+      ...MAP,
+      states: [{ id: "home", marks: [{ role: "button", name: "Go" }] }],
+    };
+    const { substrate } = fake({ result: OK_ACT, initial: loading, settled: BUTTON });
+
+    const result = await runUiOp({ map: hydrated, op: op(), params: {}, substrate });
+
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it("settles before reporting a step locator that has not rendered yet", async () => {
+    const loading = view([]);
+    const { substrate } = fake({ result: OK_ACT, initial: loading, settled: BUTTON });
+
+    const result = await runUiOp({
+      map: MAP,
+      op: op({
+        impls: [
+          {
+            tier: "ui",
+            steps: [{ do: "click", target: { role: "button", name: "Go" } }],
+            extract: { kind: "none" },
+          },
+        ],
+      }),
+      params: {},
+      substrate,
+    });
+
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it("settles when an awaited state has not rendered yet", async () => {
+    const empty = view([]);
+    const loaded = view([node({ role: "heading", name: "Done" })]);
+    const map: SiteMap = {
+      ...MAP,
+      states: [
+        { id: "home", marks: [] },
+        { id: "done", marks: [{ role: "heading", name: "Done" }] },
+      ],
+    };
+    const { substrate } = fake({ result: OK_ACT, initial: empty, settled: loaded });
+
+    const result = await runUiOp({
+      map,
+      op: op({
+        to: ["done"],
+        impls: [
+          {
+            tier: "ui",
+            steps: [{ do: "await_state", state: "done" }],
+            extract: { kind: "none" },
+          },
+        ],
+      }),
+      params: {},
+      substrate,
+    });
+
+    expect(result).toMatchObject({ ok: true, state: "done" });
   });
 
   it("refuses an op whose from state does not match", async () => {
@@ -214,6 +286,21 @@ describe("runUiOp", () => {
             extract: { kind: "none" },
           },
         ],
+      }),
+      params: {},
+      substrate,
+    });
+
+    expect(result).toMatchObject({ ok: false, code: "op_broken" });
+  });
+
+  it("fails a postcondition that is still missing after settling", async () => {
+    const { substrate } = fake({ result: OK_ACT });
+
+    const result = await runUiOp({
+      map: MAP,
+      op: op({
+        post: [{ kind: "exists", locator: { role: "button", name: "Missing" } }],
       }),
       params: {},
       substrate,

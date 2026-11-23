@@ -165,6 +165,12 @@ portolan verify --map .portolan/maps/store/v0.json --params store.params.json --
 
 Each operation is reported per tier. A failed verification never publishes.
 
+Verification waits for each page to settle before it reads a state or resolves
+a locator. On a client-rendered app the DOM is still empty at
+`domcontentloaded`; a `ui` step that misses re-settles and retries against a
+fresh capture, so a control that React, Vue, or Svelte renders after the
+initial document is not reported as a broken locator.
+
 ## Compile from traces
 
 Collect fallback traces from real runs, then compile them into a new map

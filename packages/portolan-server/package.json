@@ -1,6 +1,6 @@
 {
   "name": "@abubakarsiddiik/server",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "HTTP and MCP server for Portolan maps.",
   "license": "Apache-2.0",
   "type": "module",

@@ -6,6 +6,7 @@ import type {
   StateDef,
   UiStep,
 } from "@abubakarsiddiik/protocol";
+import { templateName } from "@abubakarsiddiik/protocol";
 import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substrate";
 
 import { slug, uniqueName } from "./draft.js";
@@ -752,16 +753,4 @@ function formLabel(form: SemanticNode): string {
 
 function isDisabled(node: SemanticNode): boolean {
   return node.properties.disabled === true;
-}
-
-/**
- * A control name with data in it, as a template: `Active 1` is `Active {count}`
- * and `Delete a@x.com` is `Delete {email}`. A leading number (`30 days`) is a
- * label and stays, so the date-range pills remain distinct controls.
- */
-export function templateName(name: string): string {
-  return name
-    .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "{email}")
-    .replace(/\((\d+)\)/g, "({count})")
-    .replace(/^(.*\S) \d+$/, "$1 {count}");
 }

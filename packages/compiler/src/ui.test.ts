@@ -99,4 +99,23 @@ describe("liftUi", () => {
 
     expect(liftUi({ segment: segment([withoutLocator]), returns: RETURNS })).toBeUndefined();
   });
+
+  it("matches a name that carries data by pattern, not by the recorded value", () => {
+    const lift = liftUi({
+      segment: segment([
+        act({ index: 0, do: "click", role: "button", name: "Active 1" }),
+        act({ index: 1, do: "click", role: "button", name: "30 days" }),
+      ]),
+      returns: RETURNS,
+    });
+
+    expect(lift?.steps[0]).toEqual({
+      do: "click",
+      target: { role: "button", name_re: "^Active \\d+$", ordinal: 0 },
+    });
+    expect(lift?.steps[1]).toEqual({
+      do: "click",
+      target: { role: "button", name: "30 days", ordinal: 0 },
+    });
+  });
 });

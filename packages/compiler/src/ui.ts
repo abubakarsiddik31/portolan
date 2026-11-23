@@ -1,4 +1,10 @@
-import type { Extractor, Locator, UiStep } from "@abubakarsiddiik/protocol";
+import {
+  type Extractor,
+  type Locator,
+  templateName,
+  templateRegex,
+  type UiStep,
+} from "@abubakarsiddiik/protocol";
 
 import type { ParameterizedSegment } from "./parameterize.js";
 import type { InferredReturns } from "./returns.js";
@@ -27,9 +33,14 @@ export function liftUi(input: {
   for (const action of input.segment.segment.actions) {
     if (action.locator === undefined) continue;
 
+    // A name that carries data (a count, an email) is matched by pattern, so
+    // the op still finds the control when the data changes.
+    const templated = templateName(action.locator.name);
     const target: Locator = {
       role: action.locator.role,
-      name: action.locator.name,
+      ...(templated !== action.locator.name
+        ? { name_re: templateRegex(templated) }
+        : { name: action.locator.name }),
       ordinal: action.locator.ordinal,
     };
 

@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { nameFitsTemplate, templateRegex } from "@abubakarsiddiik/protocol";
 import { type PolicyRule, ruleMatchesLabel, ruleReason } from "@abubakarsiddiik/substrate";
 import type { DomDiscovery } from "./dom.js";
 import { slug } from "./draft.js";
@@ -319,17 +320,6 @@ function groupGlobals(
   return { actions: [...surface.filter((action) => !merged.has(action)), ...actions], superseded };
 }
 
-/** True when a recorded control name fits an observed one, which may be a template. */
-function nameMatches(observed: string, recorded: string): boolean {
-  if (!observed.includes("{")) return observed.toLowerCase() === recorded.toLowerCase();
-
-  const source = observed
-    .replace(/[.*+?^${}()|[\]\\]/g, (char) => (char === "{" || char === "}" ? char : `\\${char}`))
-    .replace(/\{count\}/g, "\\d+")
-    .replace(/\{email\}/g, "\\S+@\\S+\\.\\S+");
-  return new RegExp(`^${source}$`, "i").test(recorded);
-}
-
 function onPage(action: GroupedAction, pages: string[]): boolean {
   return (action.pages ?? [action.page]).some((page) => pages.includes(page));
 }
@@ -352,7 +342,7 @@ function covers(action: GroupedAction, proposal: OpProposal): boolean {
   if (
     trigger !== undefined &&
     trigger.kind === action.kind &&
-    nameMatches(action.name, trigger.name) &&
+    nameFitsTemplate(action.name, trigger.name) &&
     onPage(action, [trigger.page])
   ) {
     return true;
@@ -368,8 +358,10 @@ function covers(action: GroupedAction, proposal: OpProposal): boolean {
       impl.steps.some(
         (step) =>
           step.do === "click" &&
-          nameMatches(action.name, step.target.name ?? "") &&
-          step.target.role === "button",
+          step.target.role === "button" &&
+          (step.target.name_re !== undefined
+            ? step.target.name_re === templateRegex(action.name)
+            : nameFitsTemplate(action.name, step.target.name ?? "")),
       ),
   );
 }

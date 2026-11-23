@@ -363,9 +363,19 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
 
         const positional =
           explicit === "build" || update ? args.positional.slice(1) : args.positional;
-        const url = stringFlag(args, "url");
+        const urls = listFlag(args, "url");
+        const url = urls[0];
         const baseUrl = stringFlag(args, "base-url") ?? config.baseUrl;
         const traces = [...positional, ...listFlag(args, "trace"), ...listFlag(args, "traces")];
+        const routesFrom = stringFlag(args, "routes-from");
+        if (
+          routesFrom !== undefined &&
+          routesFrom !== "react-router" &&
+          routesFrom !== "next" &&
+          routesFrom !== "sveltekit"
+        ) {
+          throw new Error('--routes-from must be "react-router", "next", or "sveltekit"');
+        }
         const tracesDir =
           stringFlag(args, "traces-dir") ??
           process.env.TRACES_DIR ??
@@ -374,6 +384,13 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           site,
           mapsDir,
           ...(url !== undefined ? { url } : {}),
+          ...(urls.length > 1 ? { urls: urls.slice(1) } : {}),
+          ...(stringFlag(args, "routes") !== undefined
+            ? { routesPath: stringFlag(args, "routes") }
+            : {}),
+          ...(routesFrom !== undefined ? { routesFrom } : {}),
+          ...(stringFlag(args, "src") !== undefined ? { src: stringFlag(args, "src") } : {}),
+          explore: booleanFlag(args, "explore"),
           ...(baseUrl !== undefined ? { baseUrl } : {}),
           ...(traces.length > 0 ? { traces } : {}),
           // The configured default only applies to a traces-only build; with
@@ -436,6 +453,13 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           out(
             `egress blocked ${blocked.join(", ")}; allow with: portolan policy allow --site ${site} ${blocked.join(" ")}`,
           );
+        }
+        const unreached = result.discovery?.unreached;
+        if (unreached !== undefined && unreached.length > 0) {
+          out(
+            `${unreached.length} routes not reached: ${unreached.slice(0, 10).join(", ")}${unreached.length > 10 ? ", ..." : ""}`,
+          );
+          out("  add --url entry points, --explore, or --params to reach them");
         }
         const cut = result.discovery?.truncated;
         if (cut !== undefined) {

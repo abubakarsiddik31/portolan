@@ -10,6 +10,7 @@ import { templateName } from "@abubakarsiddiik/protocol";
 import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substrate";
 
 import { slug, uniqueName } from "./draft.js";
+import { routeShape } from "./routes.js";
 import type { DraftTask, OpProposal, SurfaceAction } from "./types.js";
 
 export type DomDiscoverOptions = {
@@ -28,6 +29,14 @@ export type DomDiscoverOptions = {
   follow?: boolean;
   /** Names and link targets already in the map, so an update does not duplicate them. */
   reserved?: { names?: string[]; linkTargets?: string[] };
+  /** Routes the app is known to have, to report the ones the crawl did not reach. */
+  routes?: string[];
+  /**
+   * Click buttons that `safe` accepts to find routes only a button reaches. Each
+   * click is followed by a reload of the page, a button inside a form is never
+   * clicked, and a click that stays on the page is not recorded.
+   */
+  explore?: { safe: (name: string) => boolean; maxClicks?: number };
 };
 
 export type DomDiscovery = {
@@ -42,6 +51,8 @@ export type DomDiscovery = {
   pages: string[];
   /** Set when the crawl stopped at a limit with pages still queued. */
   truncated?: { limit: "max-pages" | "max-ops"; value: number; queued: number };
+  /** Known routes (see `routes`) no visited page matched. */
+  unreached?: string[];
 };
 
 const INPUT_ROLES = new Set([
@@ -105,6 +116,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
   const usedNames = new Set<string>(options.reserved?.names ?? []);
   const linkTargets = new Set<string>(options.reserved?.linkTargets ?? []);
   const follow = options.follow ?? true;
+  let clicked = 0;
   const queue: Array<{ url: string; depth: number }> = [
     { url: start.toString(), depth: 0 },
     ...(options.urls ?? []).map((url) => ({ url: new URL(url).toString(), depth: 0 })),
@@ -274,12 +286,77 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
         ...(isDisabled(node) ? { disabled: true } : {}),
       });
     }
+
+    if (options.explore !== undefined && clicked < (options.explore.maxClicks ?? 40)) {
+      const tried = new Set<string>();
+
+      for (const node of snapshot.nodes) {
+        if (clicked >= (options.explore.maxClicks ?? 40)) break;
+        if (node.role !== "button" || !node.visible || node.name.length === 0) continue;
+        if (insideForms.has(node.nodeId) || isDisabled(node)) continue;
+        if (!options.explore.safe(node.name) || tried.has(node.name)) continue;
+        tried.add(node.name);
+
+        // The document was reloaded after the last click, so find the button again.
+        const live = view.snapshot.nodes.find(
+          (candidate) =>
+            candidate.role === "button" && candidate.visible && candidate.name === node.name,
+        );
+        const ref = live === undefined ? undefined : view.refs.byNode.get(live.nodeId)?.ref;
+        if (ref === undefined) continue;
+
+        clicked += 1;
+        let landed: string | undefined;
+        try {
+          const result = await options.substrate.act({ ref, do: "click" });
+          if (result.ok) landed = result.url;
+        } catch {
+          // A button that cannot be clicked is not a route.
+        }
+
+        if (landed !== undefined) {
+          const target = new URL(landed);
+          if (
+            target.origin === start.origin &&
+            pageKey(landed) !== pageKey(snapshot.url) &&
+            proposals.length < maxOps
+          ) {
+            const to = stateFor(landed, states);
+            const name = uniqueName(`go_${slug(node.name, "page")}`, usedNames);
+            proposals.push({
+              op: buttonNavOp({
+                name,
+                button: node.name,
+                from: from.id,
+                to: to.id,
+                path: target.pathname,
+              }),
+              source: "dom",
+              provenance: `button "${node.name}" on ${current.pathname}`,
+              confidence: "medium",
+              trigger: { kind: "button", name: node.name, page: from.id },
+            });
+            enqueue(landed, next.depth + 1);
+          }
+        }
+
+        // Back to the page, so the next click starts from a known document.
+        try {
+          view = await options.substrate.goto(next.url);
+        } catch {
+          break;
+        }
+      }
+    }
   }
 
   const queued = new Set(
     queue.map((item) => pageKey(item.url)).filter((key) => !seenPages.has(key)),
   ).size;
   const limit = visited.length >= maxPages ? "max-pages" : "max-ops";
+
+  const known = new Set([...states.values()].map((state) => routeShape(state.url ?? "")));
+  const unreached = (options.routes ?? []).filter((route) => !known.has(routeShape(route)));
 
   return {
     origins: [start.origin],
@@ -289,6 +366,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
     surface,
     visited,
     pages: [...pages],
+    ...(unreached.length > 0 ? { unreached } : {}),
     ...(queued > 0 && (visited.length >= maxPages || proposals.length >= maxOps)
       ? { truncated: { limit, value: limit === "max-pages" ? maxPages : maxOps, queued } }
       : {}),
@@ -753,4 +831,37 @@ function formLabel(form: SemanticNode): string {
 
 function isDisabled(node: SemanticNode): boolean {
   return node.properties.disabled === true;
+}
+
+function buttonNavOp(input: {
+  name: string;
+  button: string;
+  from: string;
+  to: string;
+  path: string;
+}): OpDef {
+  const path = input.path
+    .split("/")
+    .map((part) => (isIdLike(part) ? "[^/]+" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+    .join("/");
+
+  return {
+    name: input.name,
+    version: 1,
+    summary: clampSummary(`Click ${input.button}.`),
+    params: { type: "object", properties: {}, required: [], additionalProperties: false },
+    returns: { type: "object" },
+    from: [input.from],
+    to: [input.to],
+    post: [{ kind: "url", pattern: `^${path}$` }],
+    effect: "read",
+    impls: [
+      {
+        tier: "ui",
+        steps: [{ do: "click", target: { role: "button", name: input.button, ordinal: 0 } }],
+        extract: { kind: "none" },
+      },
+    ],
+    status: "degraded",
+  };
 }

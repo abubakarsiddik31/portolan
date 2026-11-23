@@ -844,3 +844,50 @@ describe("postconditions", () => {
     expect(lenient.verified).toEqual(["op_30_days"]);
   });
 });
+
+describe("entry points and routes", () => {
+  it("seeds static routes, and reports a parameterized route nothing reached", async () => {
+    const dir = tempDir();
+    const routesPath = join(dir, "routes.txt");
+    writeFileSync(routesPath, "/cart\n/ghost/:id\n");
+
+    const result = await runMapBuild(
+      {
+        site: "app",
+        mapsDir: join(dir, "maps"),
+        url: "http://app.test/",
+        routesPath,
+        verify: false,
+        verifyWrites: false,
+        publish: false,
+      },
+      { substrate },
+    );
+
+    expect(result.discovery?.visited).toContain("http://app.test/cart");
+    expect(result.discovery?.unreached).toEqual(["/ghost/:id"]);
+  });
+
+  it("mines routes from source", async () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src", "App.tsx"), '<Route path="/cart" element={x} />');
+
+    const result = await runMapBuild(
+      {
+        site: "app",
+        mapsDir: join(dir, "maps"),
+        url: "http://app.test/",
+        routesFrom: "react-router",
+        src: join(dir, "src"),
+        verify: false,
+        verifyWrites: false,
+        publish: false,
+      },
+      { substrate },
+    );
+
+    expect(result.discovery?.unreached).toBeUndefined();
+    expect(result.discovery?.visited).toContain("http://app.test/cart");
+  });
+});

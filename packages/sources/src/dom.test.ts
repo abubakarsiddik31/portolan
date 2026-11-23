@@ -282,3 +282,79 @@ describe("discoverDom layout controls and rows", () => {
     expect(rows[0]?.sample).toBe("Delete a@x.com");
   });
 });
+
+describe("discoverDom entry points, routes and exploration", () => {
+  const shell = (path: string, children: SemanticNode[]): Snapshot =>
+    page(`http://app.test${path}`, [
+      node({
+        nodeId: "root",
+        role: "RootWebArea",
+        name: path,
+        childIds: children.map((child) => child.nodeId),
+      }),
+      ...children,
+    ]);
+
+  it("crawls several entry points in one discovery and reports routes it did not reach", async () => {
+    const visited: string[] = [];
+    const substrate = {
+      goto: async (url: string) => {
+        visited.push(new URL(url).pathname);
+        return { snapshot: shell(new URL(url).pathname, []), refs: undefined };
+      },
+    } as unknown as Substrate;
+
+    const result = await discoverDom({
+      site: "app",
+      url: "http://app.test/admin",
+      urls: ["http://app.test/profile"],
+      substrate,
+      routes: ["/admin", "/profile", "/app/kb/:id/files"],
+    });
+
+    expect(visited).toEqual(["/admin", "/profile"]);
+    expect(result.pages.sort()).toEqual(["admin", "profile"]);
+    expect(result.unreached).toEqual(["/app/kb/:id/files"]);
+  });
+
+  it("clicks a safe button, records the route it reaches, and never a blocked one", async () => {
+    const buttons = [
+      node({ nodeId: "back", role: "button", name: "Back to workspace" }),
+      node({ nodeId: "del", role: "button", name: "Delete everything" }),
+    ];
+    const clicked: string[] = [];
+    let at = "/admin";
+    const refsFor = (nodes: SemanticNode[]) => ({
+      byNode: new Map(nodes.map((n) => [n.nodeId, { ref: `r_${n.nodeId}` }])),
+    });
+    const substrate = {
+      goto: async (url: string) => {
+        at = new URL(url).pathname;
+        const snapshot = shell(at, at === "/admin" ? buttons : []);
+        return { snapshot, refs: refsFor(snapshot.nodes) };
+      },
+      act: async (request: { ref: string }) => {
+        clicked.push(request.ref);
+        at = "/app/kb/9";
+        return { ok: true, url: `http://app.test${at}` };
+      },
+    } as unknown as Substrate;
+
+    const result = await discoverDom({
+      site: "app",
+      url: "http://app.test/admin",
+      substrate,
+      explore: { safe: (name) => !/delete/i.test(name) },
+    });
+
+    expect(clicked).toEqual(["r_back"]);
+    const nav = result.proposals.find((proposal) => proposal.op.name === "go_back_to_workspace");
+    expect(nav?.op).toMatchObject({
+      from: ["admin"],
+      effect: "read",
+      post: [{ kind: "url", pattern: "^/app/kb/[^/]+$" }],
+      impls: [{ tier: "ui", steps: [{ do: "click" }] }],
+    });
+    expect(result.states.map((state) => state.id)).toContain("app_kb");
+  });
+});

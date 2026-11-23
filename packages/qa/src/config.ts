@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+
+import { LEGACY_CONFIG, PORTOLAN_DIR } from "@abubakarsiddiik/protocol";
 
 export type EvidenceMode = "failures" | "all" | "none";
 
@@ -38,17 +40,24 @@ export type QaConfig = {
   chrome?: string;
 };
 
-export const QA_CONFIG_KEY = "qa";
-export const QA_CONFIG_FILE = "portolan.config.json";
+type QaDefaults = Omit<QaConfig, "root">;
 
-export const DEFAULT_QA_CONFIG: Omit<QaConfig, "root"> = {
+export const QA_CONFIG_KEY = "qa";
+
+/** File name inside the Portolan directory. */
+export const QA_CONFIG_FILE = "config.json";
+
+/** Config path relative to the project root. */
+export const QA_CONFIG_PATH = `${PORTOLAN_DIR}/${QA_CONFIG_FILE}`;
+
+/** The pre-`.portolan/` config file, still read with a notice. */
+export const LEGACY_QA_CONFIG_FILE = LEGACY_CONFIG;
+
+const SHARED_QA_DEFAULTS: Omit<
+  QaDefaults,
+  "database" | "cases" | "suites" | "runs" | "fixtures" | "maps"
+> = {
   baseUrl: "http://127.0.0.1:3000",
-  database: ".portolan/qa.db",
-  cases: "qa/cases",
-  suites: "qa/suites",
-  runs: ".portolan/qa/runs",
-  fixtures: "qa/fixtures.json",
-  maps: "maps",
   baseRef: "origin/main",
   repeat: 1,
   verifyRepeat: 3,
@@ -61,26 +70,64 @@ export const DEFAULT_QA_CONFIG: Omit<QaConfig, "root"> = {
   redact: ["password", "token", "secret", "authorization", "cookie"],
 };
 
+/** Defaults for `.portolan/config.json`; paths are relative to the project root. */
+export const DEFAULT_QA_CONFIG: QaDefaults = {
+  ...SHARED_QA_DEFAULTS,
+  database: `${PORTOLAN_DIR}/state/qa.db`,
+  cases: `${PORTOLAN_DIR}/qa/cases`,
+  suites: `${PORTOLAN_DIR}/qa/suites`,
+  runs: `${PORTOLAN_DIR}/state/qa/runs`,
+  fixtures: `${PORTOLAN_DIR}/qa/fixtures.json`,
+  maps: `${PORTOLAN_DIR}/maps`,
+};
+
+/** Defaults for a legacy root `portolan.config.json`. */
+const LEGACY_DEFAULT_QA_CONFIG: QaDefaults = {
+  ...SHARED_QA_DEFAULTS,
+  database: ".portolan/qa.db",
+  cases: "qa/cases",
+  suites: "qa/suites",
+  runs: ".portolan/qa/runs",
+  fixtures: "qa/fixtures.json",
+  maps: "maps",
+};
+
 export type LoadedQaConfig = {
   config: QaConfig;
   /** The config file that was read, when one existed. */
   file?: string;
   /** True when the file existed but had no `qa` block. */
   missingBlock: boolean;
+  /** Set when a legacy root config was used instead of `.portolan/config.json`. */
+  legacy?: {
+    file: string;
+    replacement: string;
+  };
+};
+
+export type LoadQaConfigOptions = {
+  /** Receives the one-line legacy notice; pass `false` to stay silent. */
+  warn?: ((line: string) => void) | false;
 };
 
 /**
- * Read the `qa` block from `portolan.config.json`, merged over the defaults.
+ * Read the `qa` block from `.portolan/config.json`, merged over the defaults.
  *
- * The QA tool uses one config file with the rest of Portolan instead of a
- * second file. A missing file is the defaults; a malformed file throws with
- * its path. `QA_BASE_URL` and `QA_DATABASE` override the file, which lets a
- * harness point at a preview deployment without editing anything.
+ * `.portolan/config.json` is tried first; a legacy root `portolan.config.json`
+ * still loads with a one-line notice. `--config`, `QA_CONFIG`, and
+ * `PORTOLAN_CONFIG` keep precedence. A missing file is the defaults; a
+ * malformed file throws with its path.
  */
-export function loadQaConfig(path?: string, env: NodeJS.ProcessEnv = process.env): LoadedQaConfig {
-  const file = path ?? env.QA_CONFIG ?? env.PORTOLAN_CONFIG ?? QA_CONFIG_FILE;
+export function loadQaConfig(
+  path?: string,
+  env: NodeJS.ProcessEnv = process.env,
+  options: LoadQaConfigOptions = {},
+): LoadedQaConfig {
+  const located = locateConfig(path, env);
+  const file = located.file;
   const exists = existsSync(file);
-  const root = exists ? dirname(resolve(file)) : process.cwd();
+  const root = projectRoot(file);
+  const defaults = located.legacy ? LEGACY_DEFAULT_QA_CONFIG : DEFAULT_QA_CONFIG;
 
   let raw: Record<string, unknown> = {};
   let missingBlock = true;
@@ -107,11 +154,54 @@ export function loadQaConfig(path?: string, env: NodeJS.ProcessEnv = process.env
     }
   }
 
+  if (located.legacy && exists && options.warn !== false) {
+    const warn = options.warn ?? ((line: string) => process.stderr.write(`${line}\n`));
+    warn(legacyNotice(file, root));
+  }
+
   return {
-    config: mergeQaConfig(root, raw, file, env),
+    config: mergeQaConfig(root, raw, file, env, defaults),
     ...(exists ? { file } : {}),
     missingBlock,
+    ...(located.legacy && exists
+      ? { legacy: { file, replacement: join(root, PORTOLAN_DIR, QA_CONFIG_FILE) } }
+      : {}),
   };
+}
+
+function locateConfig(
+  path: string | undefined,
+  env: NodeJS.ProcessEnv,
+): { file: string; legacy: boolean } {
+  const explicit = path ?? env.QA_CONFIG ?? env.PORTOLAN_CONFIG;
+  if (explicit !== undefined && explicit.length > 0) return classify(explicit);
+
+  const current = join(process.cwd(), PORTOLAN_DIR, QA_CONFIG_FILE);
+  if (existsSync(current)) return { file: current, legacy: false };
+
+  const legacy = join(process.cwd(), LEGACY_QA_CONFIG_FILE);
+  if (existsSync(legacy)) return { file: legacy, legacy: true };
+
+  return { file: current, legacy: false };
+}
+
+function classify(file: string): { file: string; legacy: boolean } {
+  return { file, legacy: basename(resolve(file)) === LEGACY_QA_CONFIG_FILE };
+}
+
+/**
+ * The project root for a config file.
+ *
+ * `.portolan/config.json` lives one level below the project; a legacy root
+ * config, or an explicit path elsewhere, lives in the project directory itself.
+ */
+export function projectRoot(file: string): string {
+  const dir = dirname(resolve(file));
+  return basename(dir) === PORTOLAN_DIR ? dirname(dir) : dir;
+}
+
+function legacyNotice(file: string, root: string): string {
+  return `warning: ${file} is deprecated; move it to ${join(root, PORTOLAN_DIR, QA_CONFIG_FILE)} (run portolan migrate)`;
 }
 
 export function mergeQaConfig(
@@ -119,16 +209,17 @@ export function mergeQaConfig(
   raw: Record<string, unknown>,
   source = "qa config",
   env: NodeJS.ProcessEnv = process.env,
+  defaults: QaDefaults = DEFAULT_QA_CONFIG,
 ): QaConfig {
   const result: QaConfig = {
-    ...DEFAULT_QA_CONFIG,
+    ...defaults,
     root,
-    database: absolute(root, DEFAULT_QA_CONFIG.database),
-    cases: absolute(root, DEFAULT_QA_CONFIG.cases),
-    suites: absolute(root, DEFAULT_QA_CONFIG.suites),
-    runs: absolute(root, DEFAULT_QA_CONFIG.runs),
-    fixtures: absolute(root, DEFAULT_QA_CONFIG.fixtures),
-    maps: absolute(root, DEFAULT_QA_CONFIG.maps),
+    database: absolute(root, defaults.database),
+    cases: absolute(root, defaults.cases),
+    suites: absolute(root, defaults.suites),
+    runs: absolute(root, defaults.runs),
+    fixtures: absolute(root, defaults.fixtures),
+    maps: absolute(root, defaults.maps),
   };
 
   for (const key of [

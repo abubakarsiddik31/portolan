@@ -97,9 +97,9 @@ doctor --json` from a directory with no `node_modules`.
 ```bash
 docker build -t portolan .
 docker run --rm -p 4200:4200 \
-  -v "$PWD/portolan.config.json:/data/portolan.config.json:ro" \
-  -v "$PWD/maps:/data/maps:ro" \
-  -v "$PWD/policies:/data/policies:ro" \
+  -v "$PWD/.portolan/config.json:/data/.portolan/config.json:ro" \
+  -v "$PWD/.portolan/maps:/data/.portolan/maps:ro" \
+  -v "$PWD/.portolan/policies:/data/.portolan/policies:ro" \
   -v portolan-data:/data \
   -e PORTOLAN_AUTH_TOKEN=change-me \
   portolan

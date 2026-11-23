@@ -272,3 +272,16 @@ describe("QaService.repair", () => {
     service.close();
   });
 });
+
+describe("QaService.select", () => {
+  it("explains that a suite needs its own file and offers --tag", () => {
+    const service = makeService(() => new FakeApp("Login"));
+
+    expect(() => service.select({ suite: "permissions" })).toThrow(
+      /\.portolan\/qa\/suites\/permissions\.json/,
+    );
+    expect(() => service.select({ suite: "permissions" })).toThrow(/--tag permissions/);
+
+    service.close();
+  });
+});

@@ -1,3 +1,4 @@
+import { PORTOLAN_DIR } from "@abubakarsiddiik/protocol";
 import { reapOrphans } from "@abubakarsiddiik/substrate";
 
 import { assertBindAllowed } from "./host.js";
@@ -7,7 +8,7 @@ import { createServer } from "./server.js";
 import { SessionStore } from "./store.js";
 
 const port = Number(process.env.PORT ?? 4200);
-const store = new SessionStore(process.env.DATABASE_PATH ?? "portolan.db");
+const store = new SessionStore(process.env.DATABASE_PATH ?? `${PORTOLAN_DIR}/state/portolan.db`);
 
 // A stable id lets a restarted process kill browsers left by a hard-killed
 // predecessor. Without one, recovery still closes session rows, but the old

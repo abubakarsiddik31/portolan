@@ -50,9 +50,21 @@ export async function evaluateCheck(input: {
 
   if ("absent" in check) {
     const nodes = matchingNodes(view.snapshot.nodes, check.absent);
-    return nodes.length === 0
-      ? { ok: true }
-      : { ok: false, message: "expected a locator to be absent", actual: check.absent };
+    if (nodes.length === 0) return { ok: true };
+
+    const node = nodes[0];
+    const ref = node === undefined ? undefined : view.refs.byNode.get(node.nodeId)?.ref;
+
+    return {
+      ok: false,
+      message: `expected locator to be absent, but it resolved${ref === undefined ? "" : ` as ${ref}`}`,
+      expected: { absent: check.absent },
+      actual: {
+        resolved: check.absent,
+        ...(ref !== undefined ? { ref } : {}),
+        ...(node !== undefined ? { role: node.role, name: node.name } : {}),
+      },
+    };
   }
 
   if ("value" in check) {

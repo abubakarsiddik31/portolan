@@ -6,10 +6,10 @@ skill tells an agent when and how to call them.
 ## Export
 
 ```bash
-portolan export-skills --map maps/store/v1.json --out skills
+portolan export-skills --map .portolan/maps/store/v1.json
 ```
 
-The output is `skills/portolan-store/`:
+The output is `.portolan/skills/portolan-store/`:
 
 ```
 portolan-store/
@@ -31,7 +31,7 @@ ops.
 Pass traces to mine them:
 
 ```bash
-portolan export-skills --map maps/store/v1.json --trace run-1.json --trace run-2.json
+portolan export-skills --map .portolan/maps/store/v1.json --trace run-1.json --trace run-2.json
 ```
 
 ## Validation
@@ -60,7 +60,7 @@ not break execution; it can only mislead.
 
 ## The map-building skill
 
-`skills/portolan-map/SKILL.md` is the authoring counterpart to a site skill. It
+`.portolan/skills/portolan-map/SKILL.md` is the authoring counterpart to a site skill. It
 teaches a coding agent to inventory capabilities from the codebase and the live
 app, work `capabilities.json` until no entry is `missing` or `stale`, and gate
 publication with `--require-complete`. Site skills (`portolan-<site>`) teach an

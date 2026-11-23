@@ -6,6 +6,7 @@ export * from "./map/schema.js";
 export * from "./map/types.js";
 export * from "./map/validate.js";
 export * from "./meter.js";
+export * from "./paths.js";
 export * from "./session.js";
 
 export const PROTOCOL_NAME = "portolan" as const;

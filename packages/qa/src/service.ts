@@ -623,7 +623,12 @@ export class QaService {
 
   private suite(name: string): QaSuite {
     const suite = loadSuites(this.config.suites).find((item) => item.spec.name === name);
-    if (suite === undefined) throw new QaError("not_found", `no suite "${name}"`);
+    if (suite === undefined) {
+      throw new QaError(
+        "not_found",
+        `no suite "${name}": a suite is its own file at ${join(this.config.suites, `${name}.json`)}; use --tag ${name} to select cases by tag instead`,
+      );
+    }
     return suite.spec;
   }
 

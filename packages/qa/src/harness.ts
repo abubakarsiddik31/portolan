@@ -1,7 +1,14 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
-import { DEFAULT_QA_CONFIG, QA_CONFIG_FILE, QA_CONFIG_KEY } from "./config.js";
+import { PORTOLAN_DIR } from "@abubakarsiddiik/protocol";
+
+import {
+  DEFAULT_QA_CONFIG,
+  LEGACY_QA_CONFIG_FILE,
+  QA_CONFIG_KEY,
+  QA_CONFIG_PATH,
+} from "./config.js";
 
 export type HarnessName =
   | "claude"
@@ -12,39 +19,69 @@ export type HarnessName =
   | "vscode"
   | "unknown";
 
+export type QaMcpCommand = {
+  command: string;
+  args: string[];
+};
+
 export type QaInitOptions = {
-  root: string;
+  /** Project root. Defaults to the working directory. */
+  root?: string;
   baseUrl?: string;
   force?: boolean;
+  /** Write or merge `.mcp.json` instead of only printing the snippet. */
+  mcp?: boolean;
+  /** How a harness should spawn the QA server. Defaults to the npx fallback. */
+  mcpCommand?: QaMcpCommand;
 };
 
 export type QaInitResult = {
+  /** The project root. */
   root: string;
+  /** The `.portolan/` directory that was initialized. */
+  dir: string;
   files: string[];
   skipped: string[];
   harnesses: HarnessName[];
   mcpSnippet: string;
+  /** Path of the root `.mcp.json` the snippet belongs in. */
+  mcpPath: string;
+  mcpWritten: boolean;
 };
 
-const MCP_SNIPPET = `${JSON.stringify(
-  {
-    mcpServers: {
-      "portolan-qa": {
-        command: "npx",
-        args: ["-y", "-p", "@abubakarsiddiik/qa", "portolan-qa"],
-      },
-    },
-  },
-  null,
-  2,
-)}\n`;
+/** The CLI is installed, so reuse it instead of fetching on every spawn. */
+export const QA_MCP_CLI: QaMcpCommand = { command: "portolan", args: ["qa", "mcp"] };
+
+/** Used only when the `portolan` CLI is not available. */
+export const QA_MCP_NPX: QaMcpCommand = {
+  command: "npx",
+  args: ["-y", "-p", "@abubakarsiddiik/qa", "portolan-qa"],
+};
+
+type QaMcpServerEntry = {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+};
+
+type QaMcpEntry = {
+  mcpServers: Record<string, QaMcpServerEntry>;
+};
+
+/** Backward-compatible npx snippet for the current working directory. */
+export const MCP_SNIPPET = `${JSON.stringify(mcpEntry(QA_MCP_NPX, process.cwd()), null, 2)}\n`;
 
 /**
- * Wire QA into a coding harness: config, dirs, skill, ignore rules, and the
- * MCP entry. It never overwrites a file without `force`.
+ * Wire QA into a coding harness: config, dirs, skill, and the MCP snippet.
+ *
+ * Everything committed lives under `.portolan/`; only `state/` is ignored, via
+ * a nested `.portolan/.gitignore`. The root `.mcp.json` stays untouched unless
+ * `mcp` is set, because Claude Code only reads project servers from the root.
+ * It never overwrites a file without `force`.
  */
-export function qaInit(options: QaInitOptions): QaInitResult {
-  const root = options.root;
+export function qaInit(options: QaInitOptions = {}): QaInitResult {
+  const root = resolve(options.root ?? process.cwd());
+  const portolanDir = join(root, PORTOLAN_DIR);
   const force = options.force ?? false;
   const files: string[] = [];
   const skipped: string[] = [];
@@ -59,8 +96,9 @@ export function qaInit(options: QaInitOptions): QaInitResult {
     files.push(path);
   };
 
-  const configPath = join(root, QA_CONFIG_FILE);
-  const config = readConfig(configPath);
+  const configPath = join(root, QA_CONFIG_PATH);
+  const configExists = existsSync(configPath);
+  const config = readConfig(configExists ? configPath : join(root, LEGACY_QA_CONFIG_FILE));
   const existingQa =
     config[QA_CONFIG_KEY] !== null &&
     typeof config[QA_CONFIG_KEY] === "object" &&
@@ -68,36 +106,54 @@ export function qaInit(options: QaInitOptions): QaInitResult {
       ? (config[QA_CONFIG_KEY] as Record<string, unknown>)
       : {};
 
-  config[QA_CONFIG_KEY] = {
-    ...existingQa,
-    baseUrl:
-      options.baseUrl ??
-      (typeof existingQa.baseUrl === "string" ? existingQa.baseUrl : DEFAULT_QA_CONFIG.baseUrl),
-  };
+  const configuredBaseUrl = typeof existingQa.baseUrl === "string" ? existingQa.baseUrl : undefined;
+  const baseUrl =
+    force && options.baseUrl !== undefined
+      ? options.baseUrl
+      : (configuredBaseUrl ?? options.baseUrl ?? DEFAULT_QA_CONFIG.baseUrl);
 
-  write(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  config[QA_CONFIG_KEY] = { ...existingQa, baseUrl };
+
+  const configBody = `${JSON.stringify(config, null, 2)}\n`;
+  const currentConfig = configExists ? readFileSync(configPath, "utf8") : undefined;
+  if (currentConfig === configBody && !force) {
+    skipped.push(configPath);
+  } else {
+    mkdirSync(join(configPath, ".."), { recursive: true });
+    writeFileSync(configPath, configBody, "utf8");
+    files.push(configPath);
+  }
 
   mkdirSync(join(root, DEFAULT_QA_CONFIG.cases), { recursive: true });
   mkdirSync(join(root, DEFAULT_QA_CONFIG.suites), { recursive: true });
 
-  const skillPath = join(root, "skills", "portolan-qa", "SKILL.md");
+  writeIgnore(join(portolanDir, ".gitignore"), files);
+
+  const skillPath = join(root, PORTOLAN_DIR, "skills", "portolan-qa", "SKILL.md");
   write(skillPath, QA_SKILL);
 
   const harnesses = detectHarnesses(root);
 
-  if (harnesses.includes("claude")) {
-    write(join(root, ".mcp.json"), MCP_SNIPPET);
+  const mcpPath = join(root, ".mcp.json");
+  const command = options.mcpCommand ?? QA_MCP_NPX;
+  const mcpSnippet = `${JSON.stringify(mcpEntry(command, root), null, 2)}\n`;
+  let mcpWritten = false;
+
+  if (options.mcp === true) {
+    writeMcp(mcpPath, command, root, files);
+    mcpWritten = true;
   }
 
-  const ignorePath = join(root, ".gitignore");
-  const ignore = existsSync(ignorePath) ? readFileSync(ignorePath, "utf8") : "";
-  if (!ignore.split("\n").some((line) => line.trim() === ".portolan/")) {
-    if (ignore.length > 0 && !ignore.endsWith("\n")) appendFileSync(ignorePath, "\n", "utf8");
-    appendFileSync(ignorePath, ".portolan/\n", "utf8");
-    files.push(ignorePath);
-  }
-
-  return { root, files, skipped, harnesses, mcpSnippet: MCP_SNIPPET };
+  return {
+    root,
+    dir: portolanDir,
+    files,
+    skipped,
+    harnesses,
+    mcpSnippet,
+    mcpPath,
+    mcpWritten,
+  };
 }
 
 export function detectHarnesses(root: string): HarnessName[] {
@@ -112,6 +168,74 @@ export function detectHarnesses(root: string): HarnessName[] {
   if (has(".vscode")) found.push("vscode");
 
   return found.length === 0 ? ["unknown"] : found;
+}
+
+function writeIgnore(path: string, files: string[]): void {
+  const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
+  if (existing.split("\n").some((line) => line.trim() === "state/")) return;
+
+  const body = `${existing}${existing.length > 0 && !existing.endsWith("\n") ? "\n" : ""}state/\n`;
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, body, "utf8");
+  files.push(path);
+}
+
+function writeMcp(path: string, command: QaMcpCommand, root: string, files: string[]): void {
+  const entry = mcpEntry(command, root);
+  const next = existsSync(path) ? mergeMcp(path, entry) : entry;
+
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  files.push(path);
+}
+
+function mergeMcp(path: string, entry: QaMcpEntry): QaMcpEntry {
+  const raw = readFileSync(path, "utf8");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`${path} is not valid JSON: ${(error as Error).message}`);
+  }
+
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${path} must contain a JSON object`);
+  }
+
+  const current = parsed as Record<string, unknown>;
+  const servers =
+    current.mcpServers !== null &&
+    typeof current.mcpServers === "object" &&
+    !Array.isArray(current.mcpServers)
+      ? (current.mcpServers as Record<string, unknown>)
+      : {};
+
+  return {
+    ...current,
+    mcpServers: {
+      ...servers,
+      "portolan-qa": entry.mcpServers["portolan-qa"] as QaMcpServerEntry,
+    },
+  } as QaMcpEntry;
+}
+
+export function mcpEntry(command: QaMcpCommand, root: string): QaMcpEntry {
+  return {
+    mcpServers: {
+      "portolan-qa": {
+        command: command.command,
+        args: command.args,
+        env: {
+          MAPS_DIR: join(root, PORTOLAN_DIR, "maps"),
+          DATABASE_PATH: join(root, PORTOLAN_DIR, "state", "portolan.db"),
+          TRACES_DIR: join(root, PORTOLAN_DIR, "state", "traces"),
+          PORTOLAN_STORAGE_STATE: join(root, PORTOLAN_DIR, "state", "auth.json"),
+          QA_CONFIG: join(root, QA_CONFIG_PATH),
+        },
+      },
+    },
+  };
 }
 
 function readConfig(path: string): Record<string, unknown> {
@@ -138,9 +262,9 @@ description: Generate, run, and repair end-to-end tests against the local app wi
 
 # Portolan QA
 
-The app under test is local. Cases are JSON files under \`qa/cases/\`. Runs and
-evidence live under \`.portolan/\`. You are the test author; the runner replays
-what you write.
+The app under test is local. Cases are JSON files under
+\`.portolan/qa/cases/\`. Runs and evidence live under \`.portolan/state/\`. You
+are the test author; the runner replays what you write.
 
 ## The loop
 
@@ -169,7 +293,7 @@ what you write.
 ## Authoring
 
 - Write one case per file with \`qa_case_write\`. The id must match the path:
-  \`auth/login\` lives in \`qa/cases/auth/login.json\`.
+  \`auth/login\` lives in \`.portolan/qa/cases/auth/login.json\`.
 - Or hand \`qa_generate\` a step list (\`from_spec\`) or a recorded trace file
   (\`from_trace\`); it fills id, suite, routes, and fixtures and writes a
   draft. Secret-looking fill values become \`\${env.QA_*}\` references — set
@@ -188,8 +312,6 @@ what you write.
 - Never mark a case verified by editing its JSON. Use \`qa_verify\`.
 - Never run unverified cases in CI without \`allow_unverified\`.
 - Never retry a write whose result is \`unknown_outcome\`.
-- Keep evidence out of git; \`.portolan/\` is ignored.
+- Keep evidence out of git; \`.portolan/state/\` is ignored.
 - If the diff selects nothing, say so and ask whether to run a suite.
 `;
-
-export { MCP_SNIPPET };

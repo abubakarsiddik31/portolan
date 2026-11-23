@@ -12,8 +12,9 @@ function tempRoot(): string {
 
 function configRoot(baseUrl = "http://app"): string {
   const root = tempRoot();
+  mkdirSync(join(root, ".portolan"), { recursive: true });
   writeFileSync(
-    join(root, "portolan.config.json"),
+    join(root, ".portolan", "config.json"),
     JSON.stringify({ qa: { baseUrl, database: ":memory:" } }),
     "utf8",
   );
@@ -42,7 +43,7 @@ describe("runQa generate", () => {
         join(root, "spec.json"),
         "--json",
         "--config",
-        join(root, "portolan.config.json"),
+        join(root, ".portolan", "config.json"),
       ],
       { out },
     );
@@ -50,7 +51,7 @@ describe("runQa generate", () => {
     expect(code).toBe(0);
     const report = JSON.parse(lines.join("\n")) as { case_id: string; path: string };
     expect(report.case_id).toBe("login-flow");
-    expect(existsSync(join(root, "qa", "cases", "login-flow.json"))).toBe(true);
+    expect(existsSync(join(root, ".portolan", "qa", "cases", "login-flow.json"))).toBe(true);
   });
 
   it("writes a draft case from a trace file", async () => {
@@ -76,7 +77,7 @@ describe("runQa generate", () => {
         join(root, "trace.json"),
         "--json",
         "--config",
-        join(root, "portolan.config.json"),
+        join(root, ".portolan", "config.json"),
       ],
       { out },
     );
@@ -89,7 +90,7 @@ describe("runQa generate", () => {
   it("refuses to generate without a source", async () => {
     const root = configRoot();
     const errors: string[] = [];
-    const code = await runQa(["generate", "--config", join(root, "portolan.config.json")], {
+    const code = await runQa(["generate", "--config", join(root, ".portolan", "config.json")], {
       err: (line) => void errors.push(line),
       out: () => {},
     });
@@ -108,7 +109,7 @@ describe("runQa generate", () => {
         "--map",
         "nope",
         "--config",
-        join(root, "portolan.config.json"),
+        join(root, ".portolan", "config.json"),
       ],
       { err: (line) => void errors.push(line), out: () => {} },
     );
@@ -121,7 +122,7 @@ describe("runQa repair", () => {
   it("refuses to repair without a case id", async () => {
     const root = configRoot();
     const errors: string[] = [];
-    const code = await runQa(["repair", "--config", join(root, "portolan.config.json")], {
+    const code = await runQa(["repair", "--config", join(root, ".portolan", "config.json")], {
       err: (line) => void errors.push(line),
       out: () => {},
     });
@@ -131,9 +132,9 @@ describe("runQa repair", () => {
 
   it("reports a case with no failed runs without editing it", async () => {
     const root = configRoot();
-    mkdirSync(join(root, "qa", "cases", "auth"), { recursive: true });
+    mkdirSync(join(root, ".portolan", "qa", "cases", "auth"), { recursive: true });
     writeFileSync(
-      join(root, "qa", "cases", "auth", "login.json"),
+      join(root, ".portolan", "qa", "cases", "auth", "login.json"),
       JSON.stringify({
         schema: 1,
         id: "auth/login",
@@ -148,7 +149,7 @@ describe("runQa repair", () => {
 
     const { lines, out } = capture();
     const code = await runQa(
-      ["repair", "auth/login", "--json", "--config", join(root, "portolan.config.json")],
+      ["repair", "auth/login", "--json", "--config", join(root, ".portolan", "config.json")],
       {
         out,
       },
@@ -158,5 +159,68 @@ describe("runQa repair", () => {
     const report = JSON.parse(lines.join("\n")) as { repaired: boolean; reason: string };
     expect(report.repaired).toBe(false);
     expect(report.reason).toContain("no failed run recorded");
+  });
+});
+
+describe("runQa config discovery", () => {
+  it("prints a deprecation notice for a legacy root config", async () => {
+    const root = tempRoot();
+    writeFileSync(
+      join(root, "portolan.config.json"),
+      JSON.stringify({ qa: { baseUrl: "http://app", database: ":memory:" } }),
+      "utf8",
+    );
+
+    const errors: string[] = [];
+    const { out } = capture();
+    await runQa(["list", "--config", join(root, "portolan.config.json")], {
+      out,
+      err: (line) => void errors.push(line),
+    });
+
+    expect(errors.join("\n")).toContain("deprecated");
+    expect(errors.join("\n")).toContain(".portolan/config.json");
+  });
+});
+
+describe("runQa doctor", () => {
+  it("shows auto-detect and a clean integrity check as info", async () => {
+    const root = tempRoot();
+    mkdirSync(join(root, ".portolan", "qa", "cases"), { recursive: true });
+    writeFileSync(
+      join(root, ".portolan", "config.json"),
+      JSON.stringify({ qa: { baseUrl: "http://app", database: ":memory:" } }),
+      "utf8",
+    );
+
+    const { lines, out } = capture();
+    const code = await runQa(["doctor", "--config", join(root, ".portolan", "config.json")], {
+      out,
+    });
+    const text = lines.join("\n");
+
+    expect(code).toBe(0);
+    expect(text).toContain("info browser");
+    expect(text).toContain("info integrity");
+  });
+
+  it("warns with a fix when the cases directory is missing", async () => {
+    const root = tempRoot();
+    mkdirSync(join(root, ".portolan"), { recursive: true });
+    writeFileSync(
+      join(root, ".portolan", "config.json"),
+      JSON.stringify({ qa: { baseUrl: "http://app", database: ":memory:" } }),
+      "utf8",
+    );
+
+    const { lines, out } = capture();
+    const code = await runQa(["doctor", "--config", join(root, ".portolan", "config.json")], {
+      out,
+    });
+    const text = lines.join("\n");
+
+    expect(code).toBe(3);
+    expect(text).toContain("WARN cases");
+    expect(text).toContain("→ run portolan qa init");
   });
 });

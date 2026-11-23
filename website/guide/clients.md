@@ -21,7 +21,7 @@ can spawn it directly. It reads:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MAPS_DIR` | `maps` | Directory of `maps/<site>/v<n>.json`. |
+| `MAPS_DIR` | `.portolan/maps` | Directory of `maps/<site>/v<n>.json`. |
 | `DATABASE_PATH` | `portolan.db` | Session and audit database. |
 | `TRACES_DIR` | `traces` | Recorded fallback and explore traces (JSONL + HAR). |
 | `PORTOLAN_STORAGE_STATE` | unset | Playwright storage state for pages behind auth. |
@@ -51,9 +51,9 @@ Or write `~/.claude.json`:
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       }
     }
   }
@@ -72,9 +72,9 @@ macOS, or `~/.config/Claude/claude_desktop_config.json` on Linux:
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       }
     }
   }
@@ -91,7 +91,7 @@ Add to `~/.codex/config.toml`:
 [mcp_servers.portolan]
 command = "portolan"
 args = ["mcp"]
-env = { MAPS_DIR = "/absolute/path/to/maps", DATABASE_PATH = "/absolute/path/to/portolan.db", TRACES_DIR = "/absolute/path/to/traces" }
+env = { MAPS_DIR = "/absolute/path/to/project/.portolan/maps", DATABASE_PATH = "/absolute/path/to/project/.portolan/state/portolan.db", TRACES_DIR = "/absolute/path/to/project/.portolan/state/traces" }
 ```
 
 ## Cursor
@@ -105,9 +105,9 @@ Edit `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       }
     }
   }
@@ -125,9 +125,9 @@ Edit `~/.gemini/settings.json`:
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       },
       "timeout": 30000
     }
@@ -148,9 +148,9 @@ VS Code uses `servers` and a `type`, not `mcpServers`. Add
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       }
     }
   }

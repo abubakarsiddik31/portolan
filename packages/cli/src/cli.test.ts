@@ -1,9 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { CompiledCandidate, PublishResult, VerifyReport } from "@abubakarsiddiik/compiler";
 import type { SiteMap } from "@abubakarsiddiik/protocol";
+import { QaStore, readCaseFile } from "@abubakarsiddiik/qa";
 import type { StdioServerHandle } from "@abubakarsiddiik/server";
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,6 +15,7 @@ import { runBench } from "./commands/bench.js";
 import { runCompile } from "./commands/compile.js";
 import { runExportSkills } from "./commands/export-skills.js";
 import { runInit } from "./commands/init.js";
+import { runMigrate } from "./commands/migrate.js";
 import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
 import { DEFAULT_CONFIG, loadConfig } from "./config.js";
@@ -118,7 +120,7 @@ describe("config", () => {
     const path = join(dir, "portolan.config.json");
     writeFileSync(path, JSON.stringify({ site: "store", port: 5000 }));
 
-    expect(loadConfig(path)).toMatchObject({ site: "store", port: 5000, maps: "maps" });
+    expect(loadConfig(path)).toMatchObject({ site: "store", port: 5000, maps: join(dir, "maps") });
   });
 
   it("rejects an invalid type", () => {
@@ -135,16 +137,19 @@ describe("init", () => {
     const dir = tempDir();
     const result = runInit({ dir, site: "store" });
 
-    expect(result.files).toHaveLength(4);
-    expect(existsSync(join(dir, "portolan.config.json"))).toBe(true);
-    expect(existsSync(join(dir, "policies", "store.json"))).toBe(true);
-    expect(existsSync(join(dir, "maps", "store"))).toBe(true);
-    expect(existsSync(join(dir, "skills", "portolan-map", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(dir, "skills", "portolan", "SKILL.md"))).toBe(true);
-    expect(readFileSync(join(dir, "skills", "portolan-map", "SKILL.md"), "utf8")).toContain(
+    const portolan = join(dir, ".portolan");
+
+    expect(result.files).toHaveLength(5);
+    expect(existsSync(join(portolan, "config.json"))).toBe(true);
+    expect(existsSync(join(portolan, "policies", "store.json"))).toBe(true);
+    expect(existsSync(join(portolan, "maps", "store"))).toBe(true);
+    expect(existsSync(join(portolan, "skills", "portolan-map", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(portolan, "skills", "portolan", "SKILL.md"))).toBe(true);
+    expect(readFileSync(join(portolan, "skills", "portolan-map", "SKILL.md"), "utf8")).toContain(
       "--require-complete",
     );
-    expect(JSON.parse(readFileSync(join(dir, "policies", "store.json"), "utf8"))).toEqual({
+    expect(readFileSync(join(portolan, ".gitignore"), "utf8")).toBe("state/\n");
+    expect(JSON.parse(readFileSync(join(portolan, "policies", "store.json"), "utf8"))).toEqual({
       site: "store",
       allow: [],
     });
@@ -156,7 +161,171 @@ describe("init", () => {
     const second = runInit({ dir, site: "store" });
 
     expect(second.files).toHaveLength(0);
-    expect(second.skipped).toHaveLength(4);
+    expect(second.skipped).toHaveLength(5);
+  });
+
+  it("merges map settings into a config that already has a qa block", () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, ".portolan"), { recursive: true });
+    writeFileSync(
+      join(dir, ".portolan", "config.json"),
+      JSON.stringify({ qa: { baseUrl: "http://app", database: ":memory:" } }),
+    );
+
+    runInit({ dir, site: "store" });
+
+    const config = JSON.parse(
+      readFileSync(join(dir, ".portolan", "config.json"), "utf8"),
+    ) as Record<string, unknown> & { qa: { baseUrl: string } };
+    expect(config.site).toBe("store");
+    expect(config.maps).toBe(".portolan/maps");
+    expect(config.qa.baseUrl).toBe("http://app");
+  });
+
+  it("adopts a legacy root config instead of dropping its settings", () => {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, "portolan.config.json"),
+      JSON.stringify({ site: "legacy", port: 5000, qa: { baseUrl: "http://legacy" } }),
+    );
+
+    runInit({ dir });
+
+    const config = JSON.parse(readFileSync(join(dir, ".portolan", "config.json"), "utf8")) as {
+      site: string;
+      port: number;
+      qa: { baseUrl: string };
+    };
+    expect(config.site).toBe("legacy");
+    expect(config.port).toBe(5000);
+    expect(config.qa.baseUrl).toBe("http://legacy");
+  });
+
+  it("appends state/ to an existing .portolan/.gitignore", () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, ".portolan"), { recursive: true });
+    writeFileSync(join(dir, ".portolan", ".gitignore"), "node_modules\n");
+
+    runInit({ dir });
+
+    expect(readFileSync(join(dir, ".portolan", ".gitignore"), "utf8")).toBe(
+      "node_modules\nstate/\n",
+    );
+  });
+});
+
+describe("migrate", () => {
+  it("moves a legacy root layout into .portolan and rewrites the config", async () => {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, "portolan.config.json"),
+      JSON.stringify({
+        maps: "maps",
+        policies: "policies",
+        database: "portolan.db",
+        qa: { database: ".portolan/qa.db", cases: "qa/cases", runs: ".portolan/qa/runs" },
+      }),
+    );
+    mkdirSync(join(dir, "qa", "cases"), { recursive: true });
+    writeFileSync(join(dir, "qa", "cases", "a.json"), "{}");
+    mkdirSync(join(dir, "maps", "store"), { recursive: true });
+    mkdirSync(join(dir, "policies"), { recursive: true });
+    writeFileSync(join(dir, "policies", "store.json"), "{}");
+    mkdirSync(join(dir, "skills", "portolan-map"), { recursive: true });
+    writeFileSync(join(dir, "skills", "portolan-map", "SKILL.md"), "x");
+    writeFileSync(join(dir, "portolan.db"), "db");
+    mkdirSync(join(dir, ".portolan"), { recursive: true });
+    writeFileSync(join(dir, ".portolan", "qa.db"), "qa-db");
+    writeFileSync(join(dir, ".gitignore"), "node_modules\n.portolan/\n");
+    writeFileSync(
+      join(dir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          other: { command: "other" },
+          "portolan-qa": {
+            command: "npx",
+            args: ["-y", "-p", "@abubakarsiddiik/qa", "portolan-qa"],
+          },
+        },
+      }),
+    );
+
+    const sink = capture();
+    expect(await main(["migrate", dir], sink)).toBe(0);
+    expect(sink.lines.join("\n")).toContain("updated");
+
+    expect(existsSync(join(dir, ".portolan", "config.json"))).toBe(true);
+    expect(existsSync(join(dir, ".portolan", "qa", "cases", "a.json"))).toBe(true);
+    expect(existsSync(join(dir, ".portolan", "maps", "store"))).toBe(true);
+    expect(existsSync(join(dir, ".portolan", "policies", "store.json"))).toBe(true);
+    expect(existsSync(join(dir, ".portolan", "skills", "portolan-map", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(dir, ".portolan", "state", "portolan.db"))).toBe(true);
+    expect(existsSync(join(dir, ".portolan", "state", "qa.db"))).toBe(true);
+    expect(existsSync(join(dir, "portolan.config.json"))).toBe(false);
+    expect(existsSync(join(dir, "portolan.db"))).toBe(false);
+
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).not.toContain(".portolan/");
+    expect(readFileSync(join(dir, ".portolan", ".gitignore"), "utf8")).toBe("state/\n");
+
+    const config = JSON.parse(readFileSync(join(dir, ".portolan", "config.json"), "utf8")) as {
+      maps: string;
+      database: string;
+      qa: { cases: string; database: string };
+    };
+    expect(config.maps).toBe(".portolan/maps");
+    expect(config.database).toBe(".portolan/state/portolan.db");
+    expect(config.qa.cases).toBe(".portolan/qa/cases");
+    expect(config.qa.database).toBe(".portolan/state/qa.db");
+
+    const mcp = JSON.parse(readFileSync(join(dir, ".mcp.json"), "utf8")) as {
+      mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }>;
+    };
+    expect(mcp.mcpServers.other?.command).toBe("other");
+    expect(mcp.mcpServers["portolan-qa"]?.command).toBe("portolan");
+    expect(mcp.mcpServers["portolan-qa"]?.args).toEqual(["qa", "mcp"]);
+    expect(mcp.mcpServers["portolan-qa"]?.env?.QA_CONFIG).toBe(
+      join(dir, ".portolan", "config.json"),
+    );
+  });
+
+  it("moves the QA database with verified cases", () => {
+    const dir = tempDir();
+    const casePath = join(dir, "qa", "cases", "auth", "login.json");
+    mkdirSync(join(dir, "qa", "cases", "auth"), { recursive: true });
+    writeFileSync(
+      casePath,
+      JSON.stringify({
+        schema: 1,
+        id: "auth/login",
+        title: "Login",
+        suite: "smoke",
+        effect: "read",
+        status: "draft",
+        steps: [{ goto: "/sign-in" }],
+      }),
+    );
+    mkdirSync(join(dir, ".portolan"), { recursive: true });
+
+    const store = new QaStore(join(dir, ".portolan", "qa.db"));
+    store.putCase(readCaseFile(casePath), { status: "verified", note: "seed" });
+    expect(store.getCase("auth/login")?.row.status).toBe("verified");
+    store.close();
+
+    runMigrate({ root: dir });
+
+    const moved = new QaStore(join(dir, ".portolan", "state", "qa.db"));
+    expect(moved.getCase("auth/login")?.row.status).toBe("verified");
+    moved.close();
+  });
+
+  it("refuses to overwrite a destination", () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, "portolan.config.json"), "{}");
+    mkdirSync(join(dir, ".portolan"), { recursive: true });
+    writeFileSync(join(dir, ".portolan", "config.json"), "{}");
+
+    expect(() => runMigrate({ root: dir })).toThrow(/refusing to overwrite/);
+    expect(existsSync(join(dir, "portolan.config.json"))).toBe(true);
   });
 });
 
@@ -349,6 +518,25 @@ describe("main", () => {
     }
   });
 
+  it("prints the version for --version and -v", async () => {
+    const sink = capture();
+    expect(await main(["--version"], sink)).toBe(0);
+    expect(sink.lines[0]).toMatch(/^\d+\.\d+\.\d+/);
+
+    const short = capture();
+    expect(await main(["-v"], short)).toBe(0);
+    expect(short.lines[0]).toBe(sink.lines[0]);
+  });
+
+  it("shows the QA subcommand help for qa --help", async () => {
+    const sink = capture();
+    expect(await main(["qa", "--help"], sink)).toBe(0);
+    const text = sink.lines.join("\n");
+    expect(text).toContain("portolan qa <command>");
+    expect(text).toContain("init");
+    expect(text).toContain("doctor");
+  });
+
   it("returns 2 for an unknown command", async () => {
     const sink = capture();
     expect(await main(["nope"], sink)).toBe(2);
@@ -364,7 +552,7 @@ describe("main", () => {
     const dir = tempDir();
     const sink = capture();
     expect(await main(["init", dir, "--site", "store"], sink)).toBe(0);
-    expect(existsSync(join(dir, "portolan.config.json"))).toBe(true);
+    expect(existsSync(join(dir, ".portolan", "config.json"))).toBe(true);
   });
 
   it("runs mcp through the dispatcher without writing to stdout", async () => {

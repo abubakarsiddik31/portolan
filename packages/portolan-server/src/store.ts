@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 import type { AuditRecord, CreateSessionRequest, SessionRecord } from "@abubakarsiddiik/protocol";
 import type { WriteLedger } from "@abubakarsiddiik/runtime";
@@ -30,6 +32,10 @@ export class SessionStore {
   private readonly db: InstanceType<typeof Database>;
 
   constructor(path = ":memory:") {
+    if (path !== ":memory:") {
+      mkdirSync(dirname(path), { recursive: true });
+    }
+
     this.db = new Database(path);
     this.db.pragma("journal_mode = WAL");
     this.migrate();

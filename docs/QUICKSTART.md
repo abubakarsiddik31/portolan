@@ -84,13 +84,13 @@ node packages/cli/dist/bin.js doctor
 The demo above uses a fixture map. For your own app, let Portolan discover it:
 
 ```bash
-portolan init ./portolan --site myapp
+portolan init --site myapp
 
 # optional, for pages behind auth
 portolan auth login --url https://app.example/sign-in \
-  --out ./portolan/auth.json
+  --out ./.portolan/state/auth.json
 
-portolan map build --maps ./portolan/maps --site myapp \
+portolan map build --maps ./.portolan/maps --site myapp \
   --url http://localhost:3000 \
   --start "npm run dev" \
   --verify --publish
@@ -103,8 +103,8 @@ to the map. It is read-only; forms are not submitted.
 Then work the capability ledger until it is complete:
 
 ```bash
-portolan map coverage --site myapp --maps ./portolan/maps
-portolan map build --maps ./portolan/maps --site myapp \
+portolan map coverage --site myapp --maps ./.portolan/maps
+portolan map build --maps ./.portolan/maps --site myapp \
   --url http://localhost:3000 --require-complete --verify --publish
 ```
 
@@ -113,7 +113,7 @@ Portolan (`open_url` -> `view`/`act`/`read` -> `fallback_done`) and rebuild from
 traces, or exclude it with a reason. After the app changes, run
 `portolan map update`.
 
-`portolan init` also installs `skills/portolan-map/SKILL.md`, which gives a
+`portolan init` also installs `.portolan/skills/portolan-map/SKILL.md`, which gives a
 coding agent this loop step by step.
 
 ## What works today

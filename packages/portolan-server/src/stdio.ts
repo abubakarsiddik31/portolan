@@ -1,4 +1,4 @@
-import type { SessionRecord } from "@abubakarsiddiik/protocol";
+import { PORTOLAN_DIR, type SessionRecord } from "@abubakarsiddiik/protocol";
 import type { TraceStore, WriteLedger } from "@abubakarsiddiik/runtime";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -10,9 +10,9 @@ import { createMcpServer, type FallbackSubstrate } from "./mcp.js";
 import { SessionStore } from "./store.js";
 
 export type StdioServerOptions = {
-  /** Directory of `maps/<site>/v<n>.json`. Default `MAPS_DIR` or `maps`. */
+  /** Directory of `maps/<site>/v<n>.json`. Default `MAPS_DIR` or `.portolan/maps`. */
   mapsDir?: string;
-  /** SQLite path. Default `DATABASE_PATH` or `portolan.db`. */
+  /** SQLite path. Default `DATABASE_PATH` or `.portolan/state/portolan.db`. */
   databasePath?: string;
   /** Defaults to a stdio transport; tests pass an in-memory one. */
   transport?: Transport;
@@ -43,9 +43,9 @@ export type StdioServerHandle = {
 export async function startStdioServer(
   options: StdioServerOptions = {},
 ): Promise<StdioServerHandle> {
-  const maps = new MapStore(options.mapsDir ?? process.env.MAPS_DIR ?? "maps");
+  const maps = new MapStore(options.mapsDir ?? process.env.MAPS_DIR ?? `${PORTOLAN_DIR}/maps`);
   const sessions = new SessionStore(
-    options.databasePath ?? process.env.DATABASE_PATH ?? "portolan.db",
+    options.databasePath ?? process.env.DATABASE_PATH ?? `${PORTOLAN_DIR}/state/portolan.db`,
   );
   const server = createMcpServer({
     maps,

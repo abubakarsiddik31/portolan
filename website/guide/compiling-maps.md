@@ -40,11 +40,11 @@ the password:
 
 ```bash
 portolan auth login --url https://careerkor.com/sign-in \
-  --out ./portolan/auth.json
+  --out ./.portolan/state/auth.json
 
 portolan map build --site careerkor \
   --url https://careerkor.com/dashboard \
-  --storage-state ./portolan/auth.json \
+  --storage-state ./.portolan/state/auth.json \
   --verify --publish
 ```
 
@@ -79,10 +79,10 @@ A crawl finds pages, not every capability. `map build` therefore writes
 visited page, marked `mapped`, `missing`, `excluded`, or `stale`.
 
 ```bash
-portolan map coverage --site careerkor --maps ./portolan/maps
+portolan map coverage --site careerkor --maps ./.portolan/maps
 # careerkor: 27 mapped, 48 missing, 51 excluded, 0 stale (36% of actionable)
 
-portolan map capability set --site careerkor --maps ./portolan/maps \
+portolan map capability set --site careerkor --maps ./.portolan/maps \
   --id pricing.button.choose_pro --status excluded --reason "requires a paid plan"
 ```
 
@@ -101,12 +101,12 @@ Use `--require-complete` to refuse publication while anything is `missing` or
 portolan map build ... --require-complete --verify --publish
 ```
 
-`portolan init` installs `skills/portolan-map/SKILL.md`, the companion skill that
+`portolan init` installs `.portolan/skills/portolan-map/SKILL.md`, the companion skill that
 tells a coding agent how to work the ledger until it is complete.
 
 ## Optional: hand-written seed
 
-For a precise contract you can still write `maps/<site>/v0.json` by hand and
+For a precise contract you can still write `.portolan/maps/<site>/v0.json` by hand and
 verify it:
 
 ### Initialize
@@ -115,12 +115,12 @@ verify it:
 portolan init ./my-site --site store
 ```
 
-This writes `portolan.config.json`, an egress policy at
+This writes `.portolan/config.json`, an egress policy at
 `policies/store.json`, and the `maps/` and `skills/` directories.
 
 ### Write the operations
 
-Create `maps/store/v0.json` with states, operations, and their schemas. A
+Create `.portolan/maps/store/v0.json` with states, operations, and their schemas. A
 minimal operation:
 
 ```json
@@ -160,7 +160,7 @@ operation needs at least three param sets:
 ```
 
 ```bash
-portolan verify --map maps/store/v0.json --params store.params.json --base-url https://store.example
+portolan verify --map .portolan/maps/store/v0.json --params store.params.json --base-url https://store.example
 ```
 
 Each operation is reported per tier. A failed verification never publishes.
@@ -172,7 +172,7 @@ version:
 
 ```bash
 portolan compile run-1.json run-2.json \
-  --map maps/store/v0.json \
+  --map .portolan/maps/store/v0.json \
   --base-url https://store.example \
   --outcome-checks store.outcomes.json
 ```
@@ -184,10 +184,10 @@ meaning of a call in flight.
 ## Export a skill
 
 ```bash
-portolan export-skills --map maps/store/v1.json --out skills --trace run-1.json
+portolan export-skills --map .portolan/maps/store/v1.json --trace run-1.json
 ```
 
-The exporter writes `skills/portolan-store/` with `SKILL.md` and
+The exporter writes `.portolan/skills/portolan-store/` with `SKILL.md` and
 `references/ops.md`. It refuses to write an invalid skill or one that looks like
 it contains a secret. See [Skills](/guide/skills).
 

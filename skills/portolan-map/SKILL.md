@@ -21,7 +21,7 @@ button that opens a dialog, or a multi-step flow. A page is not a capability.
    unlinked routes, admin pages) with:
 
    ```bash
-   portolan map capability add --site <site> --maps ./portolan/maps \
+   portolan map capability add --site <site> --maps ./.portolan/maps \
      --page <page> --kind button --name "<label>" --source code
    ```
 
@@ -29,15 +29,15 @@ button that opens a dialog, or a multi-step flow. A page is not a capability.
    records links/forms/buttons, and writes the ledger:
 
    ```bash
-   portolan map build --site <site> --maps ./portolan/maps \
-     --url <app url> [--storage-state ./portolan/auth.json] \
+   portolan map build --site <site> --maps ./.portolan/maps \
+     --url <app url> [--storage-state ./.portolan/state/auth.json] \
      --verify --publish
    ```
 
 3. **Read the gaps.** `capabilities.json` is the work queue:
 
    ```bash
-   portolan map coverage --site <site> --maps ./portolan/maps --json
+   portolan map coverage --site <site> --maps ./.portolan/maps --json
    ```
 
 4. **Resolve every `missing` or `stale` entry.** For each one:
@@ -45,7 +45,7 @@ button that opens a dialog, or a multi-step flow. A page is not a capability.
      credit-spending, exclude it **with a reason**:
 
      ```bash
-     portolan map capability set --site <site> --maps ./portolan/maps \
+     portolan map capability set --site <site> --maps ./.portolan/maps \
        --id <capability id> --status excluded --reason "deletes user data"
      ```
 
@@ -58,8 +58,8 @@ button that opens a dialog, or a multi-step flow. A page is not a capability.
      ```
 
      ```bash
-     portolan map build --site <site> --maps ./portolan/maps \
-       --traces-dir ./portolan/traces --verify --publish
+     portolan map build --site <site> --maps ./.portolan/maps \
+       --traces-dir ./.portolan/state/traces --verify --publish
      ```
 
    For dialog and multi-step flows, click the trigger, complete the flow once,

@@ -8,8 +8,8 @@ npm install -g @abubakarsiddiik/portolan
 portolan init ./my-site
 ```
 
-`init` creates the workspace and installs `skills/portolan-map/SKILL.md` and
-`skills/portolan/SKILL.md` for a coding agent. Build a map before wiring the
+`init` creates `.portolan/` and installs `.portolan/skills/portolan-map/SKILL.md`
+and `.portolan/skills/portolan/SKILL.md` for a coding agent. Build a map before wiring the
 client:
 
 ```bash
@@ -22,9 +22,9 @@ can spawn it directly. It reads:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MAPS_DIR` | `maps` | Directory of `maps/<site>/v<n>.json`. |
-| `DATABASE_PATH` | `portolan.db` | Session and audit database. |
-| `TRACES_DIR` | `traces` | Recorded fallback and explore traces (JSONL + HAR). |
+| `MAPS_DIR` | `.portolan/maps` | Directory of `maps/<site>/v<n>.json`. |
+| `DATABASE_PATH` | `.portolan/state/portolan.db` | Session and audit database. |
+| `TRACES_DIR` | `.portolan/state/traces` | Recorded fallback and explore traces (JSONL + HAR). |
 | `PORTOLAN_STORAGE_STATE` | unset | Playwright storage state for pages behind auth, from `portolan auth login`. |
 
 Set these to absolute paths in a client config: a client spawns the server from
@@ -50,9 +50,9 @@ Or write `~/.claude.json`:
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       }
     }
   }
@@ -71,9 +71,9 @@ macOS, or `~/.config/Claude/claude_desktop_config.json` on Linux:
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       }
     }
   }
@@ -90,7 +90,7 @@ Add to `~/.codex/config.toml`:
 [mcp_servers.portolan]
 command = "portolan"
 args = ["mcp"]
-env = { MAPS_DIR = "/absolute/path/to/maps", DATABASE_PATH = "/absolute/path/to/portolan.db", TRACES_DIR = "/absolute/path/to/traces" }
+env = { MAPS_DIR = "/absolute/path/to/project/.portolan/maps", DATABASE_PATH = "/absolute/path/to/project/.portolan/state/portolan.db", TRACES_DIR = "/absolute/path/to/project/.portolan/state/traces" }
 ```
 
 ## Cursor
@@ -104,9 +104,9 @@ Edit `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       }
     }
   }
@@ -124,9 +124,9 @@ Edit `~/.gemini/settings.json`:
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       },
       "timeout": 30000
     }
@@ -147,9 +147,9 @@ VS Code uses `servers` and a `type`, not `mcpServers`. Add
       "command": "portolan",
       "args": ["mcp"],
       "env": {
-        "MAPS_DIR": "/absolute/path/to/maps",
-        "DATABASE_PATH": "/absolute/path/to/portolan.db",
-        "TRACES_DIR": "/absolute/path/to/traces"
+        "MAPS_DIR": "/absolute/path/to/project/.portolan/maps",
+        "DATABASE_PATH": "/absolute/path/to/project/.portolan/state/portolan.db",
+        "TRACES_DIR": "/absolute/path/to/project/.portolan/state/traces"
       }
     }
   }

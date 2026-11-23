@@ -144,7 +144,7 @@ CREATE INDEX cases_suite  ON cases (suite);
 CREATE INDEX cases_status ON cases (status);
 
 -- Revisions live in git, not in a second spec copy. `cases.revision` is a
--- counter only; history is `git log qa/cases/<id>.json`.
+-- counter only; history is `git log .portolan/qa/cases/<id>.json`.
 
 CREATE TABLE runs (
   id             TEXT PRIMARY KEY,
@@ -246,7 +246,7 @@ class QaStore {
 
 ## 5. Case spec
 
-One case per file: `qa/cases/<id>.json`. The id is stable and namespaced
+One case per file: `.portolan/qa/cases/<id>.json`. The id is stable and namespaced
 (`auth/login`), and the file path must match it.
 
 ```ts
@@ -292,7 +292,7 @@ resolved at run time and never written to the DB or evidence.
 
 ### 5.1 Suite spec
 
-`qa/suites/<name>.json` is a selection, not a copy of the cases:
+`.portolan/qa/suites/<name>.json` is a selection, not a copy of the cases:
 
 ```ts
 type QaSuite = {
@@ -383,7 +383,7 @@ Evidence is redacted before it is written, and the DB copy of `expected` and
 `actual` is redacted and truncated (2 KB) before insert. Secrets never appear
 in run history.
 
-Evidence lives under `.portolan/qa/runs/<run_id>/<case_id>/`. It is gitignored.
+Evidence lives under `.portolan/state/qa/runs/<run_id>/<case_id>/`. It is gitignored.
 The DB stores the path, size, and SHA-256, not the bytes.
 
 ### 6.5 Determinism and flakiness
@@ -460,7 +460,7 @@ All results use the existing envelope: `{ ok, result | error, next? }`.
 ### 9.2 CLI
 
 ```
-portolan qa init [--dir DIR] [--base-url URL] [--force] [--json]
+portolan qa init [--dir DIR] [--base-url URL] [--mcp] [--force] [--json]
 portolan qa list [--suite S] [--tag T] [--status S] [--json]
 portolan qa plan [--changed] [--base REF] [--max N] [--json]
 portolan qa run [--changed|--suite S|--case ID...|--tag T] [--repeat N] [--json]
@@ -484,19 +484,29 @@ error (browser missing, app unreachable).
 
 ### 9.3 Harness init
 
-`portolan qa init` is the only onboarding step:
+`portolan qa init` is the only onboarding step. Everything it writes lives
+under `.portolan/`:
 
-- Writes `portolan.config.json` `qa` block (or merges into an existing one).
-- Writes `.mcp.json` when Claude Code is detected. For every other harness
-  (Codex, Cursor, opencode, Gemini CLI, VS Code) it detects the harness and
-  prints the exact MCP snippet; the user adds it to that harness's config. It
-  never edits a config it cannot safely merge, and an unknown harness still
-  exits `0` with the snippet.
-- Installs `portolan-qa` skill into `skills/portolan-qa/SKILL.md`.
-- Adds only `.portolan/` to `.gitignore`. Cases live in `qa/` and are
-  committed and reviewed; runs and evidence are not.
+- Writes the `qa` block into `.portolan/config.json` (or merges into an
+  existing one).
+- Creates `.portolan/qa/cases/` and `.portolan/qa/suites/`; both are
+  committed and reviewed.
+- Installs the `portolan-qa` skill into
+  `.portolan/skills/portolan-qa/SKILL.md`.
+- Writes `.portolan/.gitignore` with `state/`, so run artifacts, traces,
+  databases, and the auth storage state stay out of git. It never touches the
+  root `.gitignore`.
+- Prints the MCP snippet and the root `.mcp.json` path. It only writes or
+  merges that file with `--mcp`; an existing `.mcp.json` keeps its other
+  entries. The snippet passes absolute `.portolan/` paths, so the server does
+  not depend on the directory it was spawned in.
 - Does not modify `package.json`.
 - Does not run `qa doctor`; run it yourself after wiring the harness.
+
+A legacy root layout (`portolan.config.json`, `qa/`, `maps/`, `skills/`, …)
+still loads with a one-line deprecation notice. `portolan migrate` moves it
+into `.portolan/` and moves the QA database with the cases, so verified cases
+stay verified.
 
 ### 9.4 Skill
 
@@ -512,16 +522,16 @@ error (browser missing, app unreachable).
 
 ## 10. Configuration
 
-`portolan.config.json` gains a `qa` block; `DefaultQaConfig` supplies the rest.
+`.portolan/config.json` gains a `qa` block; `DefaultQaConfig` supplies the rest.
 
 ```json
 {
   "qa": {
     "baseUrl": "http://127.0.0.1:3000",
-    "database": ".portolan/qa.db",
-    "cases": "qa/cases",
-    "suites": "qa/suites",
-    "runs": ".portolan/qa/runs",
+    "database": ".portolan/state/qa.db",
+    "cases": ".portolan/qa/cases",
+    "suites": ".portolan/qa/suites",
+    "runs": ".portolan/state/qa/runs",
     "baseRef": "origin/main",
     "repeat": 1,
     "verifyRepeat": 3,
@@ -529,8 +539,8 @@ error (browser missing, app unreachable).
     "headless": true,
     "evidence": "failures",
     "maxCases": 50,
-    "fixtures": "qa/fixtures.json",
-    "maps": "maps",
+    "fixtures": ".portolan/qa/fixtures.json",
+    "maps": ".portolan/maps",
     "screenshot": false,
     "redact": ["password", "token", "secret", "authorization", "cookie"]
   }

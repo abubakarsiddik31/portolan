@@ -6,7 +6,7 @@ import { findChrome, PlaywrightEngine } from "@abubakarsiddiik/substrate";
 export type AuthLoginInput = {
   /** The app's sign-in page. */
   url: string;
-  /** Where to save the Playwright storage state. Default `./portolan/auth.json`. */
+  /** Where to save the Playwright storage state. Default `.portolan/state/auth.json`. */
   out?: string;
   chrome?: string;
   /** How long to wait for the human to finish signing in. Default 5 minutes. */
@@ -40,7 +40,7 @@ export async function runAuthLogin(
     throw new Error("auth login needs Chrome; install it or set CHROME_PATH");
   }
 
-  const out = resolve(input.out ?? join("portolan", "auth.json"));
+  const out = resolve(input.out ?? join(".portolan", "state", "auth.json"));
   const now = deps.now ?? Date.now;
   const sleep = deps.sleep ?? ((ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms)));
   const log = deps.log ?? (() => undefined);

@@ -1,5 +1,12 @@
 # @abubakarsiddiik/sources
 
+## 0.2.5
+
+### Patch Changes
+
+- Updated dependencies [af07fa8]
+  - @abubakarsiddiik/substrate@0.2.1
+
 ## 0.2.4
 
 ### Patch Changes

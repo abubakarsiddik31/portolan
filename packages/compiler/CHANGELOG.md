@@ -1,5 +1,13 @@
 # @abubakarsiddiik/compiler
 
+## 0.2.5
+
+### Patch Changes
+
+- Updated dependencies [af07fa8]
+  - @abubakarsiddiik/substrate@0.2.1
+  - @abubakarsiddiik/runtime@0.1.6
+
 ## 0.2.4
 
 ### Patch Changes

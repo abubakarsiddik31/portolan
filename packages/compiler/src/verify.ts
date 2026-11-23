@@ -149,7 +149,10 @@ async function runOnce(input: {
         ? input.op
         : (input.map.ops.find((candidate) => candidate.name === firstSetup.op) ?? input.op);
     const startParams = firstSetup?.params ?? input.params;
-    await engine.navigate(startUrl(input.map, startOp, startParams, baseUrl));
+    // A fresh session may land on a client-rendered app whose DOM is still
+    // empty at domcontentloaded. Settle before any tier resolves a locator or
+    // reads a state, or every ui step sees the loading shell.
+    await substrate.goto(startUrl(input.map, startOp, startParams, baseUrl));
 
     for (const step of input.setup) {
       const setupOp = input.map.ops.find((candidate) => candidate.name === step.op);

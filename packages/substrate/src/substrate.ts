@@ -152,14 +152,15 @@ export class Substrate {
    * fetch re-renders, is settled first, so the view the caller receives is
    * current. The engine's `navigate` and `dispatch` deliberately resolve
    * early — tier ops navigate per call and hold a p50 budget, so settling
-   * belongs to the agent verbs, not the engine.
+   * belongs to the agent verbs, not the engine. A tier op may call this when
+   * a capture misses content it expects, trading latency only on the miss.
    *
    * The settle signal is capture stability: consecutive snapshots must agree
    * on url, title, and node names for 750 ms, or the budget runs out.
    * Exhaustion is not an error; the caller receives whatever is on the page,
    * which is the pre-contract behavior.
    */
-  private async settle(): Promise<SubstrateView> {
+  async settle(): Promise<SubstrateView> {
     const MIN_STABLE_MS = 750;
     const deadline = Date.now() + this.settleBudgetMs;
     let view = await this.view();

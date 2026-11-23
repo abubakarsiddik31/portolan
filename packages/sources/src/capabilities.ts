@@ -55,6 +55,8 @@ export type BuildCapabilitiesInput = {
   rules?: PolicyRule[];
   /** Proposals that failed or skipped verification, by op name, with the reason. */
   unverified?: Map<string, string>;
+  /** Ops that passed verification in this run, for `last_verified`. */
+  verified?: Set<string>;
   now?: string;
 };
 
@@ -76,6 +78,7 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
   const previous = new Map((input.previous?.capabilities ?? []).map((item) => [item.id, item]));
   const next = new Map<string, Capability>();
   const unverified = input.unverified ?? new Map<string, string>();
+  const now = input.now ?? new Date().toISOString();
 
   if (input.discovery !== undefined) {
     const seen = new Set<string>();
@@ -104,6 +107,9 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
         status = "mapped";
       } else if (failed !== undefined) {
         reason = unverified.get(failed.op.name);
+        // An op that used to work and now fails on a page that changed is
+        // stale; a control that never had a working op is just missing.
+        if (previousItem?.status === "mapped") status = "stale";
       } else if (excludedBy !== undefined) {
         status = "excluded";
         reason = `${ruleReason(excludedBy)}; record it manually if it is safe`;
@@ -127,6 +133,13 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
         ...(reason !== undefined ? { reason } : {}),
         ...(precondition !== undefined ? { precondition } : {}),
         ...(category !== undefined ? { category } : {}),
+        last_seen: now,
+        ...lastVerified(
+          proposal !== undefined && input.verified?.has(proposal.op.name) === true
+            ? now
+            : previousItem?.last_verified,
+        ),
+        ...(status === "stale" ? { stale_since: previousItem?.stale_since ?? now } : {}),
       });
     }
   }
@@ -168,8 +181,9 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
 
     next.set(id, {
       ...item,
-      status: "stale",
-      reason: "not observed in this run; the map keeps the old op",
+      status: "removed",
+      reason: "not seen on its page in this run; the map keeps the old op",
+      stale_since: item.stale_since ?? now,
     });
   }
 
@@ -186,7 +200,7 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
 }
 
 export function coverageOf(ledger: CapabilityLedger): CapabilityCoverage {
-  const counts = { mapped: 0, missing: 0, excluded: 0, stale: 0, unavailable: 0 };
+  const counts = { mapped: 0, missing: 0, excluded: 0, stale: 0, unavailable: 0, removed: 0 };
   for (const item of ledger.capabilities) counts[item.status] += 1;
 
   const total = ledger.capabilities.length;
@@ -201,8 +215,26 @@ export function unavailableOf(ledger: CapabilityLedger): Capability[] {
   return ledger.capabilities.filter((item) => item.status === "unavailable");
 }
 
+/**
+ * Entries no crawl has seen within `maxAgeMs`, or ever. A partial crawl leaves
+ * the rest of the map untouched, so this is how to find what to re-check.
+ */
+export function agedOf(ledger: CapabilityLedger, maxAgeMs: number, now = Date.now()): Capability[] {
+  return ledger.capabilities.filter((item) => {
+    if (item.status === "excluded") return false;
+    const seen = item.last_seen === undefined ? Number.NaN : Date.parse(item.last_seen);
+    return Number.isNaN(seen) || now - seen > maxAgeMs;
+  });
+}
+
+function lastVerified(at: string | undefined): { last_verified?: string } {
+  return at === undefined ? {} : { last_verified: at };
+}
+
 export function gapsOf(ledger: CapabilityLedger): Capability[] {
-  return ledger.capabilities.filter((item) => item.status === "missing" || item.status === "stale");
+  return ledger.capabilities.filter(
+    (item) => item.status === "missing" || item.status === "stale" || item.status === "removed",
+  );
 }
 
 export function formatCoverage(coverage: CapabilityCoverage): string {
@@ -210,7 +242,8 @@ export function formatCoverage(coverage: CapabilityCoverage): string {
   const percent =
     actionable === 0 ? "nothing actionable" : `${Math.round(coverage.ratio * 100)}% of actionable`;
   const unavailable = coverage.unavailable > 0 ? `, ${coverage.unavailable} unavailable` : "";
-  return `${coverage.mapped} mapped, ${coverage.missing} missing, ${coverage.excluded} excluded, ${coverage.stale} stale${unavailable} (${percent})`;
+  const removed = coverage.removed > 0 ? `, ${coverage.removed} removed` : "";
+  return `${coverage.mapped} mapped, ${coverage.missing} missing, ${coverage.excluded} excluded, ${coverage.stale} stale${removed}${unavailable} (${percent})`;
 }
 
 export function writeCapabilities(dir: string, ledger: CapabilityLedger): string {

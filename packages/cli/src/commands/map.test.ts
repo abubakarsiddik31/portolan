@@ -627,3 +627,64 @@ describe("policy allow", () => {
     ).toEqual(["localhost:8000"]);
   });
 });
+
+describe("map update --state", () => {
+  it("re-crawls only the named state and leaves the rest of the ledger alone", async () => {
+    const dir = tempDir();
+    const base = {
+      site: "app",
+      mapsDir: dir,
+      url: "http://app.test/",
+      verify: true,
+      verifyWrites: false,
+      publish: true,
+    };
+    await runMapBuild(base, { substrate, verify });
+
+    const visited: string[] = [];
+    const watching = {
+      goto: async (url: string) => {
+        visited.push(url);
+        return substrate.goto(url);
+      },
+    } as unknown as Substrate;
+
+    const result = await runMapBuild(
+      {
+        site: "app",
+        mapsDir: dir,
+        update: true,
+        states: ["cart"],
+        verify: false,
+        verifyWrites: false,
+        publish: false,
+      },
+      { substrate: watching },
+    );
+
+    expect(visited).toEqual(["http://app.test/cart"]);
+    const byName = new Map(
+      result.capabilities.capabilities.map((item) => [item.trigger.name, item]),
+    );
+    expect(byName.get("Cart")?.status).toBe("mapped");
+    expect(byName.get("Search")?.status).toBe("mapped");
+    expect(result.coverage.removed).toBe(0);
+  });
+
+  it("refuses --state without update", async () => {
+    await expect(
+      runMapBuild(
+        {
+          site: "app",
+          mapsDir: tempDir(),
+          url: "http://app.test/",
+          states: ["cart"],
+          verify: false,
+          verifyWrites: false,
+          publish: false,
+        },
+        { substrate },
+      ),
+    ).rejects.toThrow(/needs `map update`/);
+  });
+});

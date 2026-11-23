@@ -56,7 +56,8 @@ ${CONFIG_FLAG}`,
 build     discover --url and/or compile traces into a draft map; --verify and
           --publish turn verified ops into a new map version
 update    same as build, reconciled against the existing map
-coverage  print mapped vs missing capabilities (--json for machine output)
+coverage  print mapped vs missing capabilities (--json for machine output;
+          --older-than 7d lists entries no crawl has seen recently)
 capability add|set   record a capability manually (--page --name --kind
           --status missing|excluded --reason, or --id --status for set)
 
@@ -66,6 +67,8 @@ Options (build, update):
   --url <url>            entry URL for DOM discovery
   --base-url <url>       origin to verify against (default: --url origin)
   --max-pages <n>        pages to crawl
+  --state <id>           (update) re-crawl and re-verify only this state (repeatable;
+                         a parameterized state needs a --params set for its opener)
   --exclude <pattern>    capability name to leave unmapped (repeatable)
   --trace <file>         a recorded trace (repeatable; or pass files directly)
   --traces-dir <dir>     directory holding traces.jsonl

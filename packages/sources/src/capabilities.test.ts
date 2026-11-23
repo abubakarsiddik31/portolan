@@ -1,7 +1,7 @@
 import type { OpDef } from "@abubakarsiddiik/protocol";
 import { describe, expect, it } from "vitest";
 
-import { buildCapabilities, coverageOf, gapsOf } from "./capabilities.js";
+import { agedOf, buildCapabilities, coverageOf, gapsOf } from "./capabilities.js";
 import type { DomDiscovery } from "./dom.js";
 import type { OpProposal, SurfaceAction } from "./types.js";
 
@@ -167,7 +167,7 @@ describe("buildCapabilities", () => {
     });
   });
 
-  it("keeps code capabilities and marks vanished live ones stale", () => {
+  it("keeps code capabilities and marks vanished live ones removed", () => {
     const first = buildCapabilities({
       site: "app",
       discovery: discovery(),
@@ -201,7 +201,10 @@ describe("buildCapabilities", () => {
 
     const byId = new Map(next.capabilities.map((item) => [item.id, item]));
     expect(byId.get("api.create")?.status).toBe("missing");
-    expect(byId.get("home.button.legacy")?.status).toBe("stale");
+    expect(byId.get("home.button.legacy")).toMatchObject({
+      status: "removed",
+      stale_since: "2026-11-18T00:00:00.000Z",
+    });
   });
 
   const ledgerWith = (items: Array<[string, string, string]>) => ({
@@ -243,7 +246,7 @@ describe("buildCapabilities", () => {
     expect(next.capabilities[0]).toMatchObject({ status: "mapped", op: "op_export" });
   });
 
-  it("does not mark pages stale that a partial crawl never reached", () => {
+  it("does not mark pages removed that a partial crawl never reached", () => {
     const next = buildCapabilities({
       site: "app",
       discovery: { ...discovery(), surface: [], pages: ["home"] },
@@ -255,7 +258,7 @@ describe("buildCapabilities", () => {
     });
 
     const byPage = new Map(next.capabilities.map((item) => [item.page, item.status]));
-    expect(byPage.get("home")).toBe("stale");
+    expect(byPage.get("home")).toBe("removed");
     expect(byPage.get("settings")).toBe("mapped");
   });
 
@@ -313,5 +316,70 @@ describe("buildCapabilities", () => {
     });
     expect(byName.get("Notifications")?.status).toBe("missing");
     expect(byName.get("What is a map?")?.status).toBe("missing");
+  });
+
+  it("stamps last_seen and last_verified, and carries them for unseen pages", () => {
+    const first = buildCapabilities({
+      site: "app",
+      discovery: discovery(),
+      proposals: [
+        proposal("open_cart", "home", "cart", { kind: "link", name: "Cart", page: "home" }),
+      ],
+      verified: new Set(["open_cart"]),
+      now: "2026-11-17T00:00:00.000Z",
+    });
+    const cart = first.capabilities.find((item) => item.trigger.name === "Cart");
+    expect(cart).toMatchObject({
+      last_seen: "2026-11-17T00:00:00.000Z",
+      last_verified: "2026-11-17T00:00:00.000Z",
+    });
+    expect(first.capabilities.find((item) => item.trigger.name === "Search")).not.toHaveProperty(
+      "last_verified",
+    );
+
+    const second = buildCapabilities({
+      site: "app",
+      proposals: [],
+      previous: first,
+      now: "2026-11-25T00:00:00.000Z",
+    });
+    expect(second.capabilities.find((item) => item.trigger.name === "Cart")).toMatchObject({
+      last_seen: "2026-11-17T00:00:00.000Z",
+    });
+
+    const day = 86_400_000;
+    const aged = agedOf(second, 7 * day, Date.parse("2026-11-25T00:00:00.000Z"));
+    expect(aged.map((item) => item.trigger.name)).toContain("Cart");
+    expect(agedOf(second, 30 * day, Date.parse("2026-11-25T00:00:00.000Z"))).toEqual([]);
+  });
+
+  it("calls an op that used to work and now fails stale, not missing", () => {
+    const first = buildCapabilities({
+      site: "app",
+      discovery: discovery(),
+      proposals: [
+        proposal("open_cart", "home", "cart", { kind: "link", name: "Cart", page: "home" }),
+      ],
+      now: "2026-11-17T00:00:00.000Z",
+    });
+
+    const next = buildCapabilities({
+      site: "app",
+      discovery: discovery(),
+      proposals: [
+        proposal("open_cart", "home", "cart", { kind: "link", name: "Cart", page: "home" }),
+      ],
+      unverified: new Map([["open_cart", "open_cart did not verify: locator missing"]]),
+      previous: first,
+      now: "2026-11-18T00:00:00.000Z",
+    });
+
+    expect(next.capabilities.find((item) => item.trigger.name === "Cart")).toMatchObject({
+      status: "stale",
+      stale_since: "2026-11-18T00:00:00.000Z",
+    });
+    expect(next.capabilities.find((item) => item.trigger.name === "Add Application")?.status).toBe(
+      "missing",
+    );
   });
 });

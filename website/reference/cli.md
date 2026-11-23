@@ -13,7 +13,7 @@ portolan <command> [options]
 | `portolan auth login` | Open a visible browser, sign in, and save a Playwright storage state. |
 | `portolan map build` | Discover a URL and/or traces into a draft, verify, and publish. |
 | `portolan map update` | Refresh an existing map and keep capabilities discovery did not see. |
-| `portolan map coverage` | Report `mapped`, `missing`, `excluded`, and `stale` capabilities. |
+| `portolan map coverage` | Report `mapped`, `missing`, `excluded`, `unavailable`, `stale`, and `removed` capabilities. `--older-than 7d` lists entries no crawl has seen recently. |
 | `portolan map capability` | Add a capability manually or set its status/reason (`add` / `set`). |
 | `portolan mcp` | Serve MCP over stdio for a client to spawn. |
 | `portolan serve` | Start the HTTP and MCP server. |
@@ -47,7 +47,7 @@ Command flags beat the config file, which beats the default.
 Map flags: `--site`, `--maps`, `--url`, `--base-url`, `--traces-dir`, `--params`,
 `--max-pages`, `--storage-state`, `--start "<cmd>"`, `--verify`,
 `--verify-writes`, `--outcome-checks`, `--publish`, `--require-complete`, `--exclude <pattern>`,
-`--headed`, `--chrome`.
+`--allow-cost`, `--strict`, `--state <id>` (with `map update`), `--headed`, `--chrome`.
 
 `--require-complete` refuses to publish while any capability is `missing` or
 `stale`. Excluded capabilities need a reason.

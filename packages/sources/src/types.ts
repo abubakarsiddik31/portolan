@@ -42,7 +42,13 @@ export type SurfaceAction = {
   disabled?: boolean;
 };
 
-export type CapabilityStatus = "mapped" | "missing" | "excluded" | "stale" | "unavailable";
+export type CapabilityStatus =
+  | "mapped"
+  | "missing"
+  | "excluded"
+  | "stale"
+  | "unavailable"
+  | "removed";
 
 export type CapabilitySource = "live" | "code" | "manual";
 
@@ -60,6 +66,12 @@ export type Capability = {
   precondition?: string;
   /** The policy rule category behind an `excluded` status. */
   category?: string;
+  /** When a crawl last saw the control. */
+  last_seen?: string;
+  /** When an op covering it last passed verification. */
+  last_verified?: string;
+  /** Since when it is `stale` or `removed`. */
+  stale_since?: string;
 };
 
 export type CapabilityLedger = {
@@ -76,6 +88,7 @@ export type CapabilityCoverage = {
   excluded: number;
   stale: number;
   unavailable: number;
+  removed: number;
   /** Mapped / (mapped + missing), 0 when everything is excluded. */
   ratio: number;
 };

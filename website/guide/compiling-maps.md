@@ -76,7 +76,8 @@ Then `portolan map build --site herbie` compiles the trace into candidates.
 
 A crawl finds pages, not every capability. `map build` therefore writes
 `capabilities.json` next to the map: every link, form, and button it saw on every
-visited page, marked `mapped`, `missing`, `excluded`, or `stale`.
+visited page, marked `mapped`, `missing`, `excluded`, `unavailable`, `stale`, or
+`removed`.
 
 ```bash
 portolan map coverage --site careerkor --maps ./.portolan/maps
@@ -91,15 +92,32 @@ The ledger is the reviewable contract:
 - `mapped` only when a verified op covers that exact trigger;
 - `missing` is the work queue;
 - `excluded` requires a reason (destructive, credit-spending, obsolete);
+- `unavailable` is a control that was disabled everywhere the crawl saw it; it is not
+  work to record, and `--strict` makes `--require-complete` count it;
+- `removed` means a crawl reached the page and the control was gone; `stale` means
+  an op that used to verify now fails. Both carry `stale_since`. A crawl only judges
+  the pages it reached: everything else keeps its status, `last_seen`, and
+  `last_verified`;
 - a manual decision has `source: "manual"` and survives rediscovery;
 - code-derived capabilities (`source: "code"`) cover things the crawl cannot see.
 
-Use `--require-complete` to refuse publication while anything is `missing` or
-`stale`:
+Use `--require-complete` to refuse publication while anything is `missing`,
+`stale`, or `removed`:
 
 ```bash
 portolan map build ... --require-complete --verify --publish
 ```
+
+After a change to one page, re-check only it, and find what nothing has looked at
+lately:
+
+```bash
+portolan map update --site careerkor --state pricing --verify --publish
+portolan map coverage --site careerkor --older-than 7d
+```
+
+A parameterized state such as `org_detail` (`/orgs/:id`) needs a param set for the
+op that opens it in `--params`.
 
 `portolan init` installs `.portolan/skills/portolan-map/SKILL.md`, the companion skill that
 tells a coding agent how to work the ledger until it is complete.

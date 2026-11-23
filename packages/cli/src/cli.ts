@@ -4,6 +4,7 @@ import { createInterface } from "node:readline/promises";
 
 import { loadQaConfig } from "@abubakarsiddiik/qa";
 import {
+  agedOf,
   type CapabilityLedger,
   coverageOf,
   formatCoverage,
@@ -339,6 +340,14 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
             for (const gap of gapsOf(ledger)) {
               out(`  ${gap.status.padEnd(7)} ${gap.id} :: ${gap.reason ?? gap.trigger.name}`);
             }
+            const olderThan = stringFlag(args, "older-than");
+            if (olderThan !== undefined) {
+              const aged = agedOf(ledger, parseAge(olderThan));
+              out(`${aged.length} not seen in ${olderThan}:`);
+              for (const item of aged) {
+                out(`  ${item.id} :: last seen ${item.last_seen ?? "never"}`);
+              }
+            }
             const unavailable = unavailableOf(ledger);
             if (unavailable.length > 0) {
               out(
@@ -380,6 +389,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
             ? { maxPages: numberFlag(args, "max-pages") }
             : {}),
           update,
+          ...(listFlag(args, "state").length > 0 ? { states: listFlag(args, "state") } : {}),
           verify: booleanFlag(args, "verify"),
           verifyWrites: booleanFlag(args, "verify-writes"),
           publish: booleanFlag(args, "publish"),
@@ -571,6 +581,14 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
     err(`error: ${(error as Error).message}`);
     return 1;
   }
+}
+
+/** `7d`, `12h`, or `30m` as milliseconds. */
+export function parseAge(value: string): number {
+  const match = /^(\d+)([dhm])$/.exec(value);
+  if (match?.[1] === undefined) throw new Error(`--older-than must look like 7d, 12h, or 30m`);
+  const unit = { d: 86_400_000, h: 3_600_000, m: 60_000 }[match[2] as "d" | "h" | "m"];
+  return Number(match[1]) * unit;
 }
 
 function required(args: ReturnType<typeof parseArgs>, name: string): string {

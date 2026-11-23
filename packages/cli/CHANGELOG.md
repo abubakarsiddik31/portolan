@@ -1,5 +1,25 @@
 # @abubakarsiddiik/portolan
 
+## 0.2.2
+
+### Patch Changes
+
+- af649af: Keep every project file Portolan creates under `.portolan/`, with committed
+  artifacts and an ignored `state/` directory in one place. Add
+  `.portolan/config.json` discovery with a legacy `portolan.config.json`
+  fallback, `portolan migrate`, and `.mcp.json` opt-in wiring for QA.
+  
+  Also fix `portolan --version`, `qa --help`, failed `absent` check details,
+  `qa doctor` hints, and the missing-suite message.
+- Updated dependencies [af649af]
+  - @abubakarsiddiik/qa@0.1.4
+  - @abubakarsiddiik/protocol@0.2.1
+  - @abubakarsiddiik/server@0.2.2
+  - @abubakarsiddiik/compiler@0.2.2
+  - @abubakarsiddiik/runtime@0.1.3
+  - @abubakarsiddiik/skills@0.1.3
+  - @abubakarsiddiik/sources@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

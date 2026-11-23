@@ -286,4 +286,32 @@ describe("buildCapabilities", () => {
     expect(coverage).toMatchObject({ missing: 1, unavailable: 1, ratio: 0 });
     expect(gapsOf(ledger).map((item) => item.trigger.name)).toEqual(["Export"]);
   });
+
+  it("explains an exclusion by category, and leaves a bell and a question alone", () => {
+    const ledger = buildCapabilities({
+      site: "app",
+      discovery: {
+        ...discovery(),
+        surface: [
+          { page: "home", kind: "button", name: "Sign out" },
+          { page: "home", kind: "button", name: "Delete account" },
+          { page: "home", kind: "button", name: "Notifications" },
+          { page: "home", kind: "button", name: "What is a map?" },
+          { page: "home", kind: "button", name: "Open devtools" },
+        ],
+      },
+      proposals: [],
+      rules: [{ category: "dev-only", label: "devtools", reason: "not part of the app" }],
+    });
+
+    const byName = new Map(ledger.capabilities.map((item) => [item.trigger.name, item]));
+    expect(byName.get("Sign out")).toMatchObject({ status: "excluded", category: "session" });
+    expect(byName.get("Delete account")?.reason).toContain("destructive: removes data");
+    expect(byName.get("Open devtools")).toMatchObject({
+      status: "excluded",
+      category: "dev-only",
+    });
+    expect(byName.get("Notifications")?.status).toBe("missing");
+    expect(byName.get("What is a map?")?.status).toBe("missing");
+  });
 });

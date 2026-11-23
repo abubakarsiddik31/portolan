@@ -74,11 +74,27 @@ Options (build, update):
   --start "<cmd>"        command that starts the app before the build
   --verify               run every op on a fresh session
   --verify-writes        also verify writes (they run for real)
+  --allow-cost           also verify ops whose run fired a cost or destructive request
   --publish              publish verified ops (needs --verify)
   --require-complete     fail while any capability is missing or stale
   --strict               with --require-complete, also fail on unavailable controls
 ${BROWSER_FLAGS}
 ${CONFIG_FLAG}`,
+
+  policy: `portolan policy allow <host...> [options]
+
+Add hosts to a site's egress allow list (policies/<site>.json). A request to any
+other host is refused.
+
+Options:
+  --site <name>          site name (default: from config)
+${CONFIG_FLAG}
+
+Rules for what must not be mapped or run unattended live in the same file:
+  "rules": [{ "category": "cost", "request": "POST */ask/stream*", "reason": "LLM call" },
+            { "category": "destructive", "label": "\\bdelete\\b" }]
+A rule matches a control's label, or a request its run fired. cost and
+destructive rules keep an op out of verification unless --allow-cost is passed.`,
 
   compile: `portolan compile <trace...> --map <file> [options]
 

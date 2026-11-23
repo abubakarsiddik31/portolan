@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-
+import { type PolicyRule, ruleMatchesLabel, ruleReason } from "@abubakarsiddiik/substrate";
 import type { DomDiscovery } from "./dom.js";
 import { slug } from "./draft.js";
 import type {
@@ -14,16 +14,31 @@ import type {
 
 export const CAPABILITIES_FILE = "capabilities.json";
 
-/** Irreversible or account-level actions we never auto-run. */
-const DEFAULT_EXCLUDE: RegExp[] = [
-  /\b(sign out|log ?out|logout)\b/i,
-  /\b(delete|remove|destroy|revoke)\b/i,
-  /\b(upgrade|purchase|buy|billing|payment|checkout|subscribe)\b/i,
-  /\btoggle (sidebar|menu|navigation)\b/i,
-  /^(notifications?|\d+)$/i,
-  /^(menu|close|dismiss)$/i,
-  /\?$/,
-  /^(USD|BDT|EUR|GBP|CAD|AUD)$/i,
+/**
+ * Shipped exclusion rules, matched on a control's label. A site's own
+ * `policies/<site>.json` rules are added to these. A notifications bell or a
+ * suggested question ending in "?" are ordinary controls and are not listed.
+ */
+export const DEFAULT_RULES: PolicyRule[] = [
+  { category: "session", label: "\\b(sign out|log ?out|logout)\\b", reason: "ends the session" },
+  {
+    category: "destructive",
+    label: "\\b(delete|remove|destroy|revoke)\\b",
+    reason: "removes data",
+  },
+  {
+    category: "billing",
+    label: "\\b(upgrade|purchase|buy|billing|payment|checkout|subscribe)\\b",
+    reason: "changes what the account pays",
+  },
+  {
+    category: "layout",
+    label: "\\btoggle (sidebar|menu|navigation)\\b",
+    reason: "page chrome",
+  },
+  { category: "layout", label: "^(menu|close|dismiss)$", reason: "page chrome" },
+  { category: "layout", label: "^\\d+$", reason: "a page or row number" },
+  { category: "layout", label: "^(USD|BDT|EUR|GBP|CAD|AUD)$", reason: "a currency label" },
 ];
 
 export type BuildCapabilitiesInput = {
@@ -34,8 +49,10 @@ export type BuildCapabilitiesInput = {
   proposals: OpProposal[];
   /** The previous ledger; code/manual entries survive and vanished live ones go stale. */
   previous?: CapabilityLedger;
-  /** Extra exclusion patterns, appended to the defaults. */
+  /** Extra label patterns (`--exclude`), recorded under the category `manual`. */
   exclude?: string[];
+  /** The site policy's rules, added to {@link DEFAULT_RULES}. */
+  rules?: PolicyRule[];
   /** Proposals that failed or skipped verification, by op name, with the reason. */
   unverified?: Map<string, string>;
   now?: string;
@@ -51,9 +68,10 @@ export type BuildCapabilitiesInput = {
  * its trigger is `missing` and the verification failure is the reason.
  */
 export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedger {
-  const exclude = [
-    ...DEFAULT_EXCLUDE,
-    ...(input.exclude ?? []).map((pattern) => new RegExp(pattern, "i")),
+  const exclude: PolicyRule[] = [
+    ...DEFAULT_RULES,
+    ...(input.rules ?? []),
+    ...(input.exclude ?? []).map((label) => ({ category: "manual", label })),
   ];
   const previous = new Map((input.previous?.capabilities ?? []).map((item) => [item.id, item]));
   const next = new Map<string, Capability>();
@@ -75,11 +93,12 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
       const covering = input.proposals.filter((candidate) => covers(action, candidate));
       const proposal = covering.find((candidate) => !unverified.has(candidate.op.name));
       const failed = covering.find((candidate) => unverified.has(candidate.op.name));
-      const excludedBy = exclude.find((pattern) => pattern.test(action.name));
+      const excludedBy = exclude.find((rule) => ruleMatchesLabel(rule, action.name));
 
       let status: CapabilityStatus = "missing";
       let reason: string | undefined;
       let precondition: string | undefined;
+      let category: string | undefined;
 
       if (proposal !== undefined) {
         status = "mapped";
@@ -87,7 +106,8 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
         reason = unverified.get(failed.op.name);
       } else if (excludedBy !== undefined) {
         status = "excluded";
-        reason = "matches an exclusion pattern; record it manually if it is safe";
+        reason = `${ruleReason(excludedBy)}; record it manually if it is safe`;
+        category = excludedBy.category;
       } else if (action.disabled === true) {
         status = "unavailable";
         precondition = `disabled on ${action.page} in this data`;
@@ -106,6 +126,7 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
         ...(proposal !== undefined ? { op: proposal.op.name } : {}),
         ...(reason !== undefined ? { reason } : {}),
         ...(precondition !== undefined ? { precondition } : {}),
+        ...(category !== undefined ? { category } : {}),
       });
     }
   }

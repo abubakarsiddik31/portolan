@@ -9,6 +9,7 @@ import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substra
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runMapBuild, seedPolicy, setupFor } from "./map.js";
+import { blockedHosts, runPolicyAllow } from "./policy.js";
 
 const dirs: string[] = [];
 
@@ -494,5 +495,135 @@ describe("seedPolicy", () => {
     const policy = { site: "app", allow: ["app.example.com"] };
     expect(seedPolicy(policy, "http://localhost:5173/")).toBe(policy);
     expect(seedPolicy(undefined, "http://localhost:5173/")).toBeUndefined();
+  });
+});
+
+describe("cost and destructive rules", () => {
+  const at = "2026-11-17T00:00:00.000Z";
+
+  function setup() {
+    const dir = tempDir();
+    const tracePath = join(dir, "trace.json");
+    writeFileSync(
+      tracePath,
+      JSON.stringify({
+        scope_id: "run-1",
+        sid: "sid-1",
+        intent: "ask",
+        effect: "write",
+        started_at: at,
+        ended_at: at,
+        entries: [
+          {
+            kind: "act",
+            at,
+            ref: "e1",
+            do: "click",
+            locator: { role: "button", name: "Ask", ordinal: 0 },
+            doc: 1,
+            v: 1,
+            url: "http://app.test/chat",
+            effects: [
+              {
+                kind: "network",
+                method: "POST",
+                url: "http://app.test/api/ask/stream",
+                status: 200,
+                request_body: { q: "hi" },
+                response_body: { ok: true },
+              },
+            ],
+            delta: { navigation: false, entries: [] },
+          },
+        ],
+      }),
+    );
+    const policies = join(dir, "policies");
+    mkdirSync(policies);
+    writeFileSync(
+      join(policies, "app.json"),
+      JSON.stringify({
+        site: "app",
+        allow: ["app.test"],
+        rules: [{ category: "cost", request: "POST */ask/stream*", reason: "LLM call" }],
+      }),
+    );
+    const paramsPath = join(dir, "params.json");
+    writeFileSync(paramsPath, JSON.stringify({ ask: [{}, {}, {}] }));
+    return { dir, tracePath, policies, paramsPath };
+  }
+
+  const input = (s: ReturnType<typeof setup>, extra: Record<string, unknown> = {}) => ({
+    site: "app",
+    mapsDir: join(s.dir, "maps"),
+    traces: [s.tracePath],
+    baseUrl: "http://app.test",
+    policiesDir: s.policies,
+    paramsPath: s.paramsPath,
+    verify: true,
+    verifyWrites: true,
+    publish: false,
+    ...extra,
+  });
+
+  it("keeps an op whose run fired a cost request out of verification", async () => {
+    const s = setup();
+    const seen: string[] = [];
+    const recording: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => {
+      seen.push(options.op.name);
+      return { op: options.op.name, verified: true, impls: [] } satisfies VerifyReport;
+    };
+
+    const result = await runMapBuild(input(s), { substrate, verify: recording });
+
+    expect(seen).toEqual([]);
+    expect(result.draft.proposals[0]?.risk).toEqual({
+      category: "cost",
+      reason: "cost: LLM call",
+    });
+    expect(result.draft.tasks).toContainEqual(
+      expect.objectContaining({
+        kind: "confirm_effect",
+        message: expect.stringContaining("--allow-cost"),
+      }),
+    );
+
+    const allowed = await runMapBuild(input(s, { allowCost: true }), {
+      substrate,
+      verify: recording,
+    });
+    expect(allowed.verified).toEqual(["ask"]);
+  });
+});
+
+describe("policy allow", () => {
+  it("adds hosts once and creates the policy when missing", () => {
+    const dir = tempDir();
+    expect(
+      runPolicyAllow({ site: "app", policiesDir: dir, hosts: ["localhost:8000"] }).added,
+    ).toEqual(["localhost:8000"]);
+    const again = runPolicyAllow({
+      site: "app",
+      policiesDir: dir,
+      hosts: ["localhost:8000", "api.test"],
+    });
+    expect(again.added).toEqual(["api.test"]);
+    expect(JSON.parse(readFileSync(again.path, "utf8"))).toEqual({
+      site: "app",
+      allow: ["localhost:8000", "api.test"],
+    });
+    expect(() => runPolicyAllow({ site: "app", policiesDir: dir, hosts: [] })).toThrow(
+      /at least one host/,
+    );
+  });
+
+  it("finds the hosts egress refused", () => {
+    expect(
+      blockedHosts([
+        "could not open http://localhost:8000/x: egress blocked: GET http://localhost:8000/x (not_allowed)",
+        "could not open http://a.test/: egress blocked: GET http://a.test/ (private_address)",
+        "something else",
+      ]),
+    ).toEqual(["localhost:8000"]);
   });
 });

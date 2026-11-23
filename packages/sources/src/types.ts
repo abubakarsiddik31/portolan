@@ -22,6 +22,8 @@ export type OpProposal = {
   confidence: "high" | "medium" | "low";
   /** Observed parameter sets, when the source had them. */
   sample_params?: Array<Record<string, unknown>>;
+  /** A policy rule the recorded run tripped; `cost` and `destructive` gate verification. */
+  risk?: { category: string; reason: string };
   trigger?: MapTrigger;
   notes?: string[];
 };
@@ -56,6 +58,8 @@ export type Capability = {
   reason?: string;
   /** What must be true before an `unavailable` control can be used. */
   precondition?: string;
+  /** The policy rule category behind an `excluded` status. */
+  category?: string;
 };
 
 export type CapabilityLedger = {

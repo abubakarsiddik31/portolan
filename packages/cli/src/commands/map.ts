@@ -276,6 +276,11 @@ export async function runMapBuild(
     const params = readParams(input.paramsPath);
     const candidates = draft.proposals.slice();
 
+    // Discovery is done with its browser. Verification opens its own, so
+    // holding this one would keep two Chromes alive for the whole verify phase.
+    await close?.();
+    close = undefined;
+
     const reports: VerifyReport[] = [];
     const verified: string[] = [];
     const unverified = new Map<string, string>();

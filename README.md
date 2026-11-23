@@ -298,7 +298,7 @@ hand-written operations beat a step-by-step browser agent on steps and cost
 before building more. See [the build plan](./docs/BUILD_PLAN.md) and
 [decisions](./docs/DECISIONS.md).
 
-**v0.2.0** is the current alpha, published to npm as `@abubakarsiddiik/*`
+**v0.2.2** is the current alpha, published to npm as `@abubakarsiddiik/*`
 (v0.1.0 was the first public release). The G0–G2 gates have not passed yet, so
 treat it as an early alpha: `webmcp` is reserved in the map format and has no
 executor.

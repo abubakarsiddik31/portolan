@@ -574,7 +574,7 @@ Enforcement, in the runner and engine rather than in the agent-authored case:
 
 - a run in a read-only environment skips cases whose `effect` is not `read`, and
   the browser context aborts every request that is not GET, HEAD, or OPTIONS;
-- a `goto` off the environment origin fails with `precondition_failed`;
+- a `goto`, an `http` op request, or a `url` op navigation off the environment origin fails with `precondition_failed` (a server redirect is not blocked);
 - an `${env.QA_*}` value is resolved only while the page is on that origin;
 - a missing session is `auth_missing` with the sign-in command in `details.next`.
 

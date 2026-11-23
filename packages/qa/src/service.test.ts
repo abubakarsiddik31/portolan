@@ -368,6 +368,27 @@ describe("QaService environments", () => {
     );
   });
 
+  it("does not mark a case broken when a read-only environment refuses it", async () => {
+    const { service, save } = envService(() => new FakeApp("Login"));
+    save("prod", "readonly");
+    service.caseWrite(
+      loginCase({
+        id: "checkout/pay",
+        effect: "irreversible",
+        map: { site: "store", version: 1, op: "checkout" },
+      }),
+    );
+
+    const reports = await service.verify(
+      { ids: ["checkout/pay"] },
+      { env: "prod", as: "readonly" },
+    );
+
+    expect(reports[0]?.verified).toBe(false);
+    expect(reports[0]?.reason).toMatch(/read-only/);
+    expect(service.caseRead("checkout/pay").row.status).toBe("draft");
+  });
+
   it("lists environments with session presence and no path or credential", () => {
     const { service, save, home } = envService(() => new FakeApp("Login"));
     save("prod", "readonly");

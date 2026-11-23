@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { authStatePath, parseEnvironments } from "@abubakarsiddiik/qa";
@@ -108,6 +116,27 @@ describe("runAuthLogin, confirmed sign-in", () => {
     expect(result.out).toBe(out);
     expect(statSync(out).mode & 0o777).toBe(0o600);
     expect(statSync(join(dir, "sessions")).mode & 0o777).toBe(0o700);
+  });
+});
+
+describe("runAuthLogin, failed write", () => {
+  it("leaves no half-written session behind", async () => {
+    const dir = tempDir();
+    const out = join(dir, "admin.json");
+    mkdirSync(join(out, "occupied"), { recursive: true });
+
+    await expect(
+      runAuthLogin(
+        { url: "https://app.test/sign-in", out, confirm: async () => undefined },
+        {
+          launch: (async () =>
+            fakeEngine(() => "https://app.test/sign-in", { closed: false })) as never,
+          log: () => undefined,
+        },
+      ),
+    ).rejects.toThrow();
+
+    expect(readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
   });
 });
 

@@ -181,7 +181,74 @@ async function runAttempt(
     { ...outer, secretValues: secrets },
     evidenceMode,
   );
-  return secrets.size === 0 ? result : (redactValues(result, [], secrets) as CaseResult);
+  return scrubResult(result, secrets);
+}
+
+/**
+ * Scrub resolved secrets from the free-text fields of a result.
+ *
+ * Structural fields (`case_id`, `status`, `fail_code`, an event's `kind`) are
+ * left alone: a short secret such as `admin` must not rewrite a case id or a
+ * status the store and `verify` read back.
+ */
+export function scrubResult(result: CaseResult, secrets: Set<string>): CaseResult {
+  if (secrets.size === 0) return result;
+  const scrub = (value: unknown): unknown => redactValues(value, [], secrets);
+
+  return {
+    ...result,
+    ...(result.fail_reason !== undefined
+      ? { fail_reason: redactText(result.fail_reason, [], secrets) }
+      : {}),
+    ...(result.expected !== undefined ? { expected: scrub(result.expected) } : {}),
+    ...(result.actual !== undefined ? { actual: scrub(result.actual) } : {}),
+    ...(result.events !== undefined
+      ? { events: result.events.map((event) => scrubEvent(event, secrets)) }
+      : {}),
+  };
+}
+
+function scrubEvent(event: StepEvent, secrets: Set<string>): StepEvent {
+  return event.detail === undefined
+    ? event
+    : { ...event, detail: redactValues(event.detail, [], secrets) };
+}
+
+/**
+ * Hold a substrate to one origin: `goto` and `fetch` throw for any other. Map
+ * ops reach the network through these two, and an op route may be absolute.
+ */
+export function confineToOrigin(substrate: QaSubstrate, origin: string): QaSubstrate {
+  const check = (url: string): void => {
+    if (originOf(url) !== origin) {
+      throw new QaError(
+        "precondition_failed",
+        `request to ${url} leaves the environment origin ${origin}`,
+      );
+    }
+  };
+
+  return new Proxy(substrate, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target) as unknown;
+      if (typeof value !== "function") return value;
+      const method = value as (...args: unknown[]) => unknown;
+
+      if (property === "goto") {
+        return (url: string, ...rest: unknown[]) => {
+          check(url);
+          return method.call(target, url, ...rest);
+        };
+      }
+      if (property === "fetch") {
+        return (request: { url: string }, ...rest: unknown[]) => {
+          check(request.url);
+          return method.call(target, request, ...rest);
+        };
+      }
+      return method.bind(target);
+    },
+  });
 }
 
 async function attemptCore(
@@ -199,7 +266,7 @@ async function attemptCore(
 
   try {
     const create = input.createSubstrate ?? defaultCreateSubstrate;
-    substrate = await create({
+    const created = await create({
       baseUrl: input.baseUrl,
       headless: input.headless ?? true,
       ...(input.executablePath !== undefined ? { executablePath: input.executablePath } : {}),
@@ -208,6 +275,10 @@ async function attemptCore(
         ? { storageState: input.environment.storageState, readOnly: !input.environment.writes }
         : {}),
     });
+    substrate =
+      input.environment === undefined
+        ? created
+        : confineToOrigin(created, input.environment.origin);
 
     const live = substrate;
     const context: ResolveContext = {
@@ -375,13 +446,17 @@ export async function replaySteps(input: {
   now?: () => Date;
 }): Promise<void> {
   const secrets = new Set<string>();
+  const substrate =
+    input.environment === undefined
+      ? input.substrate
+      : confineToOrigin(input.substrate, input.environment.origin);
   const context: ResolveContext = {
     fixtures: input.fixtures ?? {},
     env: input.env ?? process.env,
     redact: input.redact ?? [],
     secrets,
     ...(input.environment !== undefined
-      ? { beforeEnv: () => assertOnOrigin(input.substrate, input.environment as RunEnvironment) }
+      ? { beforeEnv: () => assertOnOrigin(substrate, input.environment as RunEnvironment) }
       : {}),
   };
   const map =
@@ -395,7 +470,7 @@ export async function replaySteps(input: {
       input.spec.steps.slice(0, Math.max(0, input.uptoStep)),
     ]) {
       for (const step of steps) {
-        await executeStep(resolveStep(step, context) as QaStep, input.substrate, {
+        await executeStep(resolveStep(step, context) as QaStep, substrate, {
           baseUrl: input.baseUrl,
           ...(input.environment !== undefined ? { origin: input.environment.origin } : {}),
           timeoutMs: input.timeoutMs ?? 15_000,
@@ -861,12 +936,12 @@ function writeEvidenceSync(input: {
     );
     writeFileSync(
       join(dir, "result.json"),
-      `${JSON.stringify(redactValues(input.result, redact, input.input.secretValues), null, 2)}\n`,
+      `${JSON.stringify(redactValues(scrubResult(input.result, input.input.secretValues ?? new Set()), redact), null, 2)}\n`,
       "utf8",
     );
     writeFileSync(
       join(dir, "events.jsonl"),
-      `${(input.result.events ?? []).map((event) => JSON.stringify(redactValues(event, redact, input.input.secretValues))).join("\n")}\n`,
+      `${(input.result.events ?? []).map((event) => JSON.stringify(redactValues(scrubEvent(event, input.input.secretValues ?? new Set()), redact))).join("\n")}\n`,
       "utf8",
     );
     return dir;
@@ -903,7 +978,7 @@ async function writeEvidence(input: {
     );
     writeFileSync(
       join(dir, "result.json"),
-      `${JSON.stringify(redactValues(input.result, redact, input.input.secretValues), null, 2)}\n`,
+      `${JSON.stringify(redactValues(scrubResult(input.result, input.input.secretValues ?? new Set()), redact), null, 2)}\n`,
       "utf8",
     );
 

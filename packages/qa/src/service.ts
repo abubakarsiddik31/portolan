@@ -549,6 +549,10 @@ export class QaService {
       }
 
       const failed = results.find((result) => result.status !== "pass");
+      // A read-only environment skips a write case; that says nothing about the case.
+      const refused = results.every(
+        (result) => result.status === "skip" && result.fail_code === "precondition_failed",
+      );
       const report: VerifyReport = {
         case_id: spec.id,
         verified: failed === undefined,
@@ -568,7 +572,7 @@ export class QaService {
         });
         const loaded = readCaseFile(path);
         this.store.putCase(loaded, { note: "verified", status: "verified" });
-      } else {
+      } else if (!refused) {
         this.store.setStatus(spec.id, "broken");
       }
 

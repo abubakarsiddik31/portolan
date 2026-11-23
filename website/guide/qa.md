@@ -97,8 +97,9 @@ picks names. It never sees a password, cookie, or session path.
   whose `effect` is not `read`, and the browser aborts any non-GET, HEAD, or
   OPTIONS request. An app that reads over POST (GraphQL) needs `"writes": true`
   with a read-only account.
-- **A run stays on its origin.** A `goto` to another origin fails, and a
-  `${env.QA_*}` value is only typed on the environment's origin.
+- **A run stays on its origin.** A `goto`, an op's `http` request, or an op's
+  `url` navigation to another origin fails, and a `${env.QA_*}` value is only
+  typed on the environment's origin. A server redirect is not blocked.
 - **An expired session** fails like any broken page; the result's `next` names
   the `auth login` command for a person to run.
 - `QA_BASE_URL` cannot be combined with `--env`. Unknown keys under an

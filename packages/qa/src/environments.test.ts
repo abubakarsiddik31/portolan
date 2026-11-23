@@ -134,6 +134,15 @@ describe("resolveEnvironment", () => {
     ).toBe("invalid_request");
   });
 
+  it("treats an Object.prototype name as unknown, not a crash", () => {
+    const options = { root: "/work/app", home: home(), env: {} };
+    for (const name of ["constructor", "toString", "__proto__"]) {
+      expect(code(() => resolveEnvironment(environments, { env: name }, options))).toBe(
+        "not_found",
+      );
+    }
+  });
+
   it("asks a person to sign in when the session is missing", () => {
     try {
       resolveEnvironment(

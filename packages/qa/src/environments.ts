@@ -161,7 +161,9 @@ export function resolveEnvironment(
   }
 
   const known = Object.keys(environments);
-  const found = environments[selection.env];
+  const found = Object.hasOwn(environments, selection.env)
+    ? environments[selection.env]
+    : undefined;
   if (found === undefined) {
     throw new QaError(
       "not_found",

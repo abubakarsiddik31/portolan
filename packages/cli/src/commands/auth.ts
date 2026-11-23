@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, mkdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { authStatePath, loginCommand, type QaEnvironment } from "@abubakarsiddiik/qa";
@@ -107,8 +115,13 @@ function pathOf(url: string): string {
 function writeSessionFile(path: string, body: string): void {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const temp = `${path}.${process.pid}.tmp`;
-  writeFileSync(temp, `${body}\n`, { mode: 0o600 });
-  renameSync(temp, path);
+  try {
+    writeFileSync(temp, `${body}\n`, { mode: 0o600 });
+    renameSync(temp, path);
+  } catch (error) {
+    rmSync(temp, { force: true });
+    throw error;
+  }
   chmodSync(path, 0o600);
 }
 
@@ -122,7 +135,7 @@ export function resolveLoginTarget(
   profile: string | undefined,
   home?: string,
 ): EnvLoginTarget {
-  const found = environments[env];
+  const found = Object.hasOwn(environments, env) ? environments[env] : undefined;
   if (found === undefined) {
     const known = Object.keys(environments);
     throw new Error(

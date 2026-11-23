@@ -7,7 +7,7 @@ import { buildRefMap } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
 import type { RunEnvironment } from "./environments.js";
-import { runCases } from "./runner.js";
+import { confineToOrigin, runCases } from "./runner.js";
 import { parseCase, type QaCase } from "./spec.js";
 import type { QaSubstrate, QaView } from "./types.js";
 
@@ -378,5 +378,75 @@ describe("runCases, environments", () => {
       new FakeSubstrate(),
     );
     expect(outcome.results[0]?.status).toBe("pass");
+  });
+});
+
+describe("scrubbing leaves structure alone", () => {
+  it("does not rewrite the case id or status when a short secret matches them", async () => {
+    const fake = new FakeSubstrate();
+    fake.fillSticks = false;
+
+    const outcome = await runCases({
+      baseUrl: "http://app",
+      cases: [
+        caseSpec({
+          id: "admin-login",
+          steps: [{ goto: "/sign-in" }, fillSecret("Password")],
+          expect: [{ visible: { role: "textbox", name: "Password" } }],
+        }),
+      ],
+      trusted: ["admin-login"],
+      evidence: "none",
+      env: { QA_PASSWORD: "admin" },
+      createSubstrate: () => fake,
+    });
+
+    const result = outcome.results[0];
+    expect(result).toMatchObject({
+      case_id: "admin-login",
+      status: "fail",
+      fail_code: "value_lost",
+    });
+    expect(outcome.summary).toEqual({ pass: 0, fail: 1, skip: 0, error: 0 });
+    expect(JSON.stringify(result?.actual)).toContain("[redacted]");
+    expect(JSON.stringify(result?.actual)).not.toContain("admin");
+  });
+});
+
+describe("confineToOrigin", () => {
+  function calls() {
+    const seen: string[] = [];
+    const base = {
+      goto: (url: string) => {
+        seen.push(`goto ${url}`);
+        return Promise.resolve({});
+      },
+      fetch: (request: { url: string }) => {
+        seen.push(`fetch ${request.url}`);
+        return Promise.resolve({});
+      },
+      state: () => ({ marker: "state" }),
+    };
+    return {
+      seen,
+      substrate: confineToOrigin(base as never, "http://app") as never as typeof base,
+    };
+  }
+
+  it("lets same-origin goto and fetch through and keeps other methods working", async () => {
+    const { seen, substrate } = calls();
+    await substrate.goto("http://app/x");
+    await substrate.fetch({ url: "http://app/api" });
+    expect(seen).toEqual(["goto http://app/x", "fetch http://app/api"]);
+    expect(substrate.state()).toEqual({ marker: "state" });
+  });
+
+  it("refuses an off-origin goto or fetch, as a map op with an absolute route would make", () => {
+    const { seen, substrate } = calls();
+    expect(() => substrate.goto("https://evil.test/")).toThrow(/leaves the environment origin/);
+    expect(() => substrate.fetch({ url: "https://evil.test/c?k=1" })).toThrow(
+      /leaves the environment origin/,
+    );
+    expect(seen).toEqual([]);
   });
 });

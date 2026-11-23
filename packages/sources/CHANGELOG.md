@@ -1,5 +1,12 @@
 # @abubakarsiddiik/sources
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [af649af]
+  - @abubakarsiddiik/protocol@0.2.1
+
 ## 0.2.1
 
 ### Patch Changes

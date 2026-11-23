@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { findChrome } from "./chrome.js";
 import type { Snapshot } from "./engine.js";
-import { PlaywrightEngine } from "./playwright-engine.js";
+import { BrowserHandle, PlaywrightEngine } from "./playwright-engine.js";
 
 const PAGE = `<!doctype html>
 <html lang="en">
@@ -251,5 +251,33 @@ describe.skipIf(!ENABLED)("playwright engine, read-only", () => {
     expect(del).toBe("blocked");
     expect(seen).toContain("GET /read");
     expect(seen.some((line) => line.startsWith("POST") || line.startsWith("DELETE"))).toBe(false);
+  });
+});
+
+describe.skipIf(!ENABLED)("playwright engine, shared browser", () => {
+  it("opens isolated contexts in one browser and leaves it open when one closes", async () => {
+    const handle = await BrowserHandle.launch({ executablePath: chromePath() });
+
+    try {
+      const first = await PlaywrightEngine.launch({
+        executablePath: chromePath(),
+        browser: handle,
+      });
+      const second = await PlaywrightEngine.launch({
+        executablePath: chromePath(),
+        browser: handle,
+      });
+
+      await first.navigate("data:text/html,<title>one</title>");
+      await first.close();
+
+      expect(handle.browser.isConnected()).toBe(true);
+      expect((await second.navigate("data:text/html,<title>two</title>")).title).toBe("two");
+      await second.close();
+    } finally {
+      await handle.close();
+    }
+
+    expect(handle.browser.isConnected()).toBe(false);
   });
 });

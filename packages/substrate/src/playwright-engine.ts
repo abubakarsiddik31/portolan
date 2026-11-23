@@ -48,6 +48,12 @@ export type PlaywrightEngineOptions = {
    * process dies without a graceful close.
    */
   instanceId?: string;
+  /**
+   * Run in a fresh context of an already launched browser instead of
+   * launching one. `close()` then closes only the context, so many isolated
+   * runs share one Chrome process.
+   */
+  browser?: BrowserHandle;
 };
 
 type AxValue = { value?: string | number | boolean };
@@ -140,6 +146,43 @@ const LEAN_ARGS = [
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
+/**
+ * One Chrome process that several engines can open contexts in. Every launch
+ * of the real Chrome costs a process, so a run that needs many isolated
+ * sessions should launch once and open a context per run.
+ */
+export class BrowserHandle {
+  private constructor(readonly browser: Browser) {}
+
+  static async launch(
+    options: Pick<
+      PlaywrightEngineOptions,
+      "executablePath" | "headless" | "launchArgs" | "instanceId"
+    >,
+  ): Promise<BrowserHandle> {
+    const args = [...LEAN_ARGS, ...(options.launchArgs ?? [])];
+    if (options.instanceId !== undefined) {
+      args.push(`--portolan-instance=${options.instanceId}`);
+    }
+
+    return new BrowserHandle(
+      await chromium.launch({
+        executablePath: options.executablePath,
+        headless: options.headless ?? true,
+        args,
+      }),
+    );
+  }
+
+  async close(): Promise<void> {
+    try {
+      await this.browser.close();
+    } catch {
+      // Closing an already-closed browser is a no-op.
+    }
+  }
+}
+
 export class PlaywrightEngine implements Engine {
   private readonly timeoutMs: number;
   private doc = 0;
@@ -161,23 +204,17 @@ export class PlaywrightEngine implements Engine {
     private readonly page: Page,
     private readonly cdp: CDPSession,
     timeoutMs: number,
+    private readonly ownsBrowser: boolean,
   ) {
     this.timeoutMs = timeoutMs;
   }
 
   static async launch(options: PlaywrightEngineOptions): Promise<PlaywrightEngine> {
-    const args = [...LEAN_ARGS, ...(options.launchArgs ?? [])];
-    if (options.instanceId !== undefined) {
-      args.push(`--portolan-instance=${options.instanceId}`);
-    }
+    const ownsBrowser = options.browser === undefined;
+    const handle = options.browser ?? (await BrowserHandle.launch(options));
+    const browser = handle.browser;
 
-    const browser = await chromium.launch({
-      executablePath: options.executablePath,
-      headless: options.headless ?? true,
-      args,
-    });
-
-    let context: BrowserContext;
+    let context: BrowserContext | undefined;
     let page: Page;
     let cdp: CDPSession;
     let downloadDir: string;
@@ -198,11 +235,19 @@ export class PlaywrightEngine implements Engine {
       downloadDir = await mkdtemp(join(tmpdir(), "portolan-download-"));
     } catch (error) {
       // A bad storage state or a failed page must not leave Chrome running.
-      await browser.close().catch(() => {});
+      if (ownsBrowser) await browser.close().catch(() => {});
+      else await context?.close().catch(() => {});
       throw error;
     }
 
-    const engine = new PlaywrightEngine(browser, context, page, cdp, options.timeoutMs ?? 30_000);
+    const engine = new PlaywrightEngine(
+      browser,
+      context,
+      page,
+      cdp,
+      options.timeoutMs ?? 30_000,
+      ownsBrowser,
+    );
 
     page.on("framenavigated", (frame) => {
       if (frame === page.mainFrame()) engine.doc += 1;
@@ -378,7 +423,8 @@ export class PlaywrightEngine implements Engine {
 
   async close(): Promise<void> {
     try {
-      await this.browser.close();
+      if (this.ownsBrowser) await this.browser.close();
+      else await this.context.close();
     } catch {
       // Closing an already-closed browser is a no-op.
     }

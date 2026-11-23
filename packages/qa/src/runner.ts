@@ -17,6 +17,7 @@ import type { EvidenceMode } from "./config.js";
 import type { RunEnvironment } from "./environments.js";
 import { QaError, type QaErrorCode } from "./errors.js";
 import {
+  caseNames,
   type Fixtures,
   type ResolveContext,
   redactText,
@@ -936,7 +937,16 @@ function writeEvidenceSync(input: {
     );
     writeFileSync(
       join(dir, "result.json"),
-      `${JSON.stringify(redactValues(scrubResult(input.result, input.input.secretValues ?? new Set()), redact), null, 2)}\n`,
+      `${JSON.stringify(
+        redactValues(
+          scrubResult(input.result, input.input.secretValues ?? new Set()),
+          redact,
+          [],
+          caseNames(input.result.case_id),
+        ),
+        null,
+        2,
+      )}\n`,
       "utf8",
     );
     writeFileSync(
@@ -978,7 +988,16 @@ async function writeEvidence(input: {
     );
     writeFileSync(
       join(dir, "result.json"),
-      `${JSON.stringify(redactValues(scrubResult(input.result, input.input.secretValues ?? new Set()), redact), null, 2)}\n`,
+      `${JSON.stringify(
+        redactValues(
+          scrubResult(input.result, input.input.secretValues ?? new Set()),
+          redact,
+          [],
+          caseNames(input.result.case_id),
+        ),
+        null,
+        2,
+      )}\n`,
       "utf8",
     );
 

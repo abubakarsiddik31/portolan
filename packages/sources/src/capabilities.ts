@@ -53,6 +53,8 @@ export type BuildCapabilitiesInput = {
   exclude?: string[];
   /** The site policy's rules, added to {@link DEFAULT_RULES}. */
   rules?: PolicyRule[];
+  /** Collapse a layout control seen on many pages into one capability. Default true. */
+  dedupe?: boolean;
   /** Proposals that failed or skipped verification, by op name, with the reason. */
   unverified?: Map<string, string>;
   /** Ops that passed verification in this run, for `last_verified`. */
@@ -78,12 +80,18 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
   const previous = new Map((input.previous?.capabilities ?? []).map((item) => [item.id, item]));
   const next = new Map<string, Capability>();
   const unverified = input.unverified ?? new Map<string, string>();
+  const superseded = new Set<string>();
   const now = input.now ?? new Date().toISOString();
 
   if (input.discovery !== undefined) {
     const seen = new Set<string>();
 
-    for (const action of input.discovery.surface) {
+    const grouped = groupGlobals(input.discovery.surface, input.dedupe !== false);
+    // The per-page entries an earlier ledger held for a control that is now
+    // global are superseded, not removed.
+    for (const id of grouped.superseded) superseded.add(id);
+
+    for (const action of grouped.actions) {
       const id = uniqueCapabilityId(action, seen);
       const previousItem = previous.get(id);
 
@@ -133,6 +141,8 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
         ...(reason !== undefined ? { reason } : {}),
         ...(precondition !== undefined ? { precondition } : {}),
         ...(category !== undefined ? { category } : {}),
+        ...(action.pages !== undefined ? { pages: action.pages } : {}),
+        ...(action.sample !== undefined ? { sample: action.sample } : {}),
         last_seen: now,
         ...lastVerified(
           proposal !== undefined && input.verified?.has(proposal.op.name) === true
@@ -145,7 +155,7 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
   }
 
   for (const [id, item] of previous) {
-    if (next.has(id)) continue;
+    if (next.has(id) || superseded.has(id)) continue;
 
     if (item.source !== "live") {
       next.set(id, item);
@@ -259,7 +269,72 @@ export function readCapabilities(dir: string): CapabilityLedger | undefined {
   return JSON.parse(readFileSync(path, "utf8")) as CapabilityLedger;
 }
 
-function covers(action: SurfaceAction, proposal: OpProposal): boolean {
+type GroupedAction = SurfaceAction & { pages?: string[] };
+
+const GLOBAL_MIN_PAGES = 3;
+
+/**
+ * A layout control (account menu, "Back to workspace") appears on every page
+ * and used to become one capability and one op per page. Collapse a control
+ * that sits in a landmark on `GLOBAL_MIN_PAGES` or more pages into one entry
+ * that lists them.
+ */
+function groupGlobals(
+  surface: SurfaceAction[],
+  enabled: boolean,
+): { actions: GroupedAction[]; superseded: string[] } {
+  if (!enabled) return { actions: surface, superseded: [] };
+
+  const groups = new Map<string, SurfaceAction[]>();
+  for (const action of surface) {
+    if (action.kind === "link" || action.landmark === undefined) continue;
+    const key = `${action.kind}\u0000${action.name.toLowerCase()}\u0000${action.landmark}`;
+    groups.set(key, [...(groups.get(key) ?? []), action]);
+  }
+
+  const merged = new Set<SurfaceAction>();
+  const actions: GroupedAction[] = [];
+  const superseded: string[] = [];
+
+  for (const members of groups.values()) {
+    const pages = [...new Set(members.map((member) => member.page))].sort();
+    if (pages.length < GLOBAL_MIN_PAGES) continue;
+
+    const first = members[0];
+    if (first === undefined) continue;
+    for (const member of members) {
+      merged.add(member);
+      superseded.push(makeCapabilityId(member));
+    }
+    const enabledSomewhere = members.some((member) => member.disabled !== true);
+    const { disabled: _off, ...rest } = first;
+    actions.push({
+      ...rest,
+      page: pages[0] ?? first.page,
+      pages,
+      ...(enabledSomewhere ? {} : { disabled: true }),
+    });
+  }
+
+  return { actions: [...surface.filter((action) => !merged.has(action)), ...actions], superseded };
+}
+
+/** True when a recorded control name fits an observed one, which may be a template. */
+function nameMatches(observed: string, recorded: string): boolean {
+  if (!observed.includes("{")) return observed.toLowerCase() === recorded.toLowerCase();
+
+  const source = observed
+    .replace(/[.*+?^${}()|[\]\\]/g, (char) => (char === "{" || char === "}" ? char : `\\${char}`))
+    .replace(/\{count\}/g, "\\d+")
+    .replace(/\{email\}/g, "\\S+@\\S+\\.\\S+");
+  return new RegExp(`^${source}$`, "i").test(recorded);
+}
+
+function onPage(action: GroupedAction, pages: string[]): boolean {
+  return (action.pages ?? [action.page]).some((page) => pages.includes(page));
+}
+
+function covers(action: GroupedAction, proposal: OpProposal): boolean {
   // A navigation link is covered by a url op for its target, wherever the link
   // appears. Counting it only on the page where it was first discovered made
   // every global nav link look missing on every other page.
@@ -277,22 +352,24 @@ function covers(action: SurfaceAction, proposal: OpProposal): boolean {
   if (
     trigger !== undefined &&
     trigger.kind === action.kind &&
-    trigger.name.toLowerCase() === action.name.toLowerCase() &&
-    trigger.page === action.page
+    nameMatches(action.name, trigger.name) &&
+    onPage(action, [trigger.page])
   ) {
     return true;
   }
 
   // A recorded run has no trigger metadata, but its ui steps still name the
   // button it clicked.
-  if (action.kind !== "button" || !proposal.op.from.includes(action.page)) return false;
+  if (action.kind !== "button" || !onPage(action, proposal.op.from)) return false;
 
   return proposal.op.impls.some(
     (impl) =>
       impl.tier === "ui" &&
       impl.steps.some(
         (step) =>
-          step.do === "click" && step.target.name === action.name && step.target.role === "button",
+          step.do === "click" &&
+          nameMatches(action.name, step.target.name ?? "") &&
+          step.target.role === "button",
       ),
   );
 }
@@ -303,16 +380,17 @@ export function makeCapabilityId(action: {
   kind: SurfaceAction["kind"];
   name: string;
   target?: string;
+  pages?: string[];
 }): string {
   // A navigation target is the same capability on every page that links to it.
   // Buttons and forms are page-specific because the same label can mean
   // different work in different places.
-  return action.kind === "link" && action.target !== undefined
-    ? `link.${action.target}`
-    : `${action.page}.${action.kind}.${slug(action.name, "action")}`;
+  if (action.kind === "link" && action.target !== undefined) return `link.${action.target}`;
+  if (action.pages !== undefined) return `global.${action.kind}.${slug(action.name, "action")}`;
+  return `${action.page}.${action.kind}.${slug(action.name, "action")}`;
 }
 
-function uniqueCapabilityId(action: SurfaceAction, seen: Set<string>): string {
+function uniqueCapabilityId(action: GroupedAction, seen: Set<string>): string {
   const base = makeCapabilityId(action);
   let id = base;
   let suffix = 2;

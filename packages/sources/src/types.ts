@@ -40,6 +40,10 @@ export type SurfaceAction = {
   href?: string;
   /** The control was disabled every time the crawl saw it. */
   disabled?: boolean;
+  /** The landmark it sits in (banner, navigation, complementary, contentinfo). */
+  landmark?: string;
+  /** The name as seen, when `name` is a template such as `Active {count}`. */
+  sample?: string;
 };
 
 export type CapabilityStatus =
@@ -66,6 +70,10 @@ export type Capability = {
   precondition?: string;
   /** The policy rule category behind an `excluded` status. */
   category?: string;
+  /** Every page a shared layout control appears on; `page` is the first. */
+  pages?: string[];
+  /** The name as seen, when the trigger name is a template. */
+  sample?: string;
   /** When a crawl last saw the control. */
   last_seen?: string;
   /** When an op covering it last passed verification. */

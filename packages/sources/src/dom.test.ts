@@ -1,7 +1,7 @@
 import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
-import { discoverDom } from "./dom.js";
+import { discoverDom, templateName } from "./dom.js";
 
 function node(input: Partial<SemanticNode> & { nodeId: string; role: string }): SemanticNode {
   return {
@@ -237,5 +237,48 @@ describe("discoverDom", () => {
 
     expect(byName.get("Next")?.disabled).toBe(true);
     expect(byName.get("Pay")?.disabled).toBeUndefined();
+  });
+});
+
+describe("templateName", () => {
+  it("templates data in a name but keeps a leading number", () => {
+    expect(templateName("Active 1")).toBe("Active {count}");
+    expect(templateName("Inbox (12)")).toBe("Inbox ({count})");
+    expect(templateName("Delete a@x.com")).toBe("Delete {email}");
+    expect(templateName("Remove b@y.org from organization")).toBe(
+      "Remove {email} from organization",
+    );
+    expect(templateName("30 days")).toBe("30 days");
+    expect(templateName("7")).toBe("7");
+    expect(templateName("Save")).toBe("Save");
+  });
+});
+
+describe("discoverDom layout controls and rows", () => {
+  const withLandmark = (path: string, rowEmail: string): Snapshot =>
+    page(`http://app.test${path}`, [
+      node({ nodeId: "root", role: "RootWebArea", name: path, childIds: ["hdr", "row", "l"] }),
+      node({ nodeId: "hdr", role: "banner", name: "", childIds: ["menu"] }),
+      node({ nodeId: "menu", role: "button", name: "Account menu" }),
+      node({ nodeId: "row", role: "row", name: "", childIds: ["del"] }),
+      node({ nodeId: "del", role: "button", name: `Delete ${rowEmail}` }),
+      node({ nodeId: "l", role: "link", name: "Next", attributes: { href: "/p2" } }),
+    ]);
+
+  it("records the landmark, and collapses rows that differ only by data", async () => {
+    const substrate = {
+      goto: async (url: string) => ({
+        snapshot: withLandmark(new URL(url).pathname === "/" ? "/" : "/p2", "a@x.com"),
+        refs: undefined,
+      }),
+    } as unknown as Substrate;
+
+    const result = await discoverDom({ site: "app", url: "http://app.test/", substrate });
+    const menu = result.surface.find((action) => action.name === "Account menu");
+    expect(menu?.landmark).toBe("banner");
+
+    const rows = result.surface.filter((action) => action.name.startsWith("Delete"));
+    expect(rows.every((action) => action.name === "Delete {email}")).toBe(true);
+    expect(rows[0]?.sample).toBe("Delete a@x.com");
   });
 });

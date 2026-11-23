@@ -396,6 +396,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           requireComplete: booleanFlag(args, "require-complete"),
           strict: booleanFlag(args, "strict"),
           allowCost: booleanFlag(args, "allow-cost"),
+          noDedupe: booleanFlag(args, "no-dedupe"),
           ...(listFlag(args, "exclude").length > 0 ? { exclude: listFlag(args, "exclude") } : {}),
           ...(stringFlag(args, "start") !== undefined
             ? { start: stringFlag(args, "start") }

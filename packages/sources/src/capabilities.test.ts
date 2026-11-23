@@ -382,4 +382,115 @@ describe("buildCapabilities", () => {
       "missing",
     );
   });
+
+  const clickOp = (name: string, from: string[], buttonName: string): OpProposal => {
+    const base = op(name, from[0] ?? "home", from[0] ?? "home");
+    return {
+      op: {
+        ...base,
+        from,
+        impls: [
+          {
+            tier: "ui",
+            steps: [{ do: "click", target: { role: "button", name: buttonName, ordinal: 0 } }],
+            extract: { kind: "none" },
+          },
+        ],
+      },
+      source: "traces",
+      provenance: "test",
+      confidence: "medium",
+    };
+  };
+
+  const menuOn = (pages: string[]): SurfaceAction[] =>
+    pages.map((page) => ({
+      page,
+      kind: "button" as const,
+      name: "Account menu",
+      landmark: "banner",
+    }));
+
+  it("collapses a layout control seen on many pages into one capability", () => {
+    const pages = ["a", "b", "c", "d"];
+    const ledger = buildCapabilities({
+      site: "app",
+      discovery: { ...discovery(), surface: menuOn(pages) },
+      proposals: [clickOp("open_account", ["c"], "Account menu")],
+    });
+
+    expect(ledger.capabilities).toHaveLength(1);
+    expect(ledger.capabilities[0]).toMatchObject({
+      id: "global.button.account_menu",
+      pages,
+      status: "mapped",
+      op: "open_account",
+    });
+
+    const perPage = buildCapabilities({
+      site: "app",
+      discovery: { ...discovery(), surface: menuOn(pages) },
+      proposals: [],
+      dedupe: false,
+    });
+    expect(perPage.capabilities).toHaveLength(4);
+  });
+
+  it("does not merge a control on fewer than three pages, or outside a landmark", () => {
+    const few = buildCapabilities({
+      site: "app",
+      discovery: { ...discovery(), surface: menuOn(["a", "b"]) },
+      proposals: [],
+    });
+    expect(few.capabilities).toHaveLength(2);
+
+    const body = buildCapabilities({
+      site: "app",
+      discovery: {
+        ...discovery(),
+        surface: ["a", "b", "c"].map((page) => ({
+          page,
+          kind: "button" as const,
+          name: "Save",
+        })),
+      },
+      proposals: [],
+    });
+    expect(body.capabilities).toHaveLength(3);
+  });
+
+  it("does not report the per-page entries of an earlier ledger as removed", () => {
+    const pages = ["a", "b", "c"];
+    const old = buildCapabilities({
+      site: "app",
+      discovery: { ...discovery(), surface: menuOn(pages) },
+      proposals: [],
+      dedupe: false,
+    });
+
+    const next = buildCapabilities({
+      site: "app",
+      discovery: { ...discovery(), surface: menuOn(pages), pages },
+      proposals: [],
+      previous: old,
+    });
+    expect(next.capabilities.map((item) => item.status)).toEqual(["missing"]);
+  });
+
+  it("covers a templated name by what was recorded", () => {
+    const ledger = buildCapabilities({
+      site: "app",
+      discovery: {
+        ...discovery(),
+        surface: [{ page: "home", kind: "button", name: "Active {count}", sample: "Active 1" }],
+      },
+      proposals: [clickOp("filter_active", ["home"], "Active 7")],
+    });
+
+    expect(ledger.capabilities[0]).toMatchObject({
+      status: "mapped",
+      op: "filter_active",
+      sample: "Active 1",
+    });
+  });
 });

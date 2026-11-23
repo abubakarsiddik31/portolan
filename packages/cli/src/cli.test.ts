@@ -65,6 +65,18 @@ describe("parseArgs", () => {
     expect(args.lists.op).toEqual(["x", "y"]);
   });
 
+  it("never lets --strict, --allow-cost or --no-dedupe take a value", () => {
+    const args = parseArgs([
+      "--strict",
+      "a.json",
+      "--allow-cost",
+      "b.json",
+      "--no-dedupe",
+      "c.json",
+    ]);
+    expect(args.positional).toEqual(["a.json", "b.json", "c.json"]);
+  });
+
   it("keeps the token after a boolean flag as a positional", () => {
     const args = parseArgs(["--verify", "--publish", "trace-1.json", "trace-2.json"]);
 

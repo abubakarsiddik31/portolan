@@ -78,6 +78,7 @@ Options (build, update):
   --verify               run every op on a fresh session
   --verify-writes        also verify writes (they run for real)
   --allow-cost           also verify ops whose run fired a cost or destructive request
+  --no-dedupe            keep a layout control seen on many pages as one entry per page
   --publish              publish verified ops (needs --verify)
   --require-complete     fail while any capability is missing or stale
   --strict               with --require-complete, also fail on unavailable controls

@@ -99,7 +99,11 @@ class FakeApp implements QaSubstrate {
 
 function makeService(createSubstrate: () => QaSubstrate): QaService {
   const root = mkdtempSync(join(tmpdir(), "portolan-qa-service-"));
-  const config = mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:" });
+  const config = mergeQaConfig(root, {
+    baseUrl: "http://app",
+    database: ":memory:",
+    timeoutMs: 150,
+  });
   return new QaService(config, { createSubstrate });
 }
 
@@ -296,7 +300,7 @@ describe("QaService environments", () => {
     const root = mkdtempSync(join(tmpdir(), "portolan-qa-service-"));
     const home = mkdtempSync(join(tmpdir(), "portolan-qa-home-"));
     const config = {
-      ...mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:" }),
+      ...mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:", timeoutMs: 150 }),
       environments: parseEnvironments({
         qa: { baseUrl: "http://qa.app.test", profiles: ["admin"] },
         prod: { baseUrl: "http://app.test", profiles: ["readonly", "admin"] },
@@ -435,7 +439,7 @@ describe("QaService map links", () => {
   function service() {
     const root = mkdtempSync(join(tmpdir(), "portolan-qa-map-"));
     const config = {
-      ...mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:" }),
+      ...mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:", timeoutMs: 150 }),
       maps,
     };
     return new QaService(config, { createSubstrate: (() => new FakeApp("Login")) as never });
@@ -492,7 +496,10 @@ describe("QaService map links", () => {
 
   it("does not run a case whose link is wrong, and says so", async () => {
     const root = mkdtempSync(join(tmpdir(), "portolan-qa-map-"));
-    const base = { ...mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:" }), maps };
+    const base = {
+      ...mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:", timeoutMs: 150 }),
+      maps,
+    };
     const qa = new QaService(base, { createSubstrate: (() => new FakeApp("Login")) as never });
     qa.caseWrite(write({ map: { site: "store", version: 1, op: "add_to_cart" } }));
 
@@ -513,7 +520,11 @@ describe("QaService known failures", () => {
   function setup() {
     const root = mkdtempSync(join(tmpdir(), "portolan-qa-known-"));
     const control = { button: "Sign in" };
-    const config = mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:" });
+    const config = mergeQaConfig(root, {
+      baseUrl: "http://app",
+      database: ":memory:",
+      timeoutMs: 150,
+    });
     const qa = new QaService(config, {
       createSubstrate: (() => new FakeApp(control.button)) as never,
     });

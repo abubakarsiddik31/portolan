@@ -280,16 +280,37 @@ type Step =
   | { do: "fill" | "select"; target: Locator; value: string }
   | { do: "press"; key: string }
   | { await: "url"; pattern: string; timeout_ms?: number }
-  | { await: "text"; contains: string; timeout_ms?: number };
+  | { await: "text"; contains: string; timeout_ms?: number }
+  | { await: "visible" | "absent"; target: Locator; timeout_ms?: number }
+  | { await: "value"; target: Locator; equals: string; timeout_ms?: number };
 
 type Check =
-  | { url: string }                                   // regex on location
+  | { url: string | UrlParts }                        // regex on the path (see below)
   | { text: { contains: string } }                    // page text contains
   | { visible: Locator }
   | { absent: Locator }
   | { value: { target: Locator; equals: string } }
   | { map_post: { op: string; params?: Record<string, unknown> } }; // reuse op post
 ```
+
+```ts
+type UrlParts = { pathname?: string; query?: Record<string, string>; hash?: string };
+```
+
+A `url` string is a regex on the path. A string with `\?` or `#` in it is matched against the
+path, query and fragment together (`"/analytics\\?range=30d"`). `UrlParts` checks each part it
+names: a regex on the path, exact query values, and a regex on the fragment. `await url` takes
+the same forms.
+
+**Checks wait.** A check that fails is evaluated again, against a fresh view, until it passes or
+`timeoutMs` (the run's default) is up, so an async page that renders after the last step passes
+without an `await` first, and `absent` cannot pass before the page exists. `await` steps are for
+sequencing actions.
+
+**Failure evidence.** The evidence folder holds `view.txt`, `events.jsonl`, `result.json`, the
+full page text as `text.txt`, and `page.png` when `screenshot` is on. While a dialog is open,
+`read` returns only the dialog's text; `result.json` then carries `read_scope: { scoped_to:
+"dialog", name }` so a text failure caused by a covering modal says so.
 
 A write case's `map` is checked when the case is written, at `qa sync`, and before a run: the
 map version must exist, `op` must be in it with the case's `effect`, and an `irreversible`

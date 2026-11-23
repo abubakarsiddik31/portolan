@@ -128,6 +128,8 @@ function run(spec: QaCase, substrate: FakeSubstrate, trusted = [spec.id]) {
     cases: [spec],
     trusted,
     evidence: "none",
+    // A check that fails is retried until this long, so keep a failing test short.
+    timeoutMs: 150,
     createSubstrate: () => substrate,
   });
 }
@@ -189,6 +191,7 @@ describe("runCases", () => {
       trusted: ["auth/login"],
       repeat: 2,
       evidence: "none",
+      timeoutMs: 150,
       createSubstrate: () => {
         calls += 1;
         const fake = new FakeSubstrate();
@@ -448,5 +451,161 @@ describe("confineToOrigin", () => {
       /leaves the environment origin/,
     );
     expect(seen).toEqual([]);
+  });
+});
+
+/** A page that renders late: its controls appear on the Nth capture. */
+class LateSubstrate extends FakeSubstrate {
+  captures = 0;
+  extra: SemanticNode[] = [];
+  appearAt = 3;
+  disappearAt = Number.POSITIVE_INFINITY;
+  dialog = false;
+  shot = new Uint8Array([1, 2, 3]);
+
+  override view(): Promise<QaView> {
+    this.captures += 1;
+    return Promise.resolve(this.state());
+  }
+
+  override state(): QaView {
+    const base = super.state();
+    const shown =
+      this.captures >= this.appearAt && this.captures < this.disappearAt ? this.extra : [];
+    const dialog = this.dialog ? [node(90, "dialog", "New API key")] : [];
+    const nodes = [...base.snapshot.nodes, ...shown, ...dialog];
+    return { snapshot: { ...base.snapshot, nodes }, refs: buildRefMap(nodes, 1) };
+  }
+
+  screenshot(): Promise<Uint8Array> {
+    return Promise.resolve(this.shot);
+  }
+}
+
+describe("checks that wait", () => {
+  it("retries a check until the page renders, instead of failing on the first look", async () => {
+    const late = new LateSubstrate();
+    late.extra = [node(50, "heading", "Analytics")];
+
+    const outcome = await runCases({
+      baseUrl: "http://app",
+      cases: [caseSpec({ expect: [{ visible: { role: "heading", name: "Analytics" } }] })],
+      trusted: ["auth/login"],
+      evidence: "none",
+      timeoutMs: 2000,
+      createSubstrate: () => late,
+    });
+
+    expect(outcome.results[0]?.status).toBe("pass");
+    expect(late.captures).toBeGreaterThanOrEqual(3);
+  });
+
+  it("does not let absent pass on a page that has not rendered yet when the thing is there later", async () => {
+    // The spinner is present for the first captures, then goes away.
+    const late = new LateSubstrate();
+    late.extra = [node(51, "progressbar", "Loading")];
+    late.appearAt = 0;
+    late.disappearAt = 4;
+
+    const outcome = await runCases({
+      baseUrl: "http://app",
+      cases: [caseSpec({ expect: [{ absent: { role: "progressbar", name: "Loading" } }] })],
+      trusted: ["auth/login"],
+      evidence: "none",
+      timeoutMs: 2000,
+      createSubstrate: () => late,
+    });
+
+    expect(outcome.results[0]?.status).toBe("pass");
+  });
+
+  it("awaits visible, absent and value, and times out saying what it saw", async () => {
+    const late = new LateSubstrate();
+    late.extra = [node(52, "button", "Export")];
+
+    const waits = await runCases({
+      baseUrl: "http://app",
+      cases: [
+        caseSpec({
+          steps: [
+            { goto: "/sign-in" },
+            { await: "visible", target: { role: "button", name: "Export" }, timeout_ms: 2000 },
+            { await: "absent", target: { role: "dialog", name: "Nope" } },
+          ],
+          expect: [],
+        }),
+      ],
+      trusted: ["auth/login"],
+      evidence: "none",
+      createSubstrate: () => late,
+    });
+    expect(waits.results[0]?.status).toBe("pass");
+
+    const never = await runCases({
+      baseUrl: "http://app",
+      cases: [
+        caseSpec({
+          steps: [
+            { goto: "/sign-in" },
+            { await: "visible", target: { role: "button", name: "Missing" }, timeout_ms: 150 },
+          ],
+          expect: [],
+        }),
+      ],
+      trusted: ["auth/login"],
+      evidence: "none",
+      createSubstrate: () => new LateSubstrate(),
+    });
+    expect(never.results[0]?.fail_code).toBe("timeout");
+    expect(never.results[0]?.fail_reason).toContain("expected a locator to be visible");
+
+    const incomplete = await runCases({
+      baseUrl: "http://app",
+      cases: [
+        caseSpec({
+          steps: [{ goto: "/sign-in" }, { await: "value", timeout_ms: 100 }],
+          expect: [],
+        }),
+      ],
+      trusted: ["auth/login"],
+      evidence: "none",
+      createSubstrate: () => new LateSubstrate(),
+    });
+    expect(incomplete.results[0]?.fail_reason).toContain("await value needs a target and equals");
+  });
+});
+
+describe("failure evidence", () => {
+  it("writes the page text, a screenshot when asked, and says a dialog scoped the read", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "portolan-qa-evidence-"));
+    try {
+      const late = new LateSubstrate();
+      late.dialog = true;
+      late.appearAt = Number.POSITIVE_INFINITY;
+
+      const outcome = await runCases({
+        baseUrl: "http://app",
+        cases: [caseSpec({ expect: [{ text: { contains: "Never on the page" } }] })],
+        trusted: ["auth/login"],
+        evidence: "failures",
+        evidenceRoot: dir,
+        runId: "r1",
+        screenshot: true,
+        timeoutMs: 150,
+        createSubstrate: () => late,
+      });
+
+      const evidence = outcome.results[0]?.evidence_dir;
+      expect(evidence).toBeDefined();
+      const files = readdirSync(evidence as string);
+      expect(files).toEqual(
+        expect.arrayContaining(["text.txt", "page.png", "result.json", "view.txt"]),
+      );
+      expect(readFileSync(join(evidence as string, "text.txt"), "utf8")).toContain("Email");
+      const result = JSON.parse(readFileSync(join(evidence as string, "result.json"), "utf8"));
+      expect(result.read_scope).toEqual({ scoped_to: "dialog", name: "New API key" });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

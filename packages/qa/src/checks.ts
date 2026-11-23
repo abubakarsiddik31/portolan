@@ -16,18 +16,7 @@ export async function evaluateCheck(input: {
 }): Promise<CheckOutcome> {
   const { check, view, substrate, map } = input;
 
-  if ("url" in check) {
-    const path = pathname(view.snapshot.url);
-    const ok = new RegExp(check.url).test(path);
-    return ok
-      ? { ok: true }
-      : {
-          ok: false,
-          message: `url "${path}" did not match ${check.url}`,
-          expected: check.url,
-          actual: path,
-        };
-  }
+  if ("url" in check) return matchUrl(check.url, view.snapshot.url);
 
   if ("text" in check) {
     const page = await substrate.read();
@@ -114,6 +103,78 @@ export async function evaluateCheck(input: {
   }
 
   return { ok: false, message: "unknown check" };
+}
+
+/** A pattern that names a query or a fragment is matched against the whole URL, not the path. */
+export function matchesWholeUrl(pattern: string): boolean {
+  return pattern.includes("\\?") || pattern.includes("#");
+}
+
+export type UrlSpec = string | { pathname?: string; query?: Record<string, string>; hash?: string };
+
+/**
+ * Match a URL. A string is a regex on the path, or on path, query and hash when
+ * it contains `\?` or `#`. The object form checks each part it names: a regex
+ * on the path, exact query values, and a regex on the fragment.
+ */
+export function matchUrl(spec: UrlSpec, url: string): CheckOutcome {
+  let parsed: URL | undefined;
+  try {
+    parsed = new URL(url);
+  } catch {
+    parsed = undefined;
+  }
+  const path = parsed?.pathname ?? url;
+
+  if (typeof spec === "string") {
+    const target =
+      matchesWholeUrl(spec) && parsed !== undefined
+        ? `${path}${parsed.search}${parsed.hash}`
+        : path;
+    return new RegExp(spec).test(target)
+      ? { ok: true }
+      : {
+          ok: false,
+          message: `url "${target}" did not match ${spec}`,
+          expected: spec,
+          actual: target,
+        };
+  }
+
+  if (spec.pathname !== undefined && !new RegExp(spec.pathname).test(path)) {
+    return {
+      ok: false,
+      message: `url path "${path}" did not match ${spec.pathname}`,
+      expected: spec,
+      actual: path,
+    };
+  }
+
+  for (const [key, want] of Object.entries(spec.query ?? {})) {
+    const got = parsed?.searchParams.get(key) ?? null;
+    if (got !== want) {
+      return {
+        ok: false,
+        message: `url query ${key} was ${got === null ? "absent" : `"${got}"`}, expected "${want}"`,
+        expected: spec,
+        actual: parsed?.search ?? "",
+      };
+    }
+  }
+
+  if (spec.hash !== undefined) {
+    const got = (parsed?.hash ?? "").replace(/^#/, "");
+    if (!new RegExp(spec.hash).test(got)) {
+      return {
+        ok: false,
+        message: `url hash "${got}" did not match ${spec.hash}`,
+        expected: spec,
+        actual: got,
+      };
+    }
+  }
+
+  return { ok: true };
 }
 
 function pathname(url: string): string {

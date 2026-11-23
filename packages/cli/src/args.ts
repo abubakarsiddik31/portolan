@@ -7,7 +7,13 @@ export type ParsedArgs = {
 
 /** Flags that never take a value, so `--publish trace.json` leaves the trace positional. */
 const BOOLEAN_FLAGS = new Set([
+  "all",
   "allow-cost",
+  "allow-unverified",
+  "changed",
+  "dry-run",
+  "include-quarantined",
+  "mcp",
   "explore",
   "force",
   "gaps",
@@ -25,6 +31,11 @@ const BOOLEAN_FLAGS = new Set([
   "verify-writes",
   "writes",
 ]);
+
+/** True for a flag that never takes a value. */
+export function isBooleanFlag(name: string): boolean {
+  return BOOLEAN_FLAGS.has(name);
+}
 
 /**
  * A tiny argument parser: `--key value`, `--flag`, and positionals.

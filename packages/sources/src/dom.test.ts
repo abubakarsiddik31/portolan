@@ -358,3 +358,32 @@ describe("discoverDom entry points, routes and exploration", () => {
     expect(result.states.map((state) => state.id)).toContain("app_kb");
   });
 });
+
+describe("prefixed ids", () => {
+  it("turns /p/p_101 and /p/p_102 into one state", async () => {
+    const shell = (path: string, links: string[]): Snapshot =>
+      page(`http://app.test${path}`, [
+        node({
+          nodeId: "root",
+          role: "RootWebArea",
+          name: path,
+          childIds: links.map((l) => `l${l}`),
+        }),
+        ...links.map((href) =>
+          node({ nodeId: `l${href}`, role: "link", name: href, attributes: { href } }),
+        ),
+      ]);
+    const substrate = {
+      goto: async (url: string) => {
+        const path = new URL(url).pathname;
+        return {
+          snapshot: shell(path, path === "/" ? ["/p/p_101", "/p/p_102"] : []),
+          refs: undefined,
+        };
+      },
+    } as unknown as Substrate;
+
+    const result = await discoverDom({ site: "app", url: "http://app.test/", substrate });
+    expect(result.states.map((state) => state.id).sort()).toEqual(["home", "p"]);
+  });
+});

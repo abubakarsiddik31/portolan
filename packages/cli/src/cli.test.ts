@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,7 +17,7 @@ import type { StdioServerHandle } from "@abubakarsiddiik/server";
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseArgs } from "./args.js";
+import { isBooleanFlag, parseArgs } from "./args.js";
 import { main } from "./cli.js";
 import { runBench } from "./commands/bench.js";
 import { runCompile } from "./commands/compile.js";
@@ -75,6 +83,26 @@ describe("parseArgs", () => {
       "c.json",
     ]);
     expect(args.positional).toEqual(["a.json", "b.json", "c.json"]);
+  });
+
+  it("knows every flag the CLI reads as a boolean, so none swallows a positional", () => {
+    const dir = join(import.meta.dirname, ".");
+    const sources = [
+      join(dir, "cli.ts"),
+      ...readdirSync(join(dir, "commands"))
+        .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+        .map((name) => join(dir, "commands", name)),
+    ];
+    const names = new Set(
+      sources.flatMap((file) =>
+        [...readFileSync(file, "utf8").matchAll(/booleanFlag\(args, "([a-z-]+)"\)/g)].map(
+          (match) => match[1] as string,
+        ),
+      ),
+    );
+
+    expect(names.size).toBeGreaterThan(20);
+    expect([...names].filter((name) => !isBooleanFlag(name))).toEqual([]);
   });
 
   it("keeps the token after a boolean flag as a positional", () => {

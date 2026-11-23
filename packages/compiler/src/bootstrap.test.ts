@@ -96,6 +96,19 @@ const signIn = trace([
   }),
 ]);
 
+function bootstrapMapForTest() {
+  return {
+    site: "library",
+    origins: ["http://app.example"],
+    version: 0,
+    states: [{ id: "unknown", marks: [] }],
+    ops: [],
+    entities: {},
+    compiled_from: [],
+    verified_at: AT,
+  };
+}
+
 describe("bootstrapFromTraces", () => {
   it("names and compiles a run with no base map", async () => {
     const result = await bootstrapFromTraces({
@@ -113,14 +126,53 @@ describe("bootstrapFromTraces", () => {
     expect(result.map.states.map((state) => state.id)).toEqual(["root"]);
   });
 
-  it("keeps a write only when it has an outcome check", async () => {
-    const skipped = await bootstrapFromTraces({
+  it("compiles a write with no outcome check to a ui op, not http", async () => {
+    const result = await bootstrapFromTraces({
       site: "support",
       origins: ["http://app.example"],
       traces: [signIn],
     });
-    expect(skipped.candidates).toEqual([]);
 
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.tier).toBe("ui");
+    expect(result.candidates[0]?.op).toMatchObject({ name: "sign_in", effect: "write" });
+    expect(result.candidates[0]?.op.outcome_check).toBeUndefined();
+  });
+
+  it("names a write after the click that made it, not the last click", () => {
+    const create = trace([
+      act({
+        do: "click",
+        ref: "e1",
+        name: "Create",
+        role: "button",
+        v: 1,
+        url: "http://app.example/keys",
+        effects: [
+          {
+            kind: "network",
+            method: "POST",
+            url: "http://app.example/api/keys",
+            status: 200,
+            request_body: { name: "k" },
+            response_body: { id: 1 },
+          },
+        ],
+      }),
+      act({
+        do: "click",
+        ref: "e2",
+        name: "Done",
+        role: "button",
+        v: 2,
+        url: "http://app.example/keys",
+      }),
+    ]);
+
+    expect(labelTraces([create], bootstrapMapForTest())[0]?.[0]?.name).toBe("create");
+  });
+
+  it("keeps a write as http when it has an outcome check", async () => {
     const kept = await bootstrapFromTraces({
       site: "support",
       origins: ["http://app.example"],

@@ -23,9 +23,10 @@ export type CompileOptions = {
   /** Read op that proves a write, keyed by op name. */
   outcomeChecks?: Record<string, string>;
   /**
-   * Drop a write that has no outcome check instead of compiling an http impl
-   * the map loader would reject. Bootstrap uses this: a recording proves the
-   * request happened, not how to check that a later write took effect.
+   * Compile a write that has no outcome check to a `ui` op instead of an http
+   * impl the map loader would reject. Bootstrap uses this: a recording proves
+   * the request happened, not how to check that a later write took effect, so
+   * the op stays a candidate until a verified run promotes it.
    */
   skipWritesWithoutOutcomeCheck?: boolean;
 };
@@ -66,19 +67,16 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
 
       const write = segment.segment.actions.flatMap((action) => action.effects).find(isWriteEffect);
 
-      if (
+      const uiWrite =
         write !== undefined &&
         options.skipWritesWithoutOutcomeCheck === true &&
-        options.outcomeChecks?.[name] === undefined
-      ) {
-        continue;
-      }
+        options.outcomeChecks?.[name] === undefined;
 
       let tier: "url" | "http" | "ui";
       let returns: InferredReturns;
       let impl: Impl;
 
-      if (write !== undefined) {
+      if (write !== undefined && !uiWrite) {
         tier = "http";
         returns = inferJsonReturns(write.response_body);
 
@@ -93,13 +91,14 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
 
         impl = { tier: "http", steps: lift.steps, extract: lift.extract };
       } else {
+        // The url tier is read-only, so a write goes straight to ui steps.
         returns =
-          segment.segment.url === undefined
+          segment.segment.url === undefined || uiWrite
             ? noneReturns()
             : await captureReturns(options.capture, segment.segment.url);
 
         const urlLift =
-          segment.segment.url === undefined ? undefined : liftUrl({ segment, returns });
+          segment.segment.url === undefined || uiWrite ? undefined : liftUrl({ segment, returns });
 
         if (urlLift !== undefined) {
           tier = "url";
@@ -124,7 +123,7 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
         from: oracle?.from ?? [segment.segment.from ?? "unknown"],
         to: oracle?.to ?? [segment.segment.to ?? "unknown"],
         post: tier === "http" ? [] : (oracle?.post ?? []),
-        effect: oracle?.effect ?? (tier === "http" ? "write" : "read"),
+        effect: oracle?.effect ?? (tier === "http" || uiWrite ? "write" : "read"),
         status: "verified",
         ...(options.outcomeChecks?.[name] !== undefined
           ? { outcome_check: options.outcomeChecks[name] }
@@ -164,7 +163,7 @@ function noneReturns(): InferredReturns {
   };
 }
 
-function isWriteEffect(
+export function isWriteEffect(
   effect: Effect,
 ): effect is NetworkEffect & { method: string; status: number } {
   return (

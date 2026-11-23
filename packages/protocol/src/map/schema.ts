@@ -282,6 +282,7 @@ export const MAP_SCHEMA = {
           properties: {
             kind: { const: "url" },
             pattern: { type: "string", minLength: 1 },
+            search: { type: "string", minLength: 1 },
           },
         },
         {
@@ -379,6 +380,7 @@ export const MAP_SCHEMA = {
         effect: { enum: ["read", "write", "irreversible"] },
         outcome_check: { $ref: "#/$defs/id" },
         confirm: { type: "boolean" },
+        no_post: { type: "boolean" },
         impls: { type: "array", minItems: 1, items: { $ref: "#/$defs/impl" } },
         status: { enum: ["verified", "degraded", "broken"] },
       },

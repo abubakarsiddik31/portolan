@@ -398,6 +398,8 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           allowCost: booleanFlag(args, "allow-cost"),
           noDedupe: booleanFlag(args, "no-dedupe"),
           reverify: booleanFlag(args, "reverify"),
+          noInferPost: booleanFlag(args, "no-infer-post"),
+          requirePost: booleanFlag(args, "require-post"),
           ...(numberFlag(args, "concurrency") !== undefined
             ? { concurrency: numberFlag(args, "concurrency") }
             : {}),

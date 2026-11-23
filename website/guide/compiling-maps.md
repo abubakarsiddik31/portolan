@@ -72,6 +72,22 @@ fallback_done(scope_id)  → saves the trace
 
 Then `portolan map build --site herbie` compiles the trace into candidates.
 
+## What "verified" proves
+
+A `ui` op that only clicks verifies as soon as the locator resolves, so a filter that
+does nothing would pass. When `map build` compiles a recorded run it proposes the
+postconditions the run showed, and `draft.json` lists them under the op's notes:
+
+- the URL changed: a new path, or a query such as `?range=30d` (`url` with `search`);
+- the page moved to a state the map names (`state`);
+- a dialog, menu, or alert appeared (`exists`).
+
+Verification then enforces them. A `ui` op with no postcondition gets an
+`add_postcondition` task; `--require-post` refuses to verify it, and `"no_post": true`
+on the op says the empty list is on purpose. `--no-infer-post` skips the proposals.
+Text that changed and the effect of a write are not inferred: a phrase varies between
+runs, and a write needs an outcome check.
+
 ## Verification speed
 
 `map build --verify` runs each op in its own browser context inside one shared Chrome.

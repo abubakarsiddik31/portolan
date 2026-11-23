@@ -211,6 +211,17 @@ describe("checkPost", () => {
   });
 
   it("checks a url pattern", () => {
+    const filtered = view([], "http://x/orders?range=30d&page=2");
+    expect(
+      checkPost(
+        { kind: "url", pattern: "^/orders$", search: "(^|&)range=30d(&|$)" },
+        map,
+        filtered,
+      ),
+    ).toBeUndefined();
+    expect(
+      checkPost({ kind: "url", pattern: "^/orders$", search: "(^|&)range=7d(&|$)" }, map, filtered),
+    ).toContain("did not match");
     expect(checkPost({ kind: "url", pattern: "^/orders/ord_" }, map, order)).toBeUndefined();
     expect(checkPost({ kind: "url", pattern: "^/orders/ord_" }, map, home)).toContain(
       "did not match",

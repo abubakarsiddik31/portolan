@@ -74,6 +74,12 @@ export function checkPost(check: PostCheck, map: SiteMap, view: SubstrateView): 
       if (!new RegExp(check.pattern).test(path)) {
         return `url "${path}" did not match ${check.pattern}`;
       }
+      if (check.search !== undefined) {
+        const search = searchOf(view.snapshot.url);
+        if (!new RegExp(check.search).test(search)) {
+          return `query "${search}" did not match ${check.search}`;
+        }
+      }
       return undefined;
     }
     case "exists": {
@@ -95,6 +101,14 @@ export function checkPost(check: PostCheck, map: SiteMap, view: SubstrateView): 
       }
       return undefined;
     }
+  }
+}
+
+function searchOf(url: string): string {
+  try {
+    return new URL(url).search.replace(/^\?/, "");
+  } catch {
+    return "";
   }
 }
 

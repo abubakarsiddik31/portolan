@@ -24,7 +24,7 @@ import {
   redactValues,
   resolveValues,
 } from "./fixtures.js";
-import type { QaCase, QaLocator, QaStep } from "./spec.js";
+import { governedMap, type QaCase, type QaLocator, type QaStep } from "./spec.js";
 import type { QaSubstrate, QaView } from "./types.js";
 
 export type RunTrigger = "manual" | "changed" | "verify" | "ci" | "mcp" | "plan";
@@ -303,7 +303,9 @@ async function attemptCore(
           sleep: input.sleep ?? sleep,
           now,
           map:
-            spec.map === undefined ? undefined : input.loadMap?.(spec.map.site, spec.map.version),
+            governedMap(spec) === undefined
+              ? undefined
+              : input.loadMap?.(governedMap(spec)?.site as string, governedMap(spec)?.version),
         });
         events.push({
           at: now().toISOString(),
@@ -340,7 +342,9 @@ async function attemptCore(
           sleep: input.sleep ?? sleep,
           now,
           map:
-            spec.map === undefined ? undefined : input.loadMap?.(spec.map.site, spec.map.version),
+            governedMap(spec) === undefined
+              ? undefined
+              : input.loadMap?.(governedMap(spec)?.site as string, governedMap(spec)?.version),
         });
         events.push({
           at: now().toISOString(),
@@ -368,7 +372,9 @@ async function attemptCore(
 
     const view = substrate.state() ?? (await substrate.view());
     const map =
-      spec.map === undefined ? undefined : input.loadMap?.(spec.map.site, spec.map.version);
+      governedMap(spec) === undefined
+        ? undefined
+        : input.loadMap?.(governedMap(spec)?.site as string, governedMap(spec)?.version);
 
     for (const [offset, check] of spec.expect.entries()) {
       const outcome = await evaluateCheck({ check, view, substrate, ...(map ? { map } : {}) });
@@ -461,9 +467,9 @@ export async function replaySteps(input: {
       : {}),
   };
   const map =
-    input.spec.map === undefined
+    governedMap(input.spec) === undefined
       ? undefined
-      : input.loadMap?.(input.spec.map.site, input.spec.map.version);
+      : input.loadMap?.(governedMap(input.spec)?.site as string, governedMap(input.spec)?.version);
 
   try {
     for (const steps of [

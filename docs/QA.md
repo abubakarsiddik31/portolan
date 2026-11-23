@@ -260,7 +260,10 @@ type QaCase = {
   tags?: string[];
   touches?: string[];               // globs, e.g. "src/auth/**"
   routes?: string[];                // "/sign-in"
-  map?: { site: string; version: number; op: string };
+  map?:                             // required for a write or irreversible case
+    | { site: string; version: number; op: string }   // checked: the op exists, has this effect,
+                                                       // and an irreversible op's step has confirm
+    | { site: string; pending: string };               // no op to point at yet: say why
   setup?: Step[];                   // run before steps, same session
   steps: Step[];
   expect?: Check[];
@@ -286,6 +289,12 @@ type Check =
   | { value: { target: Locator; equals: string } }
   | { map_post: { op: string; params?: Record<string, unknown> } }; // reuse op post
 ```
+
+A write case's `map` is checked when the case is written, at `qa sync`, and before a run: the
+map version must exist, `op` must be in it with the case's `effect`, and an `irreversible`
+op's step needs `confirm: true`. A case whose link is wrong is not run; it returns an
+`invalid_request` error that says what is wrong. Until a write compiles into an op, `pending`
+makes the placeholder explicit, and `qa sync` lists those cases.
 
 Values may use `${fixture.<name>}` and `${env.QA_<NAME>}` placeholders. Only
 `QA_*` variables resolve, and only in a step's `value` or `params`; a `goto`,

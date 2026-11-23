@@ -179,6 +179,9 @@ export async function runMapBuild(
       }
       for (const proposal of discovery.proposals) draft.proposals.push(proposal);
       for (const task of discovery.tasks) draft.tasks.push(task);
+      if (discovery.truncated !== undefined) {
+        draft.build = { ...draft.build, crawl_truncated: discovery.truncated };
+      }
       addSource(draft, "dom");
     }
 
@@ -409,7 +412,10 @@ export async function runMapBuild(
       if (verified.length === 0) {
         // Write the draft first: its tasks hold the reason each op failed.
         writeDraft(join(input.mapsDir, input.site), draft);
-        throw new Error("nothing verified; the draft and tasks were written for review");
+        const reasons = [...unverified.values()].slice(0, 10).map((reason) => `\n  ${reason}`);
+        throw new Error(
+          `nothing verified; the draft and tasks were written for review${reasons.join("")}`,
+        );
       }
 
       const base = existing ?? bootstrapMap(input.site, [origin]);

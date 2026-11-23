@@ -303,6 +303,37 @@ describe("runMapBuild", () => {
     expect(withCheck?.op.outcome_check).toBe("whoami");
   });
 
+  it("records when the crawl stops at --max-pages with pages still queued", async () => {
+    const result = await runMapBuild(
+      {
+        site: "app",
+        mapsDir: tempDir(),
+        url: "http://app.test/",
+        maxPages: 1,
+        verify: false,
+        verifyWrites: false,
+        publish: false,
+      },
+      { substrate },
+    );
+
+    expect(result.draft.build.crawl_truncated).toMatchObject({ limit: "max-pages", value: 1 });
+    expect(result.draft.build.crawl_truncated?.queued).toBeGreaterThan(0);
+
+    const full = await runMapBuild(
+      {
+        site: "app",
+        mapsDir: tempDir(),
+        url: "http://app.test/",
+        verify: false,
+        verifyWrites: false,
+        publish: false,
+      },
+      { substrate },
+    );
+    expect(full.draft.build.crawl_truncated).toBeUndefined();
+  });
+
   it("keeps the verify failures in the draft when nothing verifies", async () => {
     const dir = tempDir();
     const failing: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => ({
@@ -324,7 +355,7 @@ describe("runMapBuild", () => {
         },
         { substrate, verify: failing },
       ),
-    ).rejects.toThrow(/nothing verified/);
+    ).rejects.toThrow(/nothing verified[\s\S]*open_cart did not verify: every impl failed/);
 
     const tasks = JSON.parse(readFileSync(join(dir, "app", "tasks.json"), "utf8")) as {
       tasks: Array<{ message: string }>;

@@ -391,6 +391,14 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         out(
           `drafted ${result.draft.proposals.length} ops, ${result.draft.tasks.length} tasks at ${result.draftPath}`,
         );
+        const cut = result.discovery?.truncated;
+        if (cut !== undefined) {
+          out(
+            cut.limit === "max-pages"
+              ? `crawl stopped at --max-pages ${cut.value} with ${cut.queued} URLs queued; rerun with --max-pages ${cut.value + cut.queued}`
+              : `crawl stopped at the ${cut.value}-op limit with ${cut.queued} URLs queued; exclude pages or build in parts`,
+          );
+        }
         out(`capabilities: ${formatCoverage(result.coverage)}`);
         out(`  ${result.capabilitiesPath}`);
         if (result.verified.length > 0) out(`verified ${result.verified.join(", ")}`);

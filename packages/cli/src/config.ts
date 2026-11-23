@@ -5,6 +5,15 @@ import { LEGACY_CONFIG, PORTOLAN_DIR } from "@abubakarsiddiik/protocol";
 
 export type LogLevelName = "debug" | "info" | "warn" | "error";
 
+export type SyncConfig = {
+  /** Source globs to the state ids they affect, e.g. `{"src/admin/**": ["admin_*"]}`. */
+  paths?: Record<string, string[]>;
+  /** Read the route table from this framework's source to attribute route files. */
+  routesFrom?: "react-router" | "next" | "sveltekit";
+  /** The source directory, default `src`. */
+  src?: string;
+};
+
 export type CliConfig = {
   /** The site name used by init, compile, and export-skills. */
   site: string;
@@ -28,6 +37,8 @@ export type CliConfig = {
   storageState?: string;
   /** Command that boots the app for discovery and verification. */
   start?: string;
+  /** How `map sync` attributes changed files to the pages they affect. */
+  sync?: SyncConfig;
   /** Run the browser headless. */
   headless: boolean;
   /** Idle time after which a session is closed. */
@@ -190,6 +201,25 @@ export function mergeConfig(
       throw new Error(`${source}: "${key}" must be a non-empty string`);
     }
     result[key] = value;
+  }
+
+  if (raw.sync !== undefined) {
+    const sync = raw.sync as Record<string, unknown>;
+    if (typeof sync !== "object" || sync === null || Array.isArray(sync)) {
+      throw new Error(`${source}: "sync" must be an object`);
+    }
+    const paths = sync.paths as Record<string, unknown> | undefined;
+    if (
+      paths !== undefined &&
+      (typeof paths !== "object" ||
+        paths === null ||
+        !Object.values(paths).every(
+          (value) => Array.isArray(value) && value.every((item) => typeof item === "string"),
+        ))
+    ) {
+      throw new Error(`${source}: "sync.paths" must map a glob to a list of state ids`);
+    }
+    result.sync = sync as SyncConfig;
   }
 
   for (const key of ["headless", "recoverSessions"] as const) {

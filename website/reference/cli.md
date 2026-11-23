@@ -14,6 +14,7 @@ portolan <command> [options]
 | `portolan auth refresh` | Replay a saved recipe and replace the session. |
 | `portolan map build` | Discover a URL and/or traces into a draft, verify, and publish. |
 | `portolan map update` | Refresh an existing map and keep capabilities discovery did not see. |
+| `portolan map sync --since <ref>` | Re-check only the pages the changes since a git ref affect: scoped update, re-verify, repair a drifted locator, then diff coverage. `--dry-run`, `--fail-on`, `--markdown`. |
 | `portolan map status` | Where the mapping loop stands: version, coverage, uncompiled traces, last build failures, auth expiry, next command. `--json` for data. |
 | `portolan map record --gaps` | Record a one-click run for each missing capability, tagged with its capability id. Flags: `--kind`, `--only`, `--max`, `--writes`. |
 | `portolan map coverage` | Report `mapped`, `missing`, `excluded`, `unavailable`, `stale`, and `removed` capabilities. `--older-than 7d` lists entries no crawl has seen recently. |

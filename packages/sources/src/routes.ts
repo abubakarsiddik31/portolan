@@ -20,43 +20,46 @@ export function readRoutesFile(path: string): string[] {
   return normalizeRoutes(list);
 }
 
+/** Which routes each source file defines, so a changed file names the pages it can affect. */
+export function routeFiles(
+  framework: RouteFramework,
+  srcDir: string,
+): Array<{ file: string; routes: string[] }> {
+  if (!existsSync(srcDir)) throw new Error(`--src ${srcDir} does not exist`);
+
+  return walk(srcDir)
+    .map((file) => ({ file, routes: routesOfFile(framework, srcDir, file) }))
+    .filter((entry) => entry.routes.length > 0);
+}
+
 /** Read the route table from a project's source instead of crawling for it. */
 export function mineRoutes(framework: RouteFramework, srcDir: string): string[] {
-  if (!existsSync(srcDir)) throw new Error(`--src ${srcDir} does not exist`);
-  const files = walk(srcDir);
+  return normalizeRoutes(routeFiles(framework, srcDir).flatMap((entry) => entry.routes));
+}
 
+function routesOfFile(framework: RouteFramework, srcDir: string, file: string): string[] {
   switch (framework) {
     case "react-router":
-      return normalizeRoutes(
-        files
-          .filter((file) => SOURCE.has(extname(file)))
-          .flatMap((file) => reactRouterPaths(readFileSync(file, "utf8"))),
-      );
-    case "next":
-      return normalizeRoutes(
-        files.flatMap((file) => {
-          const parts = relative(srcDir, file).split(sep);
-          const root =
-            parts.indexOf("app") !== -1 ? "app" : parts.indexOf("pages") !== -1 ? "pages" : "";
-          if (root === "") return [];
-          const rest = parts.slice(parts.indexOf(root) + 1);
-          const name = rest[rest.length - 1] ?? "";
-          const base = name.replace(/\.[^.]+$/, "");
-          if (root === "app" && base !== "page") return [];
-          if (root === "pages" && (base.startsWith("_") || rest[0] === "api")) return [];
-          const dirs = root === "app" ? rest.slice(0, -1) : [...rest.slice(0, -1), base];
-          return [fileSegments(dirs)];
-        }),
-      );
-    case "sveltekit":
-      return normalizeRoutes(
-        files.flatMap((file) => {
-          const parts = relative(srcDir, file).split(sep);
-          const at = parts.indexOf("routes");
-          if (at === -1 || parts[parts.length - 1] !== "+page.svelte") return [];
-          return [fileSegments(parts.slice(at + 1, -1))];
-        }),
-      );
+      return SOURCE.has(extname(file))
+        ? normalizeRoutes(reactRouterPaths(readFileSync(file, "utf8")))
+        : [];
+    case "next": {
+      const parts = relative(srcDir, file).split(sep);
+      const root = parts.includes("app") ? "app" : parts.includes("pages") ? "pages" : "";
+      if (root === "") return [];
+      const rest = parts.slice(parts.indexOf(root) + 1);
+      const base = (rest[rest.length - 1] ?? "").replace(/\.[^.]+$/, "");
+      if (root === "app" && base !== "page") return [];
+      if (root === "pages" && (base.startsWith("_") || rest[0] === "api")) return [];
+      const dirs = root === "app" ? rest.slice(0, -1) : [...rest.slice(0, -1), base];
+      return normalizeRoutes([fileSegments(dirs)]);
+    }
+    case "sveltekit": {
+      const parts = relative(srcDir, file).split(sep);
+      const at = parts.indexOf("routes");
+      if (at === -1 || parts[parts.length - 1] !== "+page.svelte") return [];
+      return normalizeRoutes([fileSegments(parts.slice(at + 1, -1))]);
+    }
   }
 }
 

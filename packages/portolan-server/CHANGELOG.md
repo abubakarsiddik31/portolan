@@ -1,5 +1,13 @@
 # @abubakarsiddiik/server
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies [b724e84]
+  - @abubakarsiddiik/substrate@0.2.0
+  - @abubakarsiddiik/runtime@0.1.5
+
 ## 0.2.3
 
 ### Patch Changes

@@ -148,7 +148,8 @@ describe("init", () => {
     expect(readFileSync(join(portolan, "skills", "portolan-map", "SKILL.md"), "utf8")).toContain(
       "--require-complete",
     );
-    expect(readFileSync(join(portolan, ".gitignore"), "utf8")).toBe("state/\n");
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(".portolan/\n");
+    expect(existsSync(join(portolan, ".gitignore"))).toBe(false);
     expect(JSON.parse(readFileSync(join(portolan, "policies", "store.json"), "utf8"))).toEqual({
       site: "store",
       allow: [],
@@ -201,16 +202,13 @@ describe("init", () => {
     expect(config.qa.baseUrl).toBe("http://legacy");
   });
 
-  it("appends state/ to an existing .portolan/.gitignore", () => {
+  it("appends .portolan/ to an existing root .gitignore", () => {
     const dir = tempDir();
-    mkdirSync(join(dir, ".portolan"), { recursive: true });
-    writeFileSync(join(dir, ".portolan", ".gitignore"), "node_modules\n");
+    writeFileSync(join(dir, ".gitignore"), "node_modules\n");
 
     runInit({ dir });
 
-    expect(readFileSync(join(dir, ".portolan", ".gitignore"), "utf8")).toBe(
-      "node_modules\nstate/\n",
-    );
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("node_modules\n.portolan/\n");
   });
 });
 
@@ -236,7 +234,8 @@ describe("migrate", () => {
     writeFileSync(join(dir, "portolan.db"), "db");
     mkdirSync(join(dir, ".portolan"), { recursive: true });
     writeFileSync(join(dir, ".portolan", "qa.db"), "qa-db");
-    writeFileSync(join(dir, ".gitignore"), "node_modules\n.portolan/\n");
+    writeFileSync(join(dir, ".portolan", ".gitignore"), "state/\n");
+    writeFileSync(join(dir, ".gitignore"), "node_modules\n");
     writeFileSync(
       join(dir, ".mcp.json"),
       JSON.stringify({
@@ -264,8 +263,8 @@ describe("migrate", () => {
     expect(existsSync(join(dir, "portolan.config.json"))).toBe(false);
     expect(existsSync(join(dir, "portolan.db"))).toBe(false);
 
-    expect(readFileSync(join(dir, ".gitignore"), "utf8")).not.toContain(".portolan/");
-    expect(readFileSync(join(dir, ".portolan", ".gitignore"), "utf8")).toBe("state/\n");
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("node_modules\n.portolan/\n");
+    expect(existsSync(join(dir, ".portolan", ".gitignore"))).toBe(false);
 
     const config = JSON.parse(readFileSync(join(dir, ".portolan", "config.json"), "utf8")) as {
       maps: string;

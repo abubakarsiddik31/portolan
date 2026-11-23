@@ -1,9 +1,10 @@
 /**
  * The one directory Portolan creates in a project.
  *
- * Committed artifacts (config, cases, maps, policies, skills) live here next to
- * an ignored `state/` directory. Deriving every default from this constant keeps
- * the CLI, the QA runner, and the MCP server on the same layout.
+ * All artifact (config, cases, maps, policies, skills) and runtime state live
+ * here, and the whole directory is ignored by the project root `.gitignore`.
+ * Deriving every default from this constant keeps the CLI, the QA runner, and
+ * the MCP server on the same layout.
  */
 export const PORTOLAN_DIR = ".portolan" as const;
 

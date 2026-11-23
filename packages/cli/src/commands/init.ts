@@ -32,9 +32,10 @@ export type InitResult = {
 /**
  * Write `.portolan/config.json`, a map directory, a policy, and the skills.
  *
- * `dir` is the project root; every file lands under `<root>/.portolan/`.
- * Existing files are never overwritten without `force`, so a second `init`
- * in a configured project is a no-op rather than a reset. The config is
+ * `dir` is the project root; every file lands under `<root>/.portolan/`, and
+ * the root `.gitignore` gains a `.portolan/` entry so the whole directory stays
+ * out of git. Existing files are never overwritten without `force`, so a second
+ * `init` in a configured project is a no-op rather than a reset. The config is
  * merged rather than replaced, so `qa init` and `init` can run in either
  * order without dropping each other's settings.
  */
@@ -86,7 +87,7 @@ export function runInit(options: InitOptions = {}): InitResult {
     files.push(configPath);
   }
 
-  writeIgnore(join(root, PORTOLAN_DIR, ".gitignore"), files, skipped);
+  writeIgnore(join(root, ".gitignore"), files, skipped);
   write(
     join(root, config.policies, `${site}.json`),
     `${JSON.stringify({ site, allow: [] }, null, 2)}\n`,
@@ -103,15 +104,22 @@ export function runInit(options: InitOptions = {}): InitResult {
 
 function writeIgnore(path: string, files: string[], skipped: string[]): void {
   const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
-  if (existing.split("\n").some((line) => line.trim() === "state/")) {
+  if (isIgnored(existing)) {
     skipped.push(path);
     return;
   }
 
-  const body = `${existing}${existing.length > 0 && !existing.endsWith("\n") ? "\n" : ""}state/\n`;
+  const body = `${existing}${existing.length > 0 && !existing.endsWith("\n") ? "\n" : ""}${PORTOLAN_DIR}/\n`;
   mkdirSync(join(path, ".."), { recursive: true });
   writeFileSync(path, body, "utf8");
   files.push(path);
+}
+
+/** True when a root `.gitignore` already covers the `.portolan/` directory. */
+function isIgnored(body: string): boolean {
+  return body
+    .split("\n")
+    .some((line) => line.trim() === `${PORTOLAN_DIR}/` || line.trim() === PORTOLAN_DIR);
 }
 
 function readObject(path: string): Record<string, unknown> {

@@ -71,7 +71,7 @@ Setup
      portolan map capability set --maps ./.portolan/maps --site <site> --id <id> --status excluded --reason "<why>"
    - Repeat until this passes: portolan map build --maps ./.portolan/maps --site <site> --url <url> --require-complete --verify --publish
    - Keep the map in sync after every app change: portolan map update --maps ./.portolan/maps --site <site> --url <url> --verify --publish, then rebuild from traces for anything the crawl cannot see and re-check coverage.
-   - Commit ./.portolan/maps/<site>/capabilities.json, draft.json, tasks.json, and v*.json with the app.
+   - `.portolan/` is git-ignored. Keep maps you want to version outside it or commit them explicitly with `git add -f`.
    - Only ask me to help when discovery finds nothing to start from or a capability needs a decision only I can make.
    - Use the demo store only if I ask to try Portolan without my app.
 6. Configure my MCP client for this harness to spawn:

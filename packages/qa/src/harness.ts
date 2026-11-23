@@ -74,8 +74,8 @@ export const MCP_SNIPPET = `${JSON.stringify(mcpEntry(QA_MCP_NPX, process.cwd())
 /**
  * Wire QA into a coding harness: config, dirs, skill, and the MCP snippet.
  *
- * Everything committed lives under `.portolan/`; only `state/` is ignored, via
- * a nested `.portolan/.gitignore`. The root `.mcp.json` stays untouched unless
+ * Everything lives under `.portolan/`, which the root `.gitignore` ignores.
+ * The root `.mcp.json` stays untouched unless
  * `mcp` is set, because Claude Code only reads project servers from the root.
  * It never overwrites a file without `force`.
  */
@@ -127,7 +127,7 @@ export function qaInit(options: QaInitOptions = {}): QaInitResult {
   mkdirSync(join(root, DEFAULT_QA_CONFIG.cases), { recursive: true });
   mkdirSync(join(root, DEFAULT_QA_CONFIG.suites), { recursive: true });
 
-  writeIgnore(join(portolanDir, ".gitignore"), files);
+  writeIgnore(join(root, ".gitignore"), files);
 
   const skillPath = join(root, PORTOLAN_DIR, "skills", "portolan-qa", "SKILL.md");
   write(skillPath, QA_SKILL);
@@ -172,9 +172,14 @@ export function detectHarnesses(root: string): HarnessName[] {
 
 function writeIgnore(path: string, files: string[]): void {
   const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
-  if (existing.split("\n").some((line) => line.trim() === "state/")) return;
+  if (
+    existing
+      .split("\n")
+      .some((line) => line.trim() === `${PORTOLAN_DIR}/` || line.trim() === PORTOLAN_DIR)
+  )
+    return;
 
-  const body = `${existing}${existing.length > 0 && !existing.endsWith("\n") ? "\n" : ""}state/\n`;
+  const body = `${existing}${existing.length > 0 && !existing.endsWith("\n") ? "\n" : ""}${PORTOLAN_DIR}/\n`;
   mkdirSync(join(path, ".."), { recursive: true });
   writeFileSync(path, body, "utf8");
   files.push(path);
@@ -312,6 +317,6 @@ are the test author; the runner replays what you write.
 - Never mark a case verified by editing its JSON. Use \`qa_verify\`.
 - Never run unverified cases in CI without \`allow_unverified\`.
 - Never retry a write whose result is \`unknown_outcome\`.
-- Keep evidence out of git; \`.portolan/state/\` is ignored.
+- Keep evidence out of git; \`.portolan/\` is ignored.
 - If the diff selects nothing, say so and ask whether to run a suite.
 `;

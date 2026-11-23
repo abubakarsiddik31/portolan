@@ -18,9 +18,9 @@ describe("qaInit", () => {
     expect(existsSync(join(root, ".portolan", "qa", "cases"))).toBe(true);
     expect(existsSync(join(root, ".portolan", "qa", "suites"))).toBe(true);
     expect(existsSync(join(root, ".portolan", "skills", "portolan-qa", "SKILL.md"))).toBe(true);
-    expect(readFileSync(join(root, ".portolan", ".gitignore"), "utf8")).toBe("state/\n");
+    expect(readFileSync(join(root, ".gitignore"), "utf8")).toBe(".portolan/\n");
+    expect(existsSync(join(root, ".portolan", ".gitignore"))).toBe(false);
 
-    expect(existsSync(join(root, ".gitignore"))).toBe(false);
     expect(existsSync(join(root, ".mcp.json"))).toBe(false);
 
     expect(result.harnesses).toEqual(["unknown"]);
@@ -103,16 +103,13 @@ describe("qaInit", () => {
     expect(config.qa.repeat).toBe(2);
   });
 
-  it("appends state/ to an existing .portolan/.gitignore", () => {
+  it("appends .portolan/ to an existing root .gitignore", () => {
     const root = mkdtempSync(join(tmpdir(), "portolan-qa-init-"));
-    mkdirSync(join(root, ".portolan"), { recursive: true });
-    writeFileSync(join(root, ".portolan", ".gitignore"), "node_modules\n", "utf8");
+    writeFileSync(join(root, ".gitignore"), "node_modules\n", "utf8");
 
     qaInit({ root });
 
-    expect(readFileSync(join(root, ".portolan", ".gitignore"), "utf8")).toBe(
-      "node_modules\nstate/\n",
-    );
+    expect(readFileSync(join(root, ".gitignore"), "utf8")).toBe("node_modules\n.portolan/\n");
   });
 });
 

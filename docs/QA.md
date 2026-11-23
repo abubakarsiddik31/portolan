@@ -489,13 +489,11 @@ under `.portolan/`:
 
 - Writes the `qa` block into `.portolan/config.json` (or merges into an
   existing one).
-- Creates `.portolan/qa/cases/` and `.portolan/qa/suites/`; both are
-  committed and reviewed.
+- Creates `.portolan/qa/cases/` and `.portolan/qa/suites/`.
 - Installs the `portolan-qa` skill into
   `.portolan/skills/portolan-qa/SKILL.md`.
-- Writes `.portolan/.gitignore` with `state/`, so run artifacts, traces,
-  databases, and the auth storage state stay out of git. It never touches the
-  root `.gitignore`.
+- Adds `.portolan/` to the root `.gitignore`, so cases, run artifacts,
+  traces, databases, and the auth storage state stay out of git.
 - Prints the MCP snippet and the root `.mcp.json` path. It only writes or
   merges that file with `--mcp`; an existing `.mcp.json` keeps its other
   entries. The snippet passes absolute `.portolan/` paths, so the server does

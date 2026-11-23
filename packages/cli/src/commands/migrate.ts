@@ -86,8 +86,8 @@ export function runMigrate(options: MigrateOptions = {}): MigrateResult {
   const updated: string[] = [];
 
   if (moved.length > 0) {
-    ensureNestedIgnore(dir);
-    cleanRootIgnore(root);
+    ensureRootIgnore(root);
+    removeNestedIgnore(dir);
     const mcp = refreshMcpEntry(root);
     if (mcp !== undefined) updated.push(mcp);
   }
@@ -135,26 +135,23 @@ function refreshMcpEntry(root: string): string | undefined {
   return path;
 }
 
-function ensureNestedIgnore(dir: string): void {
-  const path = join(dir, ".gitignore");
-  if (existsSync(path)) return;
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(path, "state/\n", "utf8");
+/** Add `.portolan/` to the root `.gitignore` so the migrated directory is ignored. */
+function ensureRootIgnore(root: string): void {
+  const path = join(root, ".gitignore");
+  const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
+  const covered = existing
+    .split("\n")
+    .some((line) => line.trim() === `${PORTOLAN_DIR}/` || line.trim() === PORTOLAN_DIR);
+  if (covered) return;
+
+  const body = `${existing}${existing.length > 0 && !existing.endsWith("\n") ? "\n" : ""}${PORTOLAN_DIR}/\n`;
+  writeFileSync(path, body, "utf8");
 }
 
-function cleanRootIgnore(root: string): void {
-  const path = join(root, ".gitignore");
-  if (!existsSync(path)) return;
-
-  const body = readFileSync(path, "utf8");
-  const lines = body.split("\n");
-  const kept = lines.filter((line) => {
-    const value = line.trim();
-    return value !== ".portolan/" && value !== ".portolan";
-  });
-
-  if (kept.length === lines.length) return;
-  writeFileSync(path, kept.join("\n"), "utf8");
+/** The old nested `state/` ignore is redundant once the whole directory is ignored. */
+function removeNestedIgnore(dir: string): void {
+  const path = join(dir, ".gitignore");
+  if (existsSync(path)) rmSync(path);
 }
 
 function skillMoves(root: string, dir: string): MigrateMove[] {

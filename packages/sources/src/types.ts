@@ -110,5 +110,7 @@ export type MapDraft = {
     verify: boolean;
     verified: string[];
     published?: number;
+    /** The crawl stopped at a limit with pages still queued. */
+    crawl_truncated?: { limit: "max-pages" | "max-ops"; value: number; queued: number };
   };
 };

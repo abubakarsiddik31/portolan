@@ -35,6 +35,8 @@ export type DomDiscovery = {
   visited: string[];
   /** State ids of the pages this crawl reached, so a partial crawl can tell stale from unvisited. */
   pages: string[];
+  /** Set when the crawl stopped at a limit with pages still queued. */
+  truncated?: { limit: "max-pages" | "max-ops"; value: number; queued: number };
 };
 
 const INPUT_ROLES = new Set([
@@ -245,6 +247,11 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
     }
   }
 
+  const queued = new Set(
+    queue.map((item) => pageKey(item.url)).filter((key) => !seenPages.has(key)),
+  ).size;
+  const limit = visited.length >= maxPages ? "max-pages" : "max-ops";
+
   return {
     origins: [start.origin],
     states: [...states.values()],
@@ -253,6 +260,9 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
     surface,
     visited,
     pages: [...pages],
+    ...(queued > 0 && (visited.length >= maxPages || proposals.length >= maxOps)
+      ? { truncated: { limit, value: limit === "max-pages" ? maxPages : maxOps, queued } }
+      : {}),
   };
 }
 

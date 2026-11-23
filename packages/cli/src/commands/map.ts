@@ -30,7 +30,13 @@ import {
   writeCapabilities,
   writeDraft,
 } from "@abubakarsiddiik/sources";
-import { findChrome, loadPolicy, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
+import {
+  type BrowserHandle,
+  findChrome,
+  loadPolicy,
+  PlaywrightEngine,
+  Substrate,
+} from "@abubakarsiddiik/substrate";
 
 export type MapBuildInput = {
   site: string;
@@ -138,6 +144,8 @@ export async function runMapBuild(
   const reservedTargets = existing?.ops.flatMap((op) => op.to) ?? [];
   let discovery: DomDiscovery | undefined;
   let close = deps.closeSubstrate;
+  // One Chrome for every verification run in this build, opened on first use.
+  let verifyBrowser: BrowserHandle | undefined;
   let app: Awaited<ReturnType<typeof startApp>> | undefined;
 
   try {
@@ -382,6 +390,7 @@ export async function runMapBuild(
     };
   } finally {
     await app?.stop();
+    await verifyBrowser?.close();
     await close?.();
   }
 }

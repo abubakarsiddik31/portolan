@@ -1,7 +1,7 @@
 import type { Impl, OpDef, SiteMap } from "@abubakarsiddiik/protocol";
 import { validateJsonSchema } from "@abubakarsiddiik/protocol";
 import { checkPost, runHttpOp, runUiOp, runUrlOp } from "@abubakarsiddiik/runtime";
-import { findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
+import { BrowserHandle, findChrome, PlaywrightEngine, Substrate } from "@abubakarsiddiik/substrate";
 
 export type VerifyRun = {
   params: Record<string, unknown>;
@@ -39,6 +39,11 @@ export type VerifyOptions = {
   setup?: Array<{ op: string; params: Record<string, unknown> }>;
   /** Playwright storage state for pages behind auth. */
   storageState?: string;
+  /**
+   * A browser to open each run's context in. Without it, one is launched for
+   * this call. Pass one to share a single Chrome across many ops.
+   */
+  browser?: BrowserHandle;
 };
 
 const MIN_PARAM_SETS = 3;
@@ -73,35 +78,46 @@ export async function verifyOp(options: VerifyOptions): Promise<VerifyReport> {
 
   const impls: ImplReport[] = [];
 
-  for (const impl of options.op.impls) {
-    const runs: VerifyRun[] = [];
+  // Each run still gets its own context, so a write cannot inherit a cart or a
+  // login, but they share one Chrome process instead of launching one per run.
+  const owned = options.browser === undefined;
+  const browser =
+    options.browser ??
+    (await BrowserHandle.launch({ executablePath, headless: options.headless ?? true }));
 
-    for (const params of options.paramSets) {
-      runs.push(
-        await runOnce({
-          map: options.map,
-          op: options.op,
-          impl,
-          params,
-          executablePath,
-          headless: options.headless ?? true,
-          setup: options.setup ?? [],
-          ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),
-          ...(options.storageState !== undefined ? { storageState: options.storageState } : {}),
-        }),
-      );
+  try {
+    for (const impl of options.op.impls) {
+      const runs: VerifyRun[] = [];
+
+      for (const params of options.paramSets) {
+        runs.push(
+          await runOnce({
+            map: options.map,
+            op: options.op,
+            impl,
+            params,
+            browser,
+            executablePath,
+            setup: options.setup ?? [],
+            ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),
+            ...(options.storageState !== undefined ? { storageState: options.storageState } : {}),
+          }),
+        );
+      }
+
+      const failure = runs.find((run) => !run.ok);
+
+      impls.push({
+        tier: impl.tier,
+        verified: failure === undefined,
+        runs,
+        ...(failure !== undefined
+          ? { reason: failure.message ?? `run with ${JSON.stringify(failure.params)} failed` }
+          : {}),
+      });
     }
-
-    const failure = runs.find((run) => !run.ok);
-
-    impls.push({
-      tier: impl.tier,
-      verified: failure === undefined,
-      runs,
-      ...(failure !== undefined
-        ? { reason: failure.message ?? `run with ${JSON.stringify(failure.params)} failed` }
-        : {}),
-    });
+  } finally {
+    if (owned) await browser.close();
   }
 
   const verified = impls.some((impl) => impl.verified);
@@ -119,8 +135,8 @@ async function runOnce(input: {
   op: OpDef;
   impl: Impl;
   params: Record<string, unknown>;
+  browser: BrowserHandle;
   executablePath: string;
-  headless: boolean;
   baseUrl?: string;
   setup: Array<{ op: string; params: Record<string, unknown> }>;
   storageState?: string;
@@ -136,7 +152,7 @@ async function runOnce(input: {
 
   const engine = await PlaywrightEngine.launch({
     executablePath: input.executablePath,
-    headless: input.headless,
+    browser: input.browser,
     ...(input.storageState !== undefined ? { storageState: input.storageState } : {}),
   });
 

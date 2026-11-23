@@ -23,6 +23,8 @@ export type BootstrapOptions = {
   outcomeChecks?: Record<string, string>;
   /** Default true: a recorded write becomes a task, not an unverifiable http op. */
   skipWritesWithoutOutcomeCheck?: boolean;
+  /** Propose postconditions from the recorded runs. Default true. */
+  inferPost?: boolean;
 };
 
 export type BootstrapResult = {
@@ -76,6 +78,7 @@ export async function bootstrapFromTraces(options: BootstrapOptions): Promise<Bo
     capture,
     ...(options.outcomeChecks !== undefined ? { outcomeChecks: options.outcomeChecks } : {}),
     skipWritesWithoutOutcomeCheck: options.skipWritesWithoutOutcomeCheck ?? true,
+    ...(options.inferPost !== undefined ? { inferPost: options.inferPost } : {}),
   });
 
   for (const candidate of candidates) {

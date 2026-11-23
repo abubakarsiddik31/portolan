@@ -1,10 +1,11 @@
-import type { Extractor, Impl, OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import type { Extractor, Impl, OpDef, PostCheck, SiteMap } from "@abubakarsiddiik/protocol";
 import type { Trace } from "@abubakarsiddiik/runtime";
 import type { Effect, NetworkEffect, SubstrateView } from "@abubakarsiddiik/substrate";
 
 import { liftHttp } from "./http.js";
 import { liftUrl } from "./lift.js";
 import { type ParameterizedSegment, parameterizeTrace } from "./parameterize.js";
+import { inferPost } from "./post.js";
 import { type InferredReturns, inferJsonReturns, inferReturns } from "./returns.js";
 import type { SegmentLabel } from "./segment.js";
 import { liftUi } from "./ui.js";
@@ -29,10 +30,14 @@ export type CompileOptions = {
    * the op stays a candidate until a verified run promotes it.
    */
   skipWritesWithoutOutcomeCheck?: boolean;
+  /** Propose postconditions from what the recorded run observed. Default true. */
+  inferPost?: boolean;
 };
 
 export type CompiledCandidate = {
   op: OpDef;
+  /** The postconditions proposed from the recording, so a reviewer can see them. */
+  inferredPost?: PostCheck[];
   segment: ParameterizedSegment;
   tier: "url" | "http" | "ui";
   source?: string;
@@ -113,6 +118,10 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
       }
 
       const oracle = options.map.ops.find((op) => op.name === name);
+      const inferred =
+        tier === "ui" && oracle === undefined && options.inferPost !== false
+          ? inferPost(segment.segment.actions, options.map)
+          : [];
 
       const op: OpDef = {
         name,
@@ -122,7 +131,7 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
         returns: returns.schema,
         from: oracle?.from ?? [segment.segment.from ?? "unknown"],
         to: oracle?.to ?? [segment.segment.to ?? "unknown"],
-        post: tier === "http" ? [] : (oracle?.post ?? []),
+        post: tier === "http" ? [] : (oracle?.post ?? inferred),
         effect: oracle?.effect ?? (tier === "http" || uiWrite ? "write" : "read"),
         status: "verified",
         ...(options.outcomeChecks?.[name] !== undefined
@@ -135,6 +144,7 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
 
       candidates.push({
         op,
+        ...(inferred.length > 0 ? { inferredPost: inferred } : {}),
         segment,
         tier,
         ...(input.source !== undefined ? { source: input.source } : {}),

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   bootstrapFromTraces,
   bootstrapMap,
+  type CompiledCandidate,
   type PublishResult,
   pool,
   publishMap,
@@ -84,6 +85,10 @@ export type MapBuildInput = {
   allowCost?: boolean;
   /** Keep a layout control seen on many pages as one capability per page. */
   noDedupe?: boolean;
+  /** Do not propose postconditions from recorded runs. */
+  noInferPost?: boolean;
+  /** An op with no postcondition is not verified unless `no_post` marks it deliberate. */
+  requirePost?: boolean;
   /** Reads verified at once, each in its own context. Default 4. */
   concurrency?: number;
   /** Re-verify ops that were verified against this same app build. */
@@ -238,6 +243,7 @@ export async function runMapBuild(
         traces,
         capture: async () => undefined,
         ...(outcomeChecks !== undefined ? { outcomeChecks } : {}),
+        ...(input.noInferPost === true ? { inferPost: false } : {}),
       });
 
       for (const state of boot.map.states) {
@@ -265,9 +271,7 @@ export async function runMapBuild(
           source: "traces",
           provenance: candidate.source ?? "recorded trace",
           confidence: "medium",
-          ...(candidate.op.effect === "write"
-            ? { notes: ["A recorded write needs an outcome check before an http impl is safe."] }
-            : {}),
+          ...noteFor(candidate),
         });
       }
 
@@ -405,6 +409,26 @@ export async function runMapBuild(
             `${op.name} fired a ${proposal.risk.category} request (${proposal.risk.reason}); verify it explicitly with --allow-cost`,
           );
           continue;
+        }
+
+        const proves = op.post.length > 0 || op.no_post === true;
+        const clicks = op.impls.some((impl) => impl.tier === "ui");
+        if (clicks && !proves) {
+          draft.tasks.push({
+            id: `task_${draft.tasks.length + 1}`,
+            kind: "add_postcondition",
+            source: proposal.source,
+            op: op.name,
+            message: `${op.name} has no postcondition, so verifying it only proves the click did not throw; add one, or set no_post if that is on purpose`,
+          });
+          if (input.requirePost === true) {
+            hold(
+              proposal,
+              "add_postcondition",
+              `${op.name} has no postcondition; add one or set no_post (--require-post)`,
+            );
+            continue;
+          }
         }
 
         const sets = paramSetsFor(op, proposal.sample_params, params[op.name]);
@@ -651,6 +675,17 @@ function stateStartUrl(
   });
 
   return new URL(path, origin).toString();
+}
+
+function noteFor(candidate: CompiledCandidate): { notes: string[] } | Record<string, never> {
+  const notes: string[] = [];
+  if (candidate.op.effect === "write") {
+    notes.push("A recorded write needs an outcome check before an http impl is safe.");
+  }
+  if (candidate.inferredPost !== undefined) {
+    notes.push(`Inferred postconditions: ${JSON.stringify(candidate.inferredPost)}`);
+  }
+  return notes.length > 0 ? { notes } : {};
 }
 
 function mergeStates(existing: StateDef[], discovered: StateDef[]): StateDef[] {

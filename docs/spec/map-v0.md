@@ -53,6 +53,7 @@ loudly, not silently disable an op.
 | `post` | `PostCheck[]` | yes | Checked after the impl runs. |
 | `effect` | `read` \| `write` \| `irreversible` | yes | Drives the safety path. |
 | `outcome_check` | op id | no | A **read** op that proves whether a write happened. |
+| `no_post` | boolean | no | The author checked that this op needs no postcondition, so an empty `post` is on purpose. |
 | `confirm` | boolean | no | Must be `true` for `irreversible`. |
 | `impls` | `Impl[]`, ≥1 | yes | In preference order; only verified impls run. |
 | `status` | `verified` \| `degraded` \| `broken` | yes | Health of the op. |
@@ -139,7 +140,7 @@ and URL-encoded.
 
 | `kind` | Fields | Meaning |
 |---|---|---|
-| `url` | `pattern` | The path matches the regex. |
+| `url` | `pattern`, `search?` | The path matches the regex; when `search` is set, so does the query string (without the `?`). |
 | `state` | `state` | The page is in this state. |
 | `exists` | `locator` | The locator is present. |
 | `absent` | `locator` | The locator is not present. |

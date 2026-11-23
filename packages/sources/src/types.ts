@@ -105,6 +105,7 @@ export type DraftTaskKind =
   | "name_op"
   | "add_params"
   | "add_outcome_check"
+  | "add_postcondition"
   | "confirm_effect"
   | "add_locators"
   | "resolve_route"

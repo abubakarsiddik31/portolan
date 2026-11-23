@@ -141,7 +141,7 @@ export type UiImpl = {
 export type Impl = WebmcpImpl | UrlImpl | HttpImpl | UiImpl;
 
 export type PostCheck =
-  | { kind: "url"; pattern: string }
+  | { kind: "url"; pattern: string; search?: string }
   | { kind: "state"; state: string }
   | { kind: "exists"; locator: Locator }
   | { kind: "absent"; locator: Locator }
@@ -171,6 +171,8 @@ export type OpDef = {
   outcome_check?: string;
   /** Irreversible ops require the caller to pass `confirm: true`. */
   confirm?: boolean;
+  /** The author checked that this op needs no postcondition, so `post: []` is on purpose. */
+  no_post?: boolean;
   /** In preference order. Only verified impls are used. */
   impls: Impl[];
   status: OpStatus;

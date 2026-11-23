@@ -751,3 +751,96 @@ describe("faster verification", () => {
     expect(peak).toBe(2);
   });
 });
+
+describe("postconditions", () => {
+  const at = "2026-11-17T00:00:00.000Z";
+
+  function setup() {
+    const dir = tempDir();
+    const tracePath = join(dir, "trace.json");
+    const act = (name: string, v: number, effects: unknown[]) => ({
+      kind: "act",
+      at,
+      ref: `e${v}`,
+      do: "click",
+      locator: { role: "button", name, ordinal: 0 },
+      doc: 1,
+      v,
+      url: "http://app.test/analytics?range=30d",
+      effects,
+      delta: { navigation: false, entries: [] },
+    });
+    writeFileSync(
+      tracePath,
+      JSON.stringify({
+        scope_id: "run-1",
+        sid: "sid-1",
+        intent: "filter",
+        effect: "read",
+        started_at: at,
+        ended_at: at,
+        entries: [
+          act("30 days", 1, [
+            {
+              kind: "navigation",
+              from: "http://app.test/analytics",
+              to: "http://app.test/analytics?range=30d",
+              doc: 1,
+            },
+          ]),
+        ],
+      }),
+    );
+    return { dir, tracePath };
+  }
+
+  const base = (s: ReturnType<typeof setup>, extra: Record<string, unknown> = {}) => ({
+    site: "app",
+    mapsDir: join(s.dir, "maps"),
+    traces: [s.tracePath],
+    baseUrl: "http://app.test",
+    verify: false,
+    verifyWrites: false,
+    publish: false,
+    ...extra,
+  });
+
+  it("proposes the postcondition the recording showed, and shows it in the draft", async () => {
+    const s = setup();
+    const result = await runMapBuild(base(s), { substrate });
+
+    const proposal = result.draft.proposals.find((p) => p.op.name === "op_30_days");
+    expect(proposal?.op.post).toEqual([
+      { kind: "url", pattern: "^/analytics$", search: "(^|&)range=30d(&|$)" },
+    ]);
+    expect(proposal?.notes?.join(" ")).toContain("Inferred postconditions");
+
+    const off = await runMapBuild(base(s, { noInferPost: true }), { substrate });
+    expect(off.draft.proposals.find((p) => p.op.name === "op_30_days")?.op.post).toEqual([]);
+  });
+
+  it("flags a ui op with no postcondition, and holds it under --require-post", async () => {
+    const s = setup();
+    const seen: string[] = [];
+    const recording: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => {
+      seen.push(options.op.name);
+      return { op: options.op.name, verified: true, impls: [] } satisfies VerifyReport;
+    };
+
+    const result = await runMapBuild(
+      base(s, { verify: true, noInferPost: true, requirePost: true }),
+      { substrate, verify: recording },
+    );
+
+    expect(seen).toEqual([]);
+    expect(result.draft.tasks).toContainEqual(
+      expect.objectContaining({ kind: "add_postcondition", op: "op_30_days" }),
+    );
+
+    const lenient = await runMapBuild(
+      base(s, { verify: true, noInferPost: true, mapsDir: join(s.dir, "maps2") }),
+      { substrate, verify: recording },
+    );
+    expect(lenient.verified).toEqual(["op_30_days"]);
+  });
+});

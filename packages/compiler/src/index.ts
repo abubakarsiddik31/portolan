@@ -4,6 +4,7 @@ export * from "./http.js";
 export * from "./lift.js";
 export * from "./parameterize.js";
 export * from "./pool.js";
+export * from "./post.js";
 export * from "./publish.js";
 export * from "./repair.js";
 export * from "./repair-loop.js";

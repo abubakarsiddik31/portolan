@@ -80,6 +80,8 @@ Options (build, update):
   --reverify             re-verify ops already verified against this app build
   --app-version <v>      the app build (default: a hash of the HTML at --base-url)
   --verify-writes        also verify writes (they run for real)
+  --no-infer-post        do not propose postconditions from recorded runs
+  --require-post         do not verify a ui op that has no postcondition
   --allow-cost           also verify ops whose run fired a cost or destructive request
   --no-dedupe            keep a layout control seen on many pages as one entry per page
   --publish              publish verified ops (needs --verify)

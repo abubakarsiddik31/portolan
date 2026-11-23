@@ -73,8 +73,11 @@ const DESTRUCTIVE = /\/(logout|signout|sign-out|delete|remove|destroy|revoke)(\/
 
 type NodeIndex = {
   byId: Map<string, SemanticNode>;
+  parents: Map<string, string>;
   ordinals: Map<string, number>;
 };
+
+const LANDMARKS = new Set(["banner", "navigation", "complementary", "contentinfo"]);
 
 /**
  * Discover a first map from the live DOM.
@@ -259,10 +262,14 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
     for (const node of snapshot.nodes) {
       if (node.role !== "button" || !node.visible || node.name.length === 0) continue;
       if (insideForms.has(node.nodeId)) continue;
+      const templated = templateName(node.name);
+      const landmark = landmarkOf(node, index);
       recordSurface({
         page: from.id,
         kind: "button",
-        name: node.name,
+        name: templated,
+        ...(templated !== node.name ? { sample: node.name } : {}),
+        ...(landmark !== undefined ? { landmark } : {}),
         ...(isDisabled(node) ? { disabled: true } : {}),
       });
     }
@@ -544,6 +551,10 @@ function descendantNodes(node: SemanticNode, index: NodeIndex): SemanticNode[] {
 
 function indexNodes(nodes: SemanticNode[]): NodeIndex {
   const byId = new Map(nodes.map((node) => [node.nodeId, node]));
+  const parents = new Map<string, string>();
+  for (const node of nodes) {
+    for (const child of node.childIds) parents.set(child, node.nodeId);
+  }
   const ordinals = new Map<string, number>();
   const seen = new Map<string, number>();
 
@@ -555,7 +566,17 @@ function indexNodes(nodes: SemanticNode[]): NodeIndex {
     seen.set(key, ordinal + 1);
   }
 
-  return { byId, ordinals };
+  return { byId, parents, ordinals };
+}
+
+function landmarkOf(node: SemanticNode, index: NodeIndex): string | undefined {
+  let current = index.parents.get(node.nodeId);
+  for (let depth = 0; current !== undefined && depth < 50; depth += 1) {
+    const role = index.byId.get(current)?.role;
+    if (role !== undefined && LANDMARKS.has(role)) return role;
+    current = index.parents.get(current);
+  }
+  return undefined;
 }
 
 function stateFor(url: string, states: Map<string, StateDef>): StateDef {
@@ -731,4 +752,16 @@ function formLabel(form: SemanticNode): string {
 
 function isDisabled(node: SemanticNode): boolean {
   return node.properties.disabled === true;
+}
+
+/**
+ * A control name with data in it, as a template: `Active 1` is `Active {count}`
+ * and `Delete a@x.com` is `Delete {email}`. A leading number (`30 days`) is a
+ * label and stays, so the date-range pills remain distinct controls.
+ */
+export function templateName(name: string): string {
+  return name
+    .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "{email}")
+    .replace(/\((\d+)\)/g, "({count})")
+    .replace(/^(.*\S) \d+$/, "$1 {count}");
 }

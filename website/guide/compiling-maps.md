@@ -98,6 +98,13 @@ The ledger is the reviewable contract:
   an op that used to verify now fails. Both carry `stale_since`. A crawl only judges
   the pages it reached: everything else keeps its status, `last_seen`, and
   `last_verified`;
+- a layout control in a landmark (`banner`, `navigation`, `complementary`) that
+  appears on three or more pages is one capability with `pages: [...]`, not one per
+  page; its op is verified on the page it was recorded on and then valid from all of
+  them. `--no-dedupe` keeps one entry per page;
+- a name with data in it is a template: `Active 1` is `Active {count}` and
+  `Delete a@x.com` is `Delete {email}`, so one entry covers every row. A leading
+  number (`30 days`) is a label and stays;
 - a manual decision has `source: "manual"` and survives rediscovery;
 - code-derived capabilities (`source: "code"`) cover things the crawl cannot see.
 

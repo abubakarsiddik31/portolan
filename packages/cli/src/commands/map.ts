@@ -77,6 +77,8 @@ export type MapBuildInput = {
   strict?: boolean;
   /** Verify ops whose recorded run fired a request a `cost` or `destructive` rule matches. */
   allowCost?: boolean;
+  /** Keep a layout control seen on many pages as one capability per page. */
+  noDedupe?: boolean;
 };
 
 export type MapBuildDeps = {
@@ -308,6 +310,7 @@ export async function runMapBuild(
         ...(input.exclude !== undefined ? { exclude: input.exclude } : {}),
         ...(unverified !== undefined ? { unverified, verified: new Set(verified) } : {}),
         ...(policyRules.length > 0 ? { rules: policyRules } : {}),
+        ...(input.noDedupe === true ? { dedupe: false } : {}),
       });
     let capabilities = ledgerFor();
     let coverage = coverageOf(capabilities);
@@ -444,6 +447,18 @@ export async function runMapBuild(
       // proposals that failed or were skipped, then gate on that.
       capabilities = ledgerFor(unverified);
       coverage = coverageOf(capabilities);
+
+      // A layout control is one op that works from every page it sits on. It
+      // was verified on the page it was recorded on.
+      for (const item of capabilities.capabilities) {
+        if (item.pages === undefined || item.status !== "mapped") continue;
+        const proposal = draft.proposals.find(
+          (candidate) => candidate.op.name === item.op && verified.includes(candidate.op.name),
+        );
+        if (proposal !== undefined) {
+          proposal.op.from = [...new Set([...proposal.op.from, ...item.pages])];
+        }
+      }
       writeCapabilities(mapDir, capabilities);
 
       if (

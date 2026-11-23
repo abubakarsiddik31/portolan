@@ -368,6 +368,28 @@ describe("QaService environments", () => {
     );
   });
 
+  it("keeps a case id that holds a redacted word, and still redacts secrets", async () => {
+    const { service, save } = envService(() => new FakeApp("Login"));
+    save("qa", "admin");
+    service.caseWrite(
+      loginCase({
+        id: "auth/wrong-password-shows-error",
+        steps: [{ goto: "/sign-in" }],
+        expect: [{ url: "/dashboard" }],
+      }),
+    );
+
+    const result = await service.run(
+      { ids: ["auth/wrong-password-shows-error"] },
+      { env: "qa", allowUnverified: true },
+    );
+
+    const only = result.results[0];
+    expect(only?.case_id).toBe("auth/wrong-password-shows-error");
+    expect(JSON.stringify(only)).not.toContain("wrong-[redacted]");
+    expect(only?.next?.join("\n")).toContain("auth/wrong-password-shows-error");
+  });
+
   it("does not mark a case broken when a read-only environment refuses it", async () => {
     const { service, save } = envService(() => new FakeApp("Login"));
     save("prod", "readonly");

@@ -12,7 +12,7 @@ import {
   resolveEnvironment,
 } from "./environments.js";
 import { QaError } from "./errors.js";
-import { type Fixtures, loadFixtures, redactValues } from "./fixtures.js";
+import { caseNames, type Fixtures, loadFixtures, redactValues } from "./fixtures.js";
 import {
   type GenerateOptions,
   generateFromSpec,
@@ -683,6 +683,8 @@ export class QaService {
         actual: cap(result.actual),
       },
       this.config.redact,
+      [],
+      caseNames(result.case_id),
     ) as CaseResult;
     return safe;
   }

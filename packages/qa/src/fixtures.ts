@@ -138,6 +138,11 @@ function secretForms(secrets: Iterable<string>): string[] {
   return [...forms].sort((a, b) => b.length - a.length);
 }
 
+/** A case id as written, and as it appears in an evidence directory name. */
+export function caseNames(id: string): string[] {
+  return [id, id.replace(/[^a-zA-Z0-9._-]+/g, "__")];
+}
+
 /**
  * Replace every configured secret-like token, and every known secret value,
  * in a string. Values go first so a secret that contains a token (such as
@@ -147,7 +152,24 @@ export function redactText(
   value: string,
   redact: string[],
   secrets: Iterable<string> = [],
+  keep: readonly string[] = [],
 ): string {
+  // A name the author chose (a case id) is not a secret, whatever words it
+  // holds. Redact around it, so `wrong-password` stays `wrong-password`.
+  const names = keep.filter((name) => name.length > 0);
+  if (names.length > 0) {
+    const pattern = new RegExp(
+      `(${[...names]
+        .sort((a, b) => b.length - a.length)
+        .map(escapeRegExp)
+        .join("|")})`,
+    );
+    return value
+      .split(pattern)
+      .map((part, index) => (index % 2 === 1 ? part : redactText(part, redact, secrets)))
+      .join("");
+  }
+
   let result = value;
   for (const form of secretForms(secrets)) result = result.split(form).join("[redacted]");
   for (const token of redact) {
@@ -163,20 +185,26 @@ export function redactValues(
   value: unknown,
   redact: string[],
   secrets: Iterable<string> = [],
+  keep: readonly string[] = [],
 ): unknown {
   const known = [...secrets];
-  return redactDeep(value, redact, known);
+  return redactDeep(value, redact, known, keep);
 }
 
-function redactDeep(value: unknown, redact: string[], secrets: string[]): unknown {
-  if (typeof value === "string") return redactText(value, redact, secrets);
-  if (Array.isArray(value)) return value.map((item) => redactDeep(item, redact, secrets));
+function redactDeep(
+  value: unknown,
+  redact: string[],
+  secrets: string[],
+  keep: readonly string[],
+): unknown {
+  if (typeof value === "string") return redactText(value, redact, secrets, keep);
+  if (Array.isArray(value)) return value.map((item) => redactDeep(item, redact, secrets, keep));
 
   if (value !== null && typeof value === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
       const secretKey = redact.some((token) => key.toLowerCase().includes(token.toLowerCase()));
-      result[key] = secretKey ? "[redacted]" : redactDeep(item, redact, secrets);
+      result[key] = secretKey ? "[redacted]" : redactDeep(item, redact, secrets, keep);
     }
     return result;
   }

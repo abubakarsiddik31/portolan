@@ -40,6 +40,18 @@ describe("fixtures", () => {
     });
   });
 
+  it("leaves a name the author chose alone, and redacts the text around it", () => {
+    const id = "auth/wrong-password-shows-error";
+    expect(redactText(`case ${id} failed with password=hunter2`, context.redact, [], [id])).toBe(
+      `case ${id} failed with [redacted]=hunter2`,
+    );
+    expect(redactValues({ case_id: id, detail: "token abc" }, context.redact, [], [id])).toEqual({
+      case_id: id,
+      detail: "[redacted] abc",
+    });
+    expect(redactText(id, context.redact)).toBe("auth/wrong-[redacted]-shows-error");
+  });
+
   it("redacts tokens embedded in text", () => {
     expect(redactText("Authorization: Bearer abc password=hunter2", context.redact)).toBe(
       "[redacted]: Bearer abc [redacted]=hunter2",

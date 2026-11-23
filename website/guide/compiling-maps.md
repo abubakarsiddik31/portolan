@@ -161,6 +161,71 @@ on the op says the empty list is on purpose. `--no-infer-post` skips the proposa
 Text that changed and the effect of a write are not inferred: a phrase varies between
 runs, and a write needs an outcome check.
 
+## Keep the map in sync with the code
+
+`map sync` re-checks only the pages a change touches:
+
+```bash
+portolan map sync --site app --since origin/main --verify --publish \
+  --fail-on missing,stale --markdown coverage.md
+```
+
+It takes the files that differ from the git ref, finds the states they affect, runs a
+scoped `map update` on those states, verifies their existing ops again, and then diffs
+coverage against the ledger at that ref.
+
+- **Which files affect which pages.** `.portolan/config.json` maps source globs to state
+  ids, and a route table read from source (`routesFrom`) attributes the files that define
+  a route. Changed source files that neither rule claims are listed, so a rule can be added.
+
+  ```json
+  { "sync": { "src": "src", "routesFrom": "react-router",
+              "paths": { "src/components/admin/**": ["admin_*"] } } }
+  ```
+- **Drift is repaired when it is clear.** If an op's locator no longer resolves but the page
+  has one control with the same role and a clearly closest name (`30 days` is now
+  `Last 30 days`), the op is repaired, verified, and published. Two equally close controls
+  is a guess, so the op is marked `stale` instead.
+- **`--dry-run`** prints the affected states and stops.
+- **`map coverage --diff <v3|git-ref>`** prints what changed: new missing capabilities,
+  newly stale or removed ones, newly mapped ones. With a published version it compares ops.
+  `--fail-on missing,stale,dropped` exits 1 on a regression, and `--markdown file` writes a
+  pull request comment.
+
+In CI, start the app, sign in with the recipe from [Unattended sign-in](#unattended-sign-in-for-ci-and-long-builds),
+sync, and fail the pull request when a new control lands unmapped:
+
+```yaml
+name: portolan-map
+on: pull_request
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+      - name: Sign in
+        env: { APP_USER: "${{ secrets.APP_USER }}", APP_PASSWORD: "${{ secrets.APP_PASSWORD }}" }
+        run: >
+          npx portolan auth login --url http://localhost:5173/login
+          --out .portolan/state/auth.json
+          --fill "Username or email=APP_USER" --fill "Password=APP_PASSWORD" --submit "Sign in"
+      - name: Sync the map
+        run: >
+          npx portolan map sync --site app --since origin/${{ github.base_ref }}
+          --storage-state .portolan/state/auth.json --start "npm run dev"
+          --verify --fail-on missing,stale --markdown coverage.md
+      - if: always()
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file coverage.md
+        env: { GH_TOKEN: "${{ github.token }}" }
+```
+
+The sign-in step needs the app running; start it first (`npm run dev &` and wait for the
+port) or keep the sign-in in your own script and pass `--script`.
+
 ## Where the loop stands
 
 ```bash

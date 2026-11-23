@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 
@@ -27,9 +27,10 @@ import {
 import { type AuthRecipe, parseFill } from "./commands/auth-recipe.js";
 import { runBench } from "./commands/bench.js";
 import { runCompile } from "./commands/compile.js";
+import { runCoverageDiff } from "./commands/diff.js";
 import { runExportSkills } from "./commands/export-skills.js";
 import { runInit } from "./commands/init.js";
-import { runMapBuild } from "./commands/map.js";
+import { type MapBuildInput, runMapBuild } from "./commands/map.js";
 import { runMcp } from "./commands/mcp.js";
 import { runMigrate } from "./commands/migrate.js";
 import { blockedHosts, runPolicyAllow } from "./commands/policy.js";
@@ -37,6 +38,7 @@ import { runQa } from "./commands/qa.js";
 import { runRecordGaps } from "./commands/record.js";
 import { runServe } from "./commands/serve.js";
 import { formatStatus, mapStatus } from "./commands/status.js";
+import { runSync } from "./commands/sync.js";
 import { runVerify } from "./commands/verify.js";
 import { loadConfig } from "./config.js";
 import { formatDoctor, runDoctor } from "./doctor.js";
@@ -85,6 +87,7 @@ export type CliDeps = {
   compile?: typeof runCompile;
   map?: typeof runMapBuild;
   record?: typeof runRecordGaps;
+  sync?: typeof runSync;
   auth?: typeof runAuthLogin;
   authRefresh?: typeof runAuthRefresh;
   verify?: typeof runVerify;
@@ -462,6 +465,33 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           return 0;
         }
 
+        if (explicit === "coverage" && stringFlag(args, "diff") !== undefined) {
+          const result = runCoverageDiff({
+            site,
+            mapsDir,
+            against: stringFlag(args, "diff") as string,
+            failOn: (stringFlag(args, "fail-on") ?? "")
+              .split(",")
+              .filter((part) => part.length > 0),
+          });
+          const markdownPath = stringFlag(args, "markdown");
+          if (markdownPath !== undefined)
+            writeFileSync(markdownPath, `${result.markdown}\n`, "utf8");
+          if (booleanFlag(args, "json")) {
+            out(
+              JSON.stringify(
+                { diff: result.diff, ops: result.ops, failures: result.failures },
+                null,
+                2,
+              ),
+            );
+          } else {
+            for (const line of result.lines) out(line);
+            for (const reason of result.failures) out(`FAIL ${reason}`);
+          }
+          return result.failures.length > 0 ? 1 : 0;
+        }
+
         if (explicit === "coverage") {
           const ledger = readCapabilities(join(mapsDir, site));
           if (ledger === undefined) {
@@ -521,7 +551,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
           stringFlag(args, "traces-dir") ??
           process.env.TRACES_DIR ??
           (url === undefined ? config.traces : undefined);
-        const result = await (deps.map ?? runMapBuild)({
+        const buildInput: MapBuildInput = {
           site,
           mapsDir,
           ...(url !== undefined ? { url } : {}),
@@ -585,7 +615,54 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
               : config.storageState !== undefined
                 ? { storageState: config.storageState }
                 : {}),
-        });
+        };
+        if (explicit === "sync") {
+          const since = stringFlag(args, "since");
+          if (since === undefined) throw new Error("map sync needs --since <git ref>");
+          const synced = await (deps.sync ?? runSync)({
+            ...buildInput,
+            since,
+            ...(config.sync !== undefined ? { sync: config.sync } : {}),
+            dryRun: booleanFlag(args, "dry-run"),
+            failOn: (stringFlag(args, "fail-on") ?? "")
+              .split(",")
+              .filter((part) => part.length > 0),
+          });
+
+          out(`${synced.changed.length} files changed since ${since}`);
+          out(
+            synced.affected.length > 0
+              ? `affected states: ${synced.affected.join(", ")}`
+              : "no state is affected by those changes",
+          );
+          if (synced.unmapped.length > 0) {
+            out(
+              `${synced.unmapped.length} changed source files map to no state: ${synced.unmapped.slice(0, 8).join(", ")}${synced.unmapped.length > 8 ? ", ..." : ""}`,
+            );
+            out(
+              '  add them under "sync.paths" in .portolan/config.json, e.g. {"src/admin/**": ["admin_*"]}',
+            );
+          }
+          if (synced.built !== undefined)
+            out(`capabilities: ${formatCoverage(synced.built.coverage)}`);
+          for (const name of synced.repaired) out(`repaired ${name}: its control was renamed`);
+          for (const [name, why] of Object.entries(synced.broken)) out(`BROKEN ${name}: ${why}`);
+          if (synced.published !== undefined)
+            out(`published v${synced.published.version} with the repairs`);
+          if (synced.diff !== undefined) {
+            for (const line of synced.diff.lines) out(line);
+            for (const reason of synced.diff.failures) out(`FAIL ${reason}`);
+            const markdownPath = stringFlag(args, "markdown");
+            if (markdownPath !== undefined) {
+              writeFileSync(markdownPath, `${synced.diff.markdown}\n`, "utf8");
+            }
+          }
+          const failed =
+            (synced.diff?.failures.length ?? 0) > 0 || Object.keys(synced.broken).length > 0;
+          return failed ? 1 : 0;
+        }
+
+        const result = await (deps.map ?? runMapBuild)(buildInput);
 
         out(
           `drafted ${result.draft.proposals.length} ops, ${result.draft.tasks.length} tasks at ${result.draftPath}`,

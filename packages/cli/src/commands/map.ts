@@ -817,7 +817,7 @@ function draftMap(draft: MapDraft): SiteMap {
  * The URL to re-crawl for a state: its template filled from the first param
  * set the params file holds for an op that opens it.
  */
-function stateStartUrl(
+export function stateStartUrl(
   id: string,
   map: SiteMap | undefined,
   params: Record<string, Array<Record<string, unknown>>>,
@@ -900,7 +900,9 @@ export function setupFor(
   return undefined;
 }
 
-function readParams(path: string | undefined): Record<string, Array<Record<string, unknown>>> {
+export function readParams(
+  path: string | undefined,
+): Record<string, Array<Record<string, unknown>>> {
   if (path === undefined) return {};
   return JSON.parse(readFileSync(path, "utf8")) as Record<string, Array<Record<string, unknown>>>;
 }

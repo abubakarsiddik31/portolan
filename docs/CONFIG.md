@@ -97,6 +97,24 @@ These are read in addition to the config file:
 `portolan doctor` reports which provider variables are set without printing
 their values.
 
+## Sync
+
+`sync` tells `map sync` which pages a changed file affects.
+
+```json
+{
+  "sync": {
+    "src": "src",
+    "routesFrom": "react-router",
+    "paths": { "src/components/admin/**": ["admin_*"] }
+  }
+}
+```
+
+`paths` maps a source glob to state ids (globs allowed). `routesFrom` (`react-router`,
+`next`, `sveltekit`) reads the route table under `src` so a changed route file affects its
+own page.
+
 ## Site policy
 
 `.portolan/policies/<site>.json` controls what a site may reach and what must not

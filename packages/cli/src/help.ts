@@ -74,7 +74,9 @@ status    where the loop stands: version, coverage, uncompiled traces, the last 
 record    --gaps: record a one-click run for each missing capability, without an agent loop
           (--kind button,link  --only id,id  --max N  --writes; needs --base-url or a map)
 coverage  print mapped vs missing capabilities (--json for machine output;
-          --older-than 7d lists entries no crawl has seen recently)
+          --older-than 7d lists entries no crawl has seen recently;
+          --diff <v3|git-ref> [--fail-on missing,stale] [--markdown file] shows what changed
+          since a published version or a git ref, and exits 1 on a listed regression)
 capability add|set   record a capability manually (--page --name --kind
           --status missing|excluded --reason, or --id --status for set)
 

@@ -320,11 +320,26 @@ function groupGlobals(
   return { actions: [...surface.filter((action) => !merged.has(action)), ...actions], superseded };
 }
 
+/** Every id a ledger has used for this control, per page and global. */
+function capabilityIds(action: GroupedAction): string[] {
+  const { pages, ...single } = action;
+  return [
+    makeCapabilityId(action),
+    ...(pages ?? [action.page]).map((page) => makeCapabilityId({ ...single, page })),
+  ];
+}
+
 function onPage(action: GroupedAction, pages: string[]): boolean {
   return (action.pages ?? [action.page]).some((page) => pages.includes(page));
 }
 
 function covers(action: GroupedAction, proposal: OpProposal): boolean {
+  // A run recorded for a named capability covers that capability, which a
+  // trigger name cannot say when two pages share a label.
+  if (proposal.capability !== undefined && capabilityIds(action).includes(proposal.capability)) {
+    return true;
+  }
+
   // A navigation link is covered by a url op for its target, wherever the link
   // appears. Counting it only on the page where it was first discovered made
   // every global nav link look missing on every other page.

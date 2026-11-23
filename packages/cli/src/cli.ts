@@ -26,6 +26,7 @@ import { runMcp } from "./commands/mcp.js";
 import { runMigrate } from "./commands/migrate.js";
 import { blockedHosts, runPolicyAllow } from "./commands/policy.js";
 import { runQa } from "./commands/qa.js";
+import { runRecordGaps } from "./commands/record.js";
 import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
 import { loadConfig } from "./config.js";
@@ -49,6 +50,7 @@ Commands:
   serve                  start the HTTP and MCP server
   mcp                    serve MCP over stdio (for a client to spawn)
   map <build|update>     discover a URL and/or traces into a map draft, verify, publish
+  map record --gaps      record a one-click run for each missing capability
   map coverage           report mapped vs missing app capabilities
   map capability         add or set a capability manually (add|set)
   policy allow <host...> add hosts to a site's egress allow list
@@ -72,6 +74,7 @@ export type CliDeps = {
   mcp?: typeof runMcp;
   compile?: typeof runCompile;
   map?: typeof runMapBuild;
+  record?: typeof runRecordGaps;
   auth?: typeof runAuthLogin;
   verify?: typeof runVerify;
   exportSkills?: typeof runExportSkills;
@@ -318,6 +321,64 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
             out(`${site}: ${formatCoverage(coverage)}`);
             out(`  ${path}`);
           }
+          return 0;
+        }
+
+        if (explicit === "record") {
+          if (!booleanFlag(args, "gaps")) {
+            throw new Error(
+              "map record needs --gaps: it records a run for each missing capability",
+            );
+          }
+          const split = (name: string): string[] | undefined => {
+            const value = stringFlag(args, name);
+            return value === undefined ? undefined : value.split(",").map((part) => part.trim());
+          };
+          const chrome = stringFlag(args, "chrome") ?? config.chrome;
+          const storageState =
+            stringFlag(args, "storage-state") ??
+            process.env.PORTOLAN_STORAGE_STATE ??
+            config.storageState;
+          const kinds = split("kind");
+          const only = split("only");
+          const baseUrl = stringFlag(args, "base-url") ?? config.baseUrl;
+          const outcome = await (deps.record ?? runRecordGaps)({
+            site,
+            mapsDir,
+            tracesDir: stringFlag(args, "traces-dir") ?? process.env.TRACES_DIR ?? config.traces,
+            policiesDir: config.policies,
+            ...(kinds !== undefined ? { kinds } : {}),
+            ...(only !== undefined ? { only } : {}),
+            ...(numberFlag(args, "max") !== undefined ? { max: numberFlag(args, "max") } : {}),
+            writes: booleanFlag(args, "writes"),
+            ...(baseUrl !== undefined ? { baseUrl } : {}),
+            ...(stringFlag(args, "params") !== undefined
+              ? { paramsPath: stringFlag(args, "params") }
+              : {}),
+            ...(chrome !== undefined ? { chrome } : {}),
+            ...(storageState !== undefined ? { storageState } : {}),
+            headless: booleanFlag(args, "headed") ? false : config.headless,
+          });
+
+          const counts = new Map<string, number>();
+          for (const item of outcome.outcomes) {
+            counts.set(item.status, (counts.get(item.status) ?? 0) + 1);
+          }
+          out(
+            `${site}: ${outcome.outcomes.length} gaps, ${[...counts].map(([status, n]) => `${n} ${status}`).join(", ") || "nothing to record"}`,
+          );
+          for (const item of outcome.outcomes) {
+            if (item.status === "recorded") continue;
+            out(
+              `  ${item.status.padEnd(14)} ${item.id}${item.detail !== undefined ? ` :: ${item.detail}` : ""}`,
+            );
+            if (item.affordances !== undefined && item.affordances.length > 0) {
+              out(`    saw: ${item.affordances.join("; ")}`);
+            }
+          }
+          out(
+            `traces: ${outcome.tracesPath}; next: portolan map build --site ${site} --verify --publish`,
+          );
           return 0;
         }
 

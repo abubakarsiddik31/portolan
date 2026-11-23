@@ -96,6 +96,31 @@ portolan map build --site app \
   reloads the page after each click. A click that lands on a new route is queued and
   recorded as a `go_<button>` op.
 
+## Record the gaps without an agent loop
+
+Most gaps after a crawl are one click on a named control. `map record --gaps` records
+them without a model turn per gap:
+
+```bash
+portolan map record --gaps --site app --base-url http://localhost:5173 \
+  --storage-state auth.json --max 50
+portolan map build --site app --verify --publish
+```
+
+For each `missing` button it opens the page (a parameterized state is filled from the
+sample params discovery saw, or from `--params`), clicks the control by role and name,
+and writes a trace tagged with the capability id, so the next build covers exactly that
+capability. The summary counts `recorded`, `navigated_away`, `disabled`, `not_found`,
+`skipped`, and `failed`. A control that is not found lists the buttons and links the page
+does have; a disabled one becomes `unavailable`. Add `--kind button,link`, `--only
+<id,...>`, or `--max N` to narrow it.
+
+A control that matches a destructive, cost, billing, or session rule, or whose name reads
+like a write (save, create, send, upload), is skipped unless you pass `--writes`.
+
+An agent recording over MCP can pass `capability` to `open_url` or `fallback_begin` for
+the same link.
+
 ## What "verified" proves
 
 A `ui` op that only clicks verifies as soon as the locator resolves, so a filter that

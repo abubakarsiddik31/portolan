@@ -51,11 +51,13 @@ Options (login):
   --chrome <path>        Chrome binary
 ${CONFIG_FLAG}`,
 
-  map: `portolan map <build|update|coverage|capability> [traces...] [options]
+  map: `portolan map <build|update|coverage|record|capability> [traces...] [options]
 
 build     discover --url and/or compile traces into a draft map; --verify and
           --publish turn verified ops into a new map version
 update    same as build, reconciled against the existing map
+record    --gaps: record a one-click run for each missing capability, without an agent loop
+          (--kind button,link  --only id,id  --max N  --writes; needs --base-url or a map)
 coverage  print mapped vs missing capabilities (--json for machine output;
           --older-than 7d lists entries no crawl has seen recently)
 capability add|set   record a capability manually (--page --name --kind

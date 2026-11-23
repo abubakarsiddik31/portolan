@@ -12,7 +12,7 @@ import {
   Substrate,
 } from "@abubakarsiddiik/substrate";
 
-import { evaluateCheck } from "./checks.js";
+import { type CheckOutcome, evaluateCheck } from "./checks.js";
 import type { EvidenceMode } from "./config.js";
 import type { RunEnvironment } from "./environments.js";
 import { QaError, type QaErrorCode } from "./errors.js";
@@ -24,7 +24,7 @@ import {
   redactValues,
   resolveValues,
 } from "./fixtures.js";
-import { governedMap, type QaCase, type QaLocator, type QaStep } from "./spec.js";
+import { governedMap, type QaCase, type QaCheck, type QaLocator, type QaStep } from "./spec.js";
 import type { QaSubstrate, QaView } from "./types.js";
 
 export type RunTrigger = "manual" | "changed" | "verify" | "ci" | "mcp" | "plan";
@@ -380,9 +380,21 @@ async function attemptCore(
         ? undefined
         : input.loadMap?.(governedMap(spec)?.site as string, governedMap(spec)?.version);
 
+    let current = view;
     for (const [offset, check] of spec.expect.entries()) {
-      const outcome = await evaluateCheck({ check, view, substrate, ...(map ? { map } : {}) });
+      const retried = await checkWithRetry({
+        check,
+        view: current,
+        substrate,
+        ...(map ? { map } : {}),
+        timeoutMs: input.timeoutMs ?? 15_000,
+        now,
+        sleep: input.sleep ?? sleep,
+      });
+      const outcome = retried.outcome;
+      current = retried.view;
       if (!outcome.ok) {
+        const artifacts = await failureArtifacts(substrate, input);
         return failResult(spec, attempt, started, now, {
           status: "fail",
           code: "assertion_failed",
@@ -391,10 +403,11 @@ async function attemptCore(
           expected: outcome.expected,
           actual: outcome.actual,
           events,
-          view,
+          view: current,
           substrate,
           input,
           evidenceMode,
+          artifacts,
         });
       }
     }
@@ -418,6 +431,8 @@ async function attemptCore(
     const typed = error instanceof StepFailure ? error.error : asQaError(error);
     const failStep = error instanceof StepFailure ? error.index : undefined;
     const view = substrate?.state();
+    const artifacts =
+      substrate === undefined ? undefined : await failureArtifacts(substrate, input);
 
     return failResult(spec, attempt, started, now, {
       status: typed.code === "harness_error" ? "error" : "fail",
@@ -430,6 +445,7 @@ async function attemptCore(
       ...(substrate !== undefined ? { substrate } : {}),
       input,
       evidenceMode,
+      ...(artifacts !== undefined ? { artifacts } : {}),
     });
   } finally {
     await substrate?.close?.();
@@ -559,26 +575,27 @@ async function executeStep(
   if ("await" in step) {
     const timeout = step.timeout_ms ?? options.timeoutMs;
     const deadline = options.now().getTime() + timeout;
+    const check = awaitCheck(step);
+    let last = `await ${step.await}`;
 
     while (options.now().getTime() <= deadline) {
-      const view = substrate.state() ?? (await substrate.view());
+      // A wait for the page to change must look at the page as it is now.
+      const view =
+        step.await === "url" || step.await === "text"
+          ? (substrate.state() ?? (await substrate.view()))
+          : await substrate.view();
 
-      if (step.await === "url") {
-        if (
-          step.pattern !== undefined &&
-          new RegExp(step.pattern).test(pathname(view.snapshot.url))
-        ) {
-          return;
-        }
-      } else if (step.contains !== undefined) {
-        const page = await substrate.read();
-        if (page.text.includes(step.contains)) return;
-      }
+      const outcome =
+        check === undefined
+          ? { ok: false as const, message: last }
+          : await evaluateCheck({ check, view, substrate });
+      if (outcome.ok) return;
+      last = outcome.message;
 
       await options.sleep(100);
     }
 
-    throw new QaError("timeout", `await ${step.await} timed out after ${timeout}ms`);
+    throw new QaError("timeout", `await ${step.await} timed out after ${timeout}ms: ${last}`);
   }
 
   if ("op" in step) {
@@ -788,6 +805,7 @@ function failResult(
     substrate?: QaSubstrate;
     input: RunInput;
     evidenceMode: EvidenceMode;
+    artifacts?: FailureArtifacts;
   },
 ): CaseResult {
   const result: CaseResult = {
@@ -815,6 +833,7 @@ function failResult(
       view: input.view,
       substrate: input.substrate,
       input: input.input,
+      ...(input.artifacts !== undefined ? { artifacts: input.artifacts } : {}),
     });
     if (dir !== undefined) result.evidence_dir = dir;
   }
@@ -953,8 +972,103 @@ function pathname(url: string): string {
   }
 }
 
+/** The check an `await` step waits for, or an error when it is missing what it needs. */
+function awaitCheck(step: Extract<QaStep, { await: string }>): QaCheck | undefined {
+  switch (step.await) {
+    case "url":
+      if (step.pattern === undefined)
+        throw new QaError("invalid_request", "await url needs a pattern");
+      return { url: step.pattern };
+    case "text":
+      if (step.contains === undefined)
+        throw new QaError("invalid_request", "await text needs contains");
+      return { text: { contains: step.contains } };
+    case "visible":
+    case "absent":
+      if (step.target === undefined) {
+        throw new QaError("invalid_request", `await ${step.await} needs a target locator`);
+      }
+      return step.await === "visible" ? { visible: step.target } : { absent: step.target };
+    case "value":
+      if (step.target === undefined || step.equals === undefined) {
+        throw new QaError("invalid_request", "await value needs a target and equals");
+      }
+      return { value: { target: step.target, equals: step.equals } };
+  }
+}
+
+/**
+ * Evaluate a check, trying again until it passes or the time is up. An async UI
+ * has not rendered the moment the last step returns, and a check that runs
+ * once either flakes or, for `absent`, passes before the page exists.
+ */
+async function checkWithRetry(input: {
+  check: QaCheck;
+  view: QaView;
+  substrate: QaSubstrate;
+  map?: SiteMap;
+  timeoutMs: number;
+  now: () => Date;
+  sleep: (ms: number) => Promise<void>;
+}): Promise<{ outcome: CheckOutcome; view: QaView }> {
+  let view = input.view;
+  const deadline = input.now().getTime() + input.timeoutMs;
+
+  for (;;) {
+    const outcome = await evaluateCheck({
+      check: input.check,
+      view,
+      substrate: input.substrate,
+      ...(input.map !== undefined ? { map: input.map } : {}),
+    });
+    if (outcome.ok || input.now().getTime() >= deadline) return { outcome, view };
+
+    await input.sleep(100);
+    view = await input.substrate.view();
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** What only an async read can give a failure's evidence folder. */
+type FailureArtifacts = { text?: string; screenshot?: Uint8Array };
+
+/**
+ * The page text and, when the run asks for screenshots, a screenshot, taken
+ * while the failing page is still open. Evidence is written synchronously
+ * after, so this is the one place it can ask the browser.
+ */
+async function failureArtifacts(
+  substrate: QaSubstrate,
+  input: RunInput,
+): Promise<FailureArtifacts | undefined> {
+  if (input.evidenceRoot === undefined) return undefined;
+
+  const artifacts: FailureArtifacts = {};
+  try {
+    artifacts.text = (await substrate.read()).text;
+  } catch {
+    // Evidence is best effort: a page that cannot be read still has a view.
+  }
+  if (input.screenshot === true) {
+    try {
+      const shot = await substrate.screenshot?.();
+      if (shot !== undefined) artifacts.screenshot = shot;
+    } catch {
+      // Same: no screenshot is better than no evidence.
+    }
+  }
+  return artifacts;
+}
+
+/** The dialog that scopes `read` to itself while it is open, if one is. */
+function readScope(view: QaView): { scoped_to: "dialog"; name: string } | undefined {
+  const dialog = view.snapshot.nodes.find(
+    (node) => node.visible && (node.role === "dialog" || node.role === "alertdialog"),
+  );
+  return dialog === undefined ? undefined : { scoped_to: "dialog", name: dialog.name };
 }
 
 function writeEvidenceSync(input: {
@@ -963,6 +1077,7 @@ function writeEvidenceSync(input: {
   view: QaView;
   substrate?: QaSubstrate;
   input: RunInput;
+  artifacts?: FailureArtifacts;
 }): string | undefined {
   const root = input.input.evidenceRoot;
   if (root === undefined) return undefined;
@@ -985,12 +1100,15 @@ function writeEvidenceSync(input: {
     writeFileSync(
       join(dir, "result.json"),
       `${JSON.stringify(
-        redactValues(
-          scrubResult(input.result, input.input.secretValues ?? new Set()),
-          redact,
-          [],
-          caseNames(input.result.case_id),
-        ),
+        {
+          ...(redactValues(
+            scrubResult(input.result, input.input.secretValues ?? new Set()),
+            redact,
+            [],
+            caseNames(input.result.case_id),
+          ) as object),
+          ...(readScope(input.view) !== undefined ? { read_scope: readScope(input.view) } : {}),
+        },
         null,
         2,
       )}\n`,
@@ -1001,6 +1119,16 @@ function writeEvidenceSync(input: {
       `${(input.result.events ?? []).map((event) => JSON.stringify(redactValues(scrubEvent(event, input.input.secretValues ?? new Set()), redact))).join("\n")}\n`,
       "utf8",
     );
+    if (input.artifacts?.text !== undefined) {
+      writeFileSync(
+        join(dir, "text.txt"),
+        `${redactText(input.artifacts.text, redact, input.input.secretValues)}\n`,
+        "utf8",
+      );
+    }
+    if (input.artifacts?.screenshot !== undefined) {
+      writeFileSync(join(dir, "page.png"), input.artifacts.screenshot);
+    }
     return dir;
   } catch {
     return undefined;

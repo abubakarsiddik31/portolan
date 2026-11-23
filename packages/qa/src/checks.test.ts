@@ -2,7 +2,7 @@ import type { SemanticNode, Snapshot } from "@abubakarsiddiik/substrate";
 import { buildRefMap } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
-import { evaluateCheck } from "./checks.js";
+import { evaluateCheck, matchUrl } from "./checks.js";
 import type { QaSubstrate, QaView } from "./types.js";
 
 function node(id: number, role: string, name: string): SemanticNode {
@@ -61,5 +61,36 @@ describe("evaluateCheck absent", () => {
       name: "Delete workspace",
       ref,
     });
+  });
+});
+
+describe("matchUrl", () => {
+  const url = "http://app/analytics?range=30d&page=2#overview";
+
+  it("matches the path of a plain pattern, as before", () => {
+    expect(matchUrl("^/analytics$", url)).toEqual({ ok: true });
+    expect(matchUrl("/dashboard", url)).toMatchObject({ ok: false, actual: "/analytics" });
+  });
+
+  it("matches the whole URL when the pattern names a query or a fragment", () => {
+    expect(matchUrl("/analytics\\?range=30d", url)).toEqual({ ok: true });
+    expect(matchUrl("/analytics\\?range=7d", url)).toMatchObject({ ok: false });
+    expect(matchUrl("#overview$", url)).toEqual({ ok: true });
+  });
+
+  it("checks each part the object form names", () => {
+    expect(
+      matchUrl({ pathname: "^/analytics$", query: { range: "30d" }, hash: "overview" }, url),
+    ).toEqual({
+      ok: true,
+    });
+    expect(matchUrl({ query: { range: "7d" } }, url)).toMatchObject({
+      ok: false,
+      message: 'url query range was "30d", expected "7d"',
+    });
+    expect(matchUrl({ query: { missing: "x" } }, url)).toMatchObject({
+      message: 'url query missing was absent, expected "x"',
+    });
+    expect(matchUrl({ hash: "details" }, url)).toMatchObject({ ok: false });
   });
 });

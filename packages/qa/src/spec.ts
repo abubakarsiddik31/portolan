@@ -50,15 +50,31 @@ export const StepSchema = z.union([
   z.object({ goto: z.string().min(1) }),
   DoStepSchema,
   z.object({
-    await: z.enum(["url", "text"]),
+    await: z.enum(["url", "text", "visible", "absent", "value"]),
     pattern: z.string().min(1).optional(),
     contains: z.string().min(1).optional(),
+    /** For visible, absent and value: the control to wait for. */
+    target: LocatorSchema.optional(),
+    /** For value: what the control's value must equal. */
+    equals: z.string().optional(),
     timeout_ms: z.number().int().min(1).optional(),
   }),
 ]);
 
+/** A URL check: a path regex, or `{ pathname?, query?, hash? }` to say which parts matter. */
+export const UrlCheckSchema = z.union([
+  z.string().min(1),
+  z
+    .object({
+      pathname: z.string().min(1).optional(),
+      query: z.record(z.string(), z.string()).optional(),
+      hash: z.string().min(1).optional(),
+    })
+    .refine((value) => Object.keys(value).length > 0, "a url check needs pathname, query or hash"),
+]);
+
 export const CheckSchema = z.union([
-  z.object({ url: z.string().min(1) }),
+  z.object({ url: UrlCheckSchema }),
   z.object({ text: z.object({ contains: z.string().min(1) }) }),
   z.object({ visible: LocatorSchema }),
   z.object({ absent: LocatorSchema }),

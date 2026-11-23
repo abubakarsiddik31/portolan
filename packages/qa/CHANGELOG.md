@@ -1,5 +1,13 @@
 # @abubakarsiddiik/qa
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [87d27fd]
+  - @abubakarsiddiik/substrate@0.1.2
+  - @abubakarsiddiik/runtime@0.1.4
+
 ## 0.1.4
 
 ### Patch Changes

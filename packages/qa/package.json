@@ -1,6 +1,6 @@
 {
   "name": "@abubakarsiddiik/qa",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Local, agent-first QA: test cases, runs, evidence, and repair.",
   "license": "Apache-2.0",
   "type": "module",

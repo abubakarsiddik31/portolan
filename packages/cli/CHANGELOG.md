@@ -1,5 +1,11 @@
 # @abubakarsiddiik/portolan
 
+## 0.3.2
+
+### Patch Changes
+
+- d3ae878: Boolean flags no longer swallow the next positional, so `--verify --publish trace.json` keeps the trace.
+
 ## 0.3.1
 
 ### Patch Changes

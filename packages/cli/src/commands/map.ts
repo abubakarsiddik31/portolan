@@ -298,6 +298,11 @@ export async function runMapBuild(
       }
 
       const used = new Set(draft.proposals.map((proposal) => proposal.op.name));
+      const capabilityByScope = new Map(
+        traces.flatMap((trace) =>
+          trace.capability === undefined ? [] : [[trace.scope_id, trace.capability] as const],
+        ),
+      );
 
       for (const candidate of boot.candidates) {
         const name = used.has(candidate.op.name)
@@ -305,6 +310,7 @@ export async function runMapBuild(
           : candidate.op.name;
         used.add(name);
         const risk = riskOf(candidate, policyRules);
+        const capability = capabilityByScope.get(candidate.source ?? "");
         const op = name === candidate.op.name ? candidate.op : { ...candidate.op, name };
         if (risk !== undefined && op.effect === "read") op.effect = "write";
         if (risk?.category === "destructive" && op.impls.every((impl) => impl.tier === "ui")) {
@@ -312,6 +318,7 @@ export async function runMapBuild(
         }
         draft.proposals.push({
           op,
+          ...(capability !== undefined ? { capability } : {}),
           ...(risk !== undefined ? { risk } : {}),
           source: "traces",
           provenance: candidate.source ?? "recorded trace",
@@ -862,8 +869,11 @@ export function seedPolicy(
   return { ...policy, allow: [new URL(url).host] };
 }
 
-async function launchSubstrate(
-  input: MapBuildInput,
+export async function launchSubstrate(
+  input: Pick<
+    MapBuildInput,
+    "site" | "policiesDir" | "url" | "baseUrl" | "chrome" | "headless" | "storageState"
+  >,
 ): Promise<{ substrate: Substrate; close: () => Promise<void> }> {
   const executablePath = input.chrome ?? findChrome();
   if (executablePath === undefined) {

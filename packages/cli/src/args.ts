@@ -10,6 +10,7 @@ const BOOLEAN_FLAGS = new Set([
   "allow-cost",
   "explore",
   "force",
+  "gaps",
   "headed",
   "json",
   "list",
@@ -22,6 +23,7 @@ const BOOLEAN_FLAGS = new Set([
   "strict",
   "verify",
   "verify-writes",
+  "writes",
 ]);
 
 /**

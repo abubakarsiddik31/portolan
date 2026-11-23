@@ -54,6 +54,8 @@ export type Trace = {
   started_at: string;
   ended_at?: string;
   entries: TraceEntry[];
+  /** The capability this run was recorded for, so compile covers exactly it. */
+  capability?: string;
 };
 
 export type FallbackScope = {
@@ -67,12 +69,15 @@ export type FallbackScope = {
   ended_at?: string;
   trace: TraceEntry[];
   result?: unknown;
+  capability?: string;
 };
 
 export type FallbackScopeInput = {
   sid: string;
   intent: string;
   effect?: FallbackEffect;
+  /** The capability id this run records. */
+  capability?: string;
   ttlMs?: number;
   now?: () => number;
 };
@@ -110,6 +115,7 @@ export class FallbackScopes {
       expiresAt: at + (input.ttlMs ?? DEFAULT_TTL_MS),
       started_at: new Date(at).toISOString(),
       trace: [],
+      ...(input.capability !== undefined ? { capability: input.capability } : {}),
     };
 
     this.scopes.set(scope.id, scope);

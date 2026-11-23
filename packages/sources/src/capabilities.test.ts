@@ -493,4 +493,21 @@ describe("buildCapabilities", () => {
       sample: "Active 1",
     });
   });
+
+  it("covers the capability a run was recorded for, whatever the label says", () => {
+    const recorded: OpProposal = {
+      ...clickOp("op_x", ["home"], "Something else"),
+      capability: "home.button.add_application",
+    };
+
+    const ledger = buildCapabilities({
+      site: "app",
+      discovery: discovery(),
+      proposals: [recorded],
+    });
+
+    expect(
+      ledger.capabilities.find((item) => item.trigger.name === "Add Application"),
+    ).toMatchObject({ status: "mapped", op: "op_x" });
+  });
 });

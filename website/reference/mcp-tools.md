@@ -8,9 +8,9 @@ Portolan speaks MCP over stdio or streamable HTTP. The tools are the same.
 |---|---|---|
 | `list_sites` | `{}` | Every site with a map. |
 | `open_site` | `{ site }` | The compact map, a pinned version, and a session id. |
-| `open_url` | `{ url, intent, site?, effect? }` | An explore session and a fallback scope for a site with no map. |
+| `open_url` | `{ url, intent, site?, effect?, capability? }` | An explore session and a fallback scope for a site with no map. |
 | `call` | `{ op, params, confirm?, idempotency_key? }` | The op's typed result, or a typed error. |
-| `fallback_begin` | `{ intent, effect? }` | A fallback scope for finishing an intent by hand. |
+| `fallback_begin` | `{ intent, effect?, capability? }` | A fallback scope for finishing an intent by hand. |
 | `view` | `{ format?, max_affordances?, max_tokens? }` | URL, state, and ranked affordances. `format` is `text` (default), `json`, or `both`. |
 | `act` | `{ ref, do, value?, key? }` | The delta and effects of one semantic action. |
 | `read` | `{ ref?, format? }` | Page text, or one ref's value. Plain text by default; `format: "json"` for the envelope. |

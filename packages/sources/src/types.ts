@@ -22,6 +22,8 @@ export type OpProposal = {
   confidence: "high" | "medium" | "low";
   /** Observed parameter sets, when the source had them. */
   sample_params?: Array<Record<string, unknown>>;
+  /** The capability id a run was recorded for; covers exactly that capability. */
+  capability?: string;
   /** A policy rule the recorded run tripped; `cost` and `destructive` gate verification. */
   risk?: { category: string; reason: string };
   trigger?: MapTrigger;

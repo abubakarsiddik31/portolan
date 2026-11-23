@@ -492,9 +492,10 @@ export function createMcpServer(deps: McpDeps): McpServer {
         intent: z.string().min(1).max(200),
         site: z.string().min(1).max(64).optional(),
         effect: z.enum(["read", "write", "irreversible"]).optional(),
+        capability: z.string().min(1).max(200).optional(),
       },
     },
-    async ({ url, intent, site, effect }) => {
+    async ({ url, intent, site, effect, capability }) => {
       if (currentSid !== undefined) await endSession(currentSid);
 
       const name = site ?? siteNameFromUrl(url);
@@ -510,7 +511,12 @@ export function createMcpServer(deps: McpDeps): McpServer {
         clearNativeTools();
       }
 
-      const scope = scopes.begin({ sid: session.sid, intent, effect: effect ?? "write" });
+      const scope = scopes.begin({
+        sid: session.sid,
+        intent,
+        effect: effect ?? "write",
+        ...(capability !== undefined ? { capability } : {}),
+      });
 
       return text(
         JSON.stringify({
@@ -552,9 +558,10 @@ export function createMcpServer(deps: McpDeps): McpServer {
       inputSchema: {
         intent: z.string().min(1),
         effect: z.enum(["read", "write", "irreversible"]).optional(),
+        capability: z.string().min(1).max(200).optional(),
       },
     },
-    async ({ intent, effect }) => {
+    async ({ intent, effect, capability }) => {
       if (currentSid === undefined) {
         return failure("session_not_found", "call open_site first");
       }
@@ -569,6 +576,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
         sid: session.sid,
         intent,
         effect: effect ?? "write",
+        ...(capability !== undefined ? { capability } : {}),
       });
 
       return text(
@@ -796,6 +804,7 @@ export function createMcpServer(deps: McpDeps): McpServer {
         effect: closed.effect,
         started_at: closed.started_at,
         ...(closed.ended_at !== undefined ? { ended_at: closed.ended_at } : {}),
+        ...(closed.capability !== undefined ? { capability: closed.capability } : {}),
         entries: closed.trace,
       };
 

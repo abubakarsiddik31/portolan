@@ -13,6 +13,7 @@ portolan <command> [options]
 | `portolan auth login` | Open a visible browser, sign in, and save a Playwright storage state. |
 | `portolan map build` | Discover a URL and/or traces into a draft, verify, and publish. |
 | `portolan map update` | Refresh an existing map and keep capabilities discovery did not see. |
+| `portolan map record --gaps` | Record a one-click run for each missing capability, tagged with its capability id. Flags: `--kind`, `--only`, `--max`, `--writes`. |
 | `portolan map coverage` | Report `mapped`, `missing`, `excluded`, `unavailable`, `stale`, and `removed` capabilities. `--older-than 7d` lists entries no crawl has seen recently. |
 | `portolan map capability` | Add a capability manually or set its status/reason (`add` / `set`). |
 | `portolan mcp` | Serve MCP over stdio for a client to spawn. |

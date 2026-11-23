@@ -34,6 +34,7 @@ older one.
 | `chrome` | string | unset | `map`, `compile`, `verify` | Chrome binary. Unset means `CHROME_PATH`, then the usual install paths. |
 | `start` | string | unset | `map` | Command that boots the app, e.g. `"npm run dev"`; used with `--verify`. |
 | `storageState` | string | unset | `map`, `verify`, `compile`, `mcp`, `serve` | Playwright storage-state file for pages behind auth. `PORTOLAN_STORAGE_STATE` overrides it. |
+| `environments` | object | `{}` | `qa`, `auth` | Named targets: `{ "<name>": { "baseUrl", "profiles": [..], "loginUrl"?, "writes"? } }`. `writes` defaults to `false`. Parsed strictly; see [QA](./QA.md#101-environments-and-sessions). |
 | `headless` | boolean | `true` | `compile`, `verify` | Run Chromium headless. `--headed` overrides it to `false`. |
 | `sessionTtlMs` | integer ≥ 1 | `1800000` (30 min) | `serve` | Idle time after which a session is closed. |
 | `maxOpenSessions` | integer ≥ 1 | `100` | `serve` | A create at the cap returns `429 session_limit`. |
@@ -90,6 +91,7 @@ These are read in addition to the config file:
 | `DATABASE_PATH` | `.portolan/state/portolan.db` | Used by `start.ts` (the bare server process), not `portolan serve`. |
 | `TRACES_DIR` | `.portolan/state/traces` | Recorded traces for `mcp`, `serve`, and `map`. |
 | `PORTOLAN_STORAGE_STATE` | unset | Playwright storage-state file for authenticated pages. |
+| `PORTOLAN_HOME` | `~/.portolan` | Where `auth login --env` saves sessions (`sessions/<project>/<env>/<profile>.json`), outside the repository. |
 | `PORT` / `HOST` | `4200` / `127.0.0.1` | Used by `start.ts`, not `portolan serve`. |
 
 `portolan doctor` reports which provider variables are set without printing

@@ -287,8 +287,26 @@ are the test author; the runner replays what you write.
 
 \`qa_list\`, \`qa_plan\`, \`qa_run\`, \`qa_status\`, \`qa_result\`,
 \`qa_case_read\`, \`qa_case_write\`, \`qa_generate\`, \`qa_verify\`,
-\`qa_repair\`, \`qa_coverage\`, \`qa_report\`. Doctor and sync are CLI-only
-(\`portolan qa doctor\`, \`portolan qa sync\`).
+\`qa_repair\`, \`qa_coverage\`, \`qa_report\`, \`qa_environments\`. Doctor,
+sync, and sign-in are CLI-only (\`portolan qa doctor\`, \`portolan qa sync\`,
+\`portolan auth login\`).
+
+## Environments and sign-in
+
+To test dev, QA, or prod, call \`qa_environments\` to see the configured
+environments, their profiles, and whether each has a saved session. Then pass
+\`env\` (and \`as\`, the profile) to \`qa_run\`, \`qa_verify\`, or \`qa_repair\`.
+
+- You choose an environment and a profile by name. You never receive, store,
+  or type a password, cookie, or token, and no tool returns one.
+- \`auth_missing\`, or a failure on what looks like a sign-in page — the
+  session is missing or expired. Stop and ask me to run the command in
+  \`next\` (\`portolan auth login --env NAME --profile PROFILE\`). Do not try to
+  sign in yourself.
+- A read-only environment (\`writes: false\`, the default) skips any case whose
+  \`effect\` is not \`read\` and blocks mutating requests. Do not work around
+  it; ask me to change the config if a write is intended.
+- Cases may not \`goto\` another origin during an environment run.
 
 ## Authoring
 
@@ -302,7 +320,9 @@ are the test author; the runner replays what you write.
   Never use CSS selectors.
 - Assert with \`expect\` checks: \`url\`, \`visible\`, \`absent\`, \`text\`, \`value\`.
 - Reference fixtures as \`\${fixture.user.email}\` and secrets as
-  \`\${env.QA_PASSWORD}\`. Never write a secret into a case.
+  \`\${env.QA_PASSWORD}\`. Only \`QA_*\` variables resolve, and only in a
+  step's \`value\` or \`params\`, never in a \`goto\`. Never write a secret
+  into a case.
 - A new case is written as \`draft\`. Call \`qa_verify\` to replay it on fresh
   sessions; only then is it \`verified\`.
 - Editing a verified case makes it a draft again. That is correct.

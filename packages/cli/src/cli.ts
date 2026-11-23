@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createInterface } from "node:readline/promises";
 
+import { loadQaConfig } from "@abubakarsiddiik/qa";
 import {
   type CapabilityLedger,
   coverageOf,
@@ -12,7 +14,7 @@ import {
 } from "@abubakarsiddiik/sources";
 
 import { booleanFlag, listFlag, numberFlag, parseArgs, stringFlag } from "./args.js";
-import { runAuthLogin } from "./commands/auth.js";
+import { authStatusLines, resolveLoginTarget, runAuthLogin } from "./commands/auth.js";
 import { runBench } from "./commands/bench.js";
 import { runCompile } from "./commands/compile.js";
 import { runExportSkills } from "./commands/export-skills.js";
@@ -38,6 +40,8 @@ Commands:
   init [dir]             initialize .portolan/ (config, policy, maps, skills)
   migrate [dir]          move a legacy root layout into .portolan/
   auth login             open a browser, sign in, save the session for --storage-state
+                         (--env NAME --profile P saves a named environment session)
+  auth status            list environment profiles and whether a session is saved
   serve                  start the HTTP and MCP server
   mcp                    serve MCP over stdio (for a client to spawn)
   map <build|update>     discover a URL and/or traces into a map draft, verify, publish
@@ -147,15 +151,54 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
 
       case "auth": {
         const sub = args.positional[0];
-        if (sub !== undefined && sub !== "login") {
-          throw new Error(`unknown auth command "${sub}"; expected "login"`);
+        if (sub !== undefined && sub !== "login" && sub !== "status") {
+          throw new Error(`unknown auth command "${sub}"; expected "login" or "status"`);
         }
+
+        if (sub === "status") {
+          const qa = loadQaConfig(stringFlag(args, "config"), process.env, { warn: err }).config;
+          const lines = authStatusLines(qa.environments, qa.root);
+          out(lines.length === 0 ? "no environments are configured" : lines.join("\n"));
+          return 0;
+        }
+
         const config = loadConfig(stringFlag(args, "config"));
-        const url = stringFlag(args, "url");
-        if (url === undefined) throw new Error("auth login needs --url <sign-in page>");
+        const envName = stringFlag(args, "env");
+        let url = stringFlag(args, "url");
+        let outPath = stringFlag(args, "out");
+        let confirm: (() => Promise<void>) | undefined;
+
+        if (envName !== undefined) {
+          if (url !== undefined || outPath !== undefined) {
+            throw new Error("--env takes its sign-in page and session path from the config");
+          }
+          if (!process.stdin.isTTY) {
+            throw new Error("auth login --env needs a terminal: a person must confirm the sign-in");
+          }
+          const qa = loadQaConfig(stringFlag(args, "config"), process.env, { warn: err }).config;
+          const target = resolveLoginTarget(
+            qa.environments,
+            qa.root,
+            envName,
+            stringFlag(args, "profile"),
+          );
+          url = target.url;
+          outPath = target.out;
+          confirm = async () => {
+            const rl = createInterface({ input: process.stdin, output: process.stderr });
+            try {
+              await rl.question("Finish signing in (including MFA), then press Enter here: ");
+            } finally {
+              rl.close();
+            }
+          };
+        }
+
+        if (url === undefined) throw new Error("auth login needs --url <sign-in page> or --env");
         const result = await (deps.auth ?? runAuthLogin)({
           url,
-          ...(stringFlag(args, "out") !== undefined ? { out: stringFlag(args, "out") } : {}),
+          ...(confirm !== undefined ? { confirm } : {}),
+          ...(outPath !== undefined ? { out: outPath } : {}),
           ...(stringFlag(args, "chrome") !== undefined
             ? { chrome: stringFlag(args, "chrome") }
             : config.chrome !== undefined
@@ -167,7 +210,9 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         });
         out(`saved ${result.out}`);
         out(
-          `next: portolan map build --storage-state ${result.out} --url <app url> --verify --publish`,
+          envName !== undefined
+            ? `next: portolan qa run --env ${envName} --all`
+            : `next: portolan map build --storage-state ${result.out} --url <app url> --verify --publish`,
         );
         return 0;
       }

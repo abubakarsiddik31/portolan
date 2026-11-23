@@ -5,6 +5,12 @@ import { isAbsolute, join } from "node:path";
 import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
 
 import type { QaConfig } from "./config.js";
+import {
+  authStatePath,
+  loginCommand,
+  type RunEnvironment,
+  resolveEnvironment,
+} from "./environments.js";
 import { QaError } from "./errors.js";
 import { type Fixtures, loadFixtures, redactValues } from "./fixtures.js";
 import {
@@ -62,6 +68,10 @@ export type ResolvedSelection = {
 };
 
 export type RunOptions = {
+  /** Named environment to run against, by name. */
+  env?: string;
+  /** Profile (account role) within `env`. */
+  as?: string;
   repeat?: number;
   allowUnverified?: boolean;
   evidence?: "failures" | "all" | "none";
@@ -109,6 +119,8 @@ export type QaServiceDeps = {
   now?: () => Date;
   /** Overrides substrate creation; tests inject a fake. */
   createSubstrate?: CreateSubstrate;
+  /** Overrides where environment sessions are read from (`PORTOLAN_HOME`). */
+  home?: string;
 };
 
 /**
@@ -122,6 +134,7 @@ export class QaService {
   private readonly fixtures: Fixtures;
   private readonly now: () => Date;
   private readonly createSubstrate?: CreateSubstrate;
+  private readonly home: string | undefined;
 
   constructor(
     readonly config: QaConfig,
@@ -131,6 +144,7 @@ export class QaService {
     this.fixtures = loadFixtures(config.fixtures);
     this.now = deps.now ?? (() => new Date());
     this.createSubstrate = deps.createSubstrate;
+    this.home = deps.home;
     this.sync();
   }
 
@@ -219,8 +233,14 @@ export class QaService {
    * target on a fresh capture, rewrite the locator, write the case as draft,
    * record a drift event, and run the repaired case once to confirm.
    */
-  async repair(input: { caseId: string; fromRun?: string }): Promise<RepairReport> {
+  async repair(input: {
+    caseId: string;
+    fromRun?: string;
+    env?: string;
+    as?: string;
+  }): Promise<RepairReport> {
     this.sync();
+    const target0 = this.target(input);
     const found = this.store.getCase(input.caseId);
     if (found === undefined) throw new QaError("not_found", `no case "${input.caseId}"`);
     const spec = found.spec;
@@ -265,10 +285,16 @@ export class QaService {
 
     try {
       substrate = await create({
-        baseUrl: this.config.baseUrl,
+        baseUrl: target0.baseUrl,
         headless: this.config.headless,
         ...(this.config.chrome !== undefined ? { executablePath: this.config.chrome } : {}),
         timeoutMs: this.config.timeoutMs,
+        ...(target0.environment !== undefined
+          ? {
+              storageState: target0.environment.storageState,
+              readOnly: !target0.environment.writes,
+            }
+          : {}),
       });
 
       try {
@@ -276,7 +302,8 @@ export class QaService {
           spec,
           uptoStep: target.phase === "check" ? spec.steps.length : (row.fail_step ?? 0),
           substrate,
-          baseUrl: this.config.baseUrl,
+          baseUrl: target0.baseUrl,
+          ...(target0.environment !== undefined ? { environment: target0.environment } : {}),
           timeoutMs: this.config.timeoutMs,
           fixtures: this.fixtures,
           env: process.env,
@@ -323,7 +350,12 @@ export class QaService {
 
       const confirmation = await this.run(
         { ids: [input.caseId] },
-        { allowUnverified: true, trigger: "repair" },
+        {
+          allowUnverified: true,
+          trigger: "repair",
+          ...(input.env !== undefined ? { env: input.env } : {}),
+          ...(input.as !== undefined ? { as: input.as } : {}),
+        },
       );
       const result = confirmation.results[0];
       const confirmed = result?.status === "pass";
@@ -418,21 +450,28 @@ export class QaService {
   }
 
   async run(selection: Selection = {}, options: RunOptions = {}): Promise<RunResult> {
+    const target = this.target(options);
     const resolved = this.select(selection);
     const run = this.store.startRun({
-      base_url: this.config.baseUrl,
+      base_url: target.baseUrl,
       trigger: options.trigger ?? "manual",
       ...(this.commit() !== undefined ? { commit: this.commit() } : {}),
       ...(this.branch() !== undefined ? { branch: this.branch() } : {}),
       selection,
-      config: { repeat: options.repeat ?? this.config.repeat },
+      config: {
+        repeat: options.repeat ?? this.config.repeat,
+        ...(target.environment !== undefined
+          ? { environment: `${target.environment.name}/${target.environment.profile}` }
+          : {}),
+      },
     });
 
     let outcome: RunOutcome;
 
     try {
       outcome = await runCases({
-        baseUrl: this.config.baseUrl,
+        baseUrl: target.baseUrl,
+        ...(target.environment !== undefined ? { environment: target.environment } : {}),
         cases: resolved.cases,
         repeat: options.repeat ?? this.config.repeat,
         headless: this.config.headless,
@@ -455,7 +494,9 @@ export class QaService {
       throw error;
     }
 
-    const redacted = outcome.results.map((result) => this.redactResult(result));
+    const redacted = outcome.results.map((result) =>
+      this.withSessionHint(this.redactResult(result), target.environment),
+    );
 
     for (const result of redacted) {
       this.store.recordCase(run.id, result);
@@ -475,8 +516,9 @@ export class QaService {
 
   async verify(
     selection: Selection = {},
-    options: { repeat?: number } = {},
+    options: { repeat?: number; env?: string; as?: string } = {},
   ): Promise<VerifyReport[]> {
+    const target = this.target(options);
     const resolved = this.select(selection);
     const repeat = options.repeat ?? this.config.verifyRepeat;
     const reports: VerifyReport[] = [];
@@ -486,7 +528,8 @@ export class QaService {
 
       for (let attempt = 0; attempt < repeat; attempt += 1) {
         const outcome = await runCases({
-          baseUrl: this.config.baseUrl,
+          baseUrl: target.baseUrl,
+          ...(target.environment !== undefined ? { environment: target.environment } : {}),
           cases: [spec],
           repeat: 1,
           headless: this.config.headless,
@@ -506,6 +549,10 @@ export class QaService {
       }
 
       const failed = results.find((result) => result.status !== "pass");
+      // A read-only environment skips a write case; that says nothing about the case.
+      const refused = results.every(
+        (result) => result.status === "skip" && result.fail_code === "precondition_failed",
+      );
       const report: VerifyReport = {
         case_id: spec.id,
         verified: failed === undefined,
@@ -525,7 +572,7 @@ export class QaService {
         });
         const loaded = readCaseFile(path);
         this.store.putCase(loaded, { note: "verified", status: "verified" });
-      } else {
+      } else if (!refused) {
         this.store.setStatus(spec.id, "broken");
       }
 
@@ -581,6 +628,51 @@ export class QaService {
     } catch {
       return undefined;
     }
+  }
+
+  /** Environments an agent may name, with session presence but no paths or values. */
+  environments(): {
+    name: string;
+    base_url: string;
+    writes: boolean;
+    profiles: { name: string; session: boolean }[];
+  }[] {
+    return Object.values(this.config.environments).map((environment) => ({
+      name: environment.name,
+      base_url: environment.baseUrl,
+      writes: environment.writes,
+      profiles: environment.profiles.map((profile) => ({
+        name: profile,
+        session: existsSync(authStatePath(this.config.root, environment.name, profile, this.home)),
+      })),
+    }));
+  }
+
+  /** The base URL and, for an environment run, the session it runs as. */
+  private target(input: { env?: string | undefined; as?: string | undefined }): {
+    baseUrl: string;
+    environment?: RunEnvironment;
+  } {
+    const environment = resolveEnvironment(this.config.environments, input, {
+      root: this.config.root,
+      ...(this.home !== undefined ? { home: this.home } : {}),
+    });
+    return environment === undefined
+      ? { baseUrl: this.config.baseUrl }
+      : { baseUrl: environment.baseUrl, environment };
+  }
+
+  /**
+   * A stale session fails like any other broken page, so name the likely cause
+   * on a failure in an environment run. The agent gets a command for a person
+   * to run, never a credential.
+   */
+  private withSessionHint(result: CaseResult, environment: RunEnvironment | undefined): CaseResult {
+    if (environment === undefined || (result.status !== "fail" && result.status !== "error")) {
+      return result;
+    }
+    const hint = `if the page is a sign-in screen the session expired; a person runs: ${loginCommand(environment.name, environment.profile)}`;
+    return { ...result, next: [...(result.next ?? []), hint] };
   }
 
   private redactResult(result: CaseResult): CaseResult {

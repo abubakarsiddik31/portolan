@@ -1,12 +1,13 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { ActResult, SemanticNode, Snapshot } from "@abubakarsiddiik/substrate";
 import { buildRefMap } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
 import { mergeQaConfig } from "./config.js";
+import { authStatePath, parseEnvironments } from "./environments.js";
 import { QaService } from "./service.js";
 import { parseCase, type QaCase } from "./spec.js";
 import type { QaSubstrate, QaView } from "./types.js";
@@ -283,5 +284,125 @@ describe("QaService.select", () => {
     expect(() => service.select({ suite: "permissions" })).toThrow(/--tag permissions/);
 
     service.close();
+  });
+});
+
+describe("QaService environments", () => {
+  function envService(createSubstrate: Parameters<typeof makeEnvService>[0]) {
+    return makeEnvService(createSubstrate);
+  }
+
+  function makeEnvService(createSubstrate: (input: Record<string, unknown>) => QaSubstrate) {
+    const root = mkdtempSync(join(tmpdir(), "portolan-qa-service-"));
+    const home = mkdtempSync(join(tmpdir(), "portolan-qa-home-"));
+    const config = {
+      ...mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:" }),
+      environments: parseEnvironments({
+        qa: { baseUrl: "http://qa.app.test", profiles: ["admin"] },
+        prod: { baseUrl: "http://app.test", profiles: ["readonly", "admin"] },
+      }),
+    };
+    const service = new QaService(config, {
+      createSubstrate: createSubstrate as never,
+      home,
+    });
+    const save = (env: string, profile: string): string => {
+      const path = authStatePath(root, env, profile, home);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, "{}");
+      return path;
+    };
+    return { service, save, home };
+  }
+
+  function seedLogin(service: QaService): void {
+    service.caseWrite(loginCase({ steps: [{ goto: "/sign-in" }], expect: [], status: "draft" }));
+  }
+
+  it("runs as the named environment with its saved session", async () => {
+    const seen: Record<string, unknown>[] = [];
+    const { service, save } = envService((input) => {
+      seen.push(input);
+      return new FakeApp("Login");
+    });
+    const session = save("qa", "admin");
+    seedLogin(service);
+
+    const result = await service.run({ ids: ["auth/login"] }, { env: "qa", allowUnverified: true });
+
+    expect(result.summary.pass).toBe(1);
+    expect(seen[0]).toMatchObject({
+      baseUrl: "http://qa.app.test",
+      storageState: session,
+      readOnly: true,
+    });
+  });
+
+  it("returns a typed auth_missing error naming the command a person runs", async () => {
+    const { service } = envService(() => new FakeApp("Login"));
+    seedLogin(service);
+
+    await expect(service.run({ ids: ["auth/login"] }, { env: "qa" })).rejects.toMatchObject({
+      code: "auth_missing",
+      details: { next: ["portolan auth login --env qa --profile admin"] },
+    });
+  });
+
+  it("refuses an unconfigured environment", async () => {
+    const { service } = envService(() => new FakeApp("Login"));
+    await expect(service.run({}, { env: "staging" })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("points a failed environment run at the sign-in command", async () => {
+    const { service, save } = envService(() => new FakeApp("Login"));
+    save("qa", "admin");
+    service.caseWrite(
+      loginCase({ steps: [{ goto: "/sign-in" }], expect: [{ url: "/dashboard" }] }),
+    );
+
+    const result = await service.run({ ids: ["auth/login"] }, { env: "qa", allowUnverified: true });
+
+    expect(result.results[0]?.status).toBe("fail");
+    expect(result.results[0]?.next?.join("\n")).toMatch(
+      /portolan auth login --env qa --profile admin/,
+    );
+  });
+
+  it("does not mark a case broken when a read-only environment refuses it", async () => {
+    const { service, save } = envService(() => new FakeApp("Login"));
+    save("prod", "readonly");
+    service.caseWrite(
+      loginCase({
+        id: "checkout/pay",
+        effect: "irreversible",
+        map: { site: "store", version: 1, op: "checkout" },
+      }),
+    );
+
+    const reports = await service.verify(
+      { ids: ["checkout/pay"] },
+      { env: "prod", as: "readonly" },
+    );
+
+    expect(reports[0]?.verified).toBe(false);
+    expect(reports[0]?.reason).toMatch(/read-only/);
+    expect(service.caseRead("checkout/pay").row.status).toBe("draft");
+  });
+
+  it("lists environments with session presence and no path or credential", () => {
+    const { service, save, home } = envService(() => new FakeApp("Login"));
+    save("prod", "readonly");
+
+    const listed = service.environments();
+    const prod = listed.find((item) => item.name === "prod");
+
+    expect(prod).toMatchObject({
+      writes: false,
+      profiles: [
+        { name: "readonly", session: true },
+        { name: "admin", session: false },
+      ],
+    });
+    expect(JSON.stringify(listed)).not.toContain(home);
   });
 });

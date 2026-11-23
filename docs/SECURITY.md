@@ -44,6 +44,11 @@ a malicious map is equivalent to a malicious operator.
 | Threat | Mitigation | Where |
 |---|---|---|
 | Credential appears in a map, trace, log, or skill | Site-scoped credential store; audit/trace redaction by key and value shape; skill secret scan | `credentials.ts`, `redact.ts`, `skills/export.ts` |
+| A QA case reads a host secret (`${env.AWS_SECRET_ACCESS_KEY}`) or puts one in a URL | Only `QA_*` variables resolve, and only in a step's `value` or `params`; `goto`, `contains`, and `pattern` reject them | `qa/fixtures.ts`, `qa/runner.ts` |
+| A resolved QA secret appears in a result, event, evidence file, or DB row (a failed fill echoes `expected`) | The attempt records every resolved value and scrubs raw, URL-encoded, JSON-escaped, and base64 forms before output; values under four characters are not scrubbed | `qa/fixtures.ts`, `qa/runner.ts` |
+| A credential is typed on another site | With `--env`, an `${env.QA_*}` value resolves only while the page is on the environment's origin, and `goto`, op `http` requests, and op navigations off the origin fail | `qa/runner.ts` |
+| A QA run writes to prod | `writes` defaults to `false`: cases with a non-read `effect` are skipped and the browser context aborts non-GET/HEAD/OPTIONS requests. The environment block is parsed strictly, so a typo fails instead of defaulting | `qa/environments.ts`, `substrate/playwright-engine.ts` |
+| A saved session is committed, world-readable, or half-written | Sessions are stored under `$PORTOLAN_HOME`, outside the repo, written `0600` in a `0700` directory and renamed into place; `auth login --env` waits for the person to confirm | `cli/commands/auth.ts`, `qa/environments.ts` |
 | Off-allowlist request leaves the page | Default-deny egress guard on `fetch` and `goto`; the final URL after a redirect and the resolved address are checked too; every block recorded | `substrate/policy.ts`, `substrate/substrate.ts` |
 | Page text becomes a tool call | Every page-derived MCP result is labeled `untrusted` with a notice; injection fixture asserts the scripted runner never calls a tool | `server/mcp.ts`, `bench/security` |
 | Irreversible write without consent | `confirm: true` required before dispatch | `runtime/write.ts` |
@@ -126,6 +131,19 @@ three failure classes, thrown errors, and the key-collision fix
   upload feature is a file-read risk; `act` currently rejects uploads.
 - **The audit log is only as complete as the executor.** A write that never
   reaches `runWrite` is not audited.
+- **A saved session is as powerful as its account.** Whoever can read the file
+  can replay the cookies and skip MFA until the session ends. The file's
+  location and mode are the protection. An agent with a shell as the same user
+  can read it, as it can read the OS keychain. Use a dedicated read-only
+  account for prod; the `writes: false` network guard is a second layer, not a
+  substitute. An app that reads over POST needs `writes: true`.
+- **A session carries every cookie from sign-in**, including an identity
+  provider's. An environment run stays on its origin, but a session that was
+  saved through shared SSO can still reach another environment if a page
+  redirects there; `goto` off-origin is refused, a server redirect is not.
+- **Environment config is a file the agent may be able to edit.** The MCP
+  tools cannot change `environments`, but an agent with file or shell access
+  can. The boundary is the MCP surface, not the working directory.
 - **Redaction covers known credential shapes, not every secret.** A novel
   format, or a secret that looks like ordinary prose, can survive. The field
   name and the value shape are two filters, not a guarantee.

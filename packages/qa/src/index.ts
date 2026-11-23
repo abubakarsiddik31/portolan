@@ -1,5 +1,6 @@
 export * from "./checks.js";
 export * from "./config.js";
+export * from "./environments.js";
 export * from "./errors.js";
 export * from "./fixtures.js";
 export * from "./generate.js";

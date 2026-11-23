@@ -38,6 +38,12 @@ export type PlaywrightEngineOptions = {
    */
   storageState?: BrowserContextOptions["storageState"];
   /**
+   * Abort every request whose method can change server state (anything but
+   * GET, HEAD, and OPTIONS). A read-only guard that holds whatever the page's
+   * own script tries. Apps that read over POST, such as GraphQL, need it off.
+   */
+  readOnly?: boolean;
+  /**
    * Tags the browser's command line so `reapOrphans` can find it after this
    * process dies without a graceful close.
    */
@@ -122,6 +128,8 @@ type CallResult = {
   exceptionDetails?: { text?: string };
 };
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 export class PlaywrightEngine implements Engine {
   private readonly timeoutMs: number;
   private doc = 0;
@@ -163,6 +171,13 @@ export class PlaywrightEngine implements Engine {
       acceptDownloads: true,
       ...(options.storageState !== undefined ? { storageState: options.storageState } : {}),
     });
+    if (options.readOnly === true) {
+      await context.route("**/*", (route) =>
+        SAFE_METHODS.has(route.request().method())
+          ? route.continue()
+          : route.abort("blockedbyclient"),
+      );
+    }
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
     const downloadDir = await mkdtemp(join(tmpdir(), "portolan-download-"));

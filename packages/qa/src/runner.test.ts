@@ -1,8 +1,13 @@
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import type { ActResult, SemanticNode, Snapshot } from "@abubakarsiddiik/substrate";
 import { buildRefMap } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
 
-import { runCases } from "./runner.js";
+import type { RunEnvironment } from "./environments.js";
+import { confineToOrigin, runCases } from "./runner.js";
 import { parseCase, type QaCase } from "./spec.js";
 import type { QaSubstrate, QaView } from "./types.js";
 
@@ -193,5 +198,255 @@ describe("runCases", () => {
     });
 
     expect(outcome.results[0]?.fail_code).toBe("flaky");
+  });
+});
+
+const ENVIRONMENT: RunEnvironment = {
+  name: "qa",
+  profile: "admin",
+  baseUrl: "http://app",
+  origin: "http://app",
+  writes: false,
+  storageState: "/sessions/qa/admin.json",
+};
+
+const SECRET = "hunter2-live-secret";
+const fillSecret = (field: string) => ({
+  do: "fill",
+  target: { role: "textbox", name: field },
+  value: "$" + "{env.QA_PASSWORD}",
+});
+
+describe("runCases, secrets", () => {
+  it("scrubs a resolved secret from the result, events, and evidence", async () => {
+    const fake = new FakeSubstrate();
+    fake.fillSticks = false;
+    const root = mkdtempSync(join(tmpdir(), "portolan-qa-"));
+
+    try {
+      const outcome = await runCases({
+        baseUrl: "http://app",
+        cases: [
+          caseSpec({
+            steps: [{ goto: "/sign-in" }, fillSecret("Password")],
+            expect: [{ visible: { role: "textbox", name: "Password" } }],
+          }),
+        ],
+        trusted: ["auth/login"],
+        evidence: "failures",
+        evidenceRoot: root,
+        runId: "r1",
+        env: { QA_PASSWORD: SECRET },
+        createSubstrate: () => fake,
+      });
+
+      const result = outcome.results[0];
+      expect(result?.fail_code).toBe("value_lost");
+      expect(JSON.stringify(result)).not.toContain(SECRET);
+      expect(JSON.stringify(result)).toContain("[redacted]");
+
+      const files = readdirSync(root, { recursive: true, encoding: "utf8" });
+      expect(files.length).toBeGreaterThan(0);
+      for (const file of files) {
+        if (!/\.(json|jsonl|txt)$/.test(file)) continue;
+        expect(readFileSync(join(root, file), "utf8")).not.toContain(SECRET);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses an env placeholder in a goto, where it would leave the machine", async () => {
+    const outcome = await runCases({
+      baseUrl: "http://app",
+      cases: [caseSpec({ steps: [{ goto: "/x?k=" + "$" + "{env.QA_PASSWORD}" }] })],
+      trusted: ["auth/login"],
+      evidence: "none",
+      env: { QA_PASSWORD: SECRET },
+      createSubstrate: () => new FakeSubstrate(),
+    });
+
+    expect(outcome.results[0]?.fail_code).toBe("invalid_request");
+    expect(JSON.stringify(outcome.results[0])).not.toContain(SECRET);
+  });
+});
+
+describe("runCases, environments", () => {
+  function runIn(spec: QaCase, fake: FakeSubstrate, environment = ENVIRONMENT) {
+    return runCases({
+      baseUrl: environment.baseUrl,
+      environment,
+      cases: [spec],
+      trusted: [spec.id],
+      evidence: "none",
+      env: { QA_PASSWORD: SECRET },
+      createSubstrate: () => fake,
+    });
+  }
+
+  it("opens the substrate with the session and a read-only network", async () => {
+    const seen: unknown[] = [];
+    await runCases({
+      baseUrl: "http://app",
+      environment: ENVIRONMENT,
+      cases: [caseSpec()],
+      trusted: ["auth/login"],
+      evidence: "none",
+      createSubstrate: (input) => {
+        seen.push(input);
+        return new FakeSubstrate();
+      },
+    });
+
+    expect(seen[0]).toMatchObject({ storageState: "/sessions/qa/admin.json", readOnly: true });
+  });
+
+  it("does not make the network read-only when the environment allows writes", async () => {
+    const seen: unknown[] = [];
+    await runCases({
+      baseUrl: "http://app",
+      environment: { ...ENVIRONMENT, writes: true },
+      cases: [caseSpec()],
+      trusted: ["auth/login"],
+      evidence: "none",
+      createSubstrate: (input) => {
+        seen.push(input);
+        return new FakeSubstrate();
+      },
+    });
+
+    expect(seen[0]).toMatchObject({ readOnly: false });
+  });
+
+  it("skips a write case in a read-only environment without opening a browser", async () => {
+    let opened = 0;
+    const outcome = await runCases({
+      baseUrl: "http://app",
+      environment: ENVIRONMENT,
+      cases: [
+        caseSpec({ effect: "irreversible", map: { site: "store", version: 1, op: "checkout" } }),
+      ],
+      trusted: ["auth/login"],
+      evidence: "none",
+      createSubstrate: () => {
+        opened += 1;
+        return new FakeSubstrate();
+      },
+    });
+
+    expect(opened).toBe(0);
+    expect(outcome.results[0]).toMatchObject({ status: "skip", fail_code: "precondition_failed" });
+    expect(outcome.results[0]?.fail_reason).toMatch(/read-only/);
+  });
+
+  it("refuses a goto that leaves the environment origin", async () => {
+    const outcome = await runIn(
+      caseSpec({ steps: [{ goto: "https://prod.example.com/admin" }], expect: [] }),
+      new FakeSubstrate(),
+    );
+
+    expect(outcome.results[0]?.fail_code).toBe("precondition_failed");
+    expect(outcome.results[0]?.fail_reason).toMatch(/leaves the environment origin/);
+  });
+
+  it("fills a credential on the environment origin", async () => {
+    const outcome = await runIn(
+      caseSpec({
+        steps: [{ goto: "/sign-in" }, fillSecret("Password")],
+        expect: [],
+      }),
+      new FakeSubstrate(),
+    );
+
+    expect(outcome.results[0]?.status).toBe("pass");
+  });
+
+  it("refuses to type a credential on another origin", async () => {
+    const fake = new FakeSubstrate();
+    fake.url = "http://evil.test/sign-in";
+
+    const outcome = await runIn(caseSpec({ steps: [fillSecret("Password")], expect: [] }), fake);
+
+    expect(outcome.results[0]?.fail_code).toBe("precondition_failed");
+    expect(outcome.results[0]?.fail_reason).toMatch(/bound to http:\/\/app/);
+    expect(JSON.stringify(outcome.results[0])).not.toContain(SECRET);
+  });
+
+  it("adds no origin rule without an environment", async () => {
+    const outcome = await run(
+      caseSpec({ steps: [{ goto: "https://elsewhere.test/" }], expect: [] }),
+      new FakeSubstrate(),
+    );
+    expect(outcome.results[0]?.status).toBe("pass");
+  });
+});
+
+describe("scrubbing leaves structure alone", () => {
+  it("does not rewrite the case id or status when a short secret matches them", async () => {
+    const fake = new FakeSubstrate();
+    fake.fillSticks = false;
+
+    const outcome = await runCases({
+      baseUrl: "http://app",
+      cases: [
+        caseSpec({
+          id: "admin-login",
+          steps: [{ goto: "/sign-in" }, fillSecret("Password")],
+          expect: [{ visible: { role: "textbox", name: "Password" } }],
+        }),
+      ],
+      trusted: ["admin-login"],
+      evidence: "none",
+      env: { QA_PASSWORD: "admin" },
+      createSubstrate: () => fake,
+    });
+
+    const result = outcome.results[0];
+    expect(result).toMatchObject({
+      case_id: "admin-login",
+      status: "fail",
+      fail_code: "value_lost",
+    });
+    expect(outcome.summary).toEqual({ pass: 0, fail: 1, skip: 0, error: 0 });
+    expect(JSON.stringify(result?.actual)).toContain("[redacted]");
+    expect(JSON.stringify(result?.actual)).not.toContain("admin");
+  });
+});
+
+describe("confineToOrigin", () => {
+  function calls() {
+    const seen: string[] = [];
+    const base = {
+      goto: (url: string) => {
+        seen.push(`goto ${url}`);
+        return Promise.resolve({});
+      },
+      fetch: (request: { url: string }) => {
+        seen.push(`fetch ${request.url}`);
+        return Promise.resolve({});
+      },
+      state: () => ({ marker: "state" }),
+    };
+    return {
+      seen,
+      substrate: confineToOrigin(base as never, "http://app") as never as typeof base,
+    };
+  }
+
+  it("lets same-origin goto and fetch through and keeps other methods working", async () => {
+    const { seen, substrate } = calls();
+    await substrate.goto("http://app/x");
+    await substrate.fetch({ url: "http://app/api" });
+    expect(seen).toEqual(["goto http://app/x", "fetch http://app/api"]);
+    expect(substrate.state()).toEqual({ marker: "state" });
+  });
+
+  it("refuses an off-origin goto or fetch, as a map op with an absolute route would make", () => {
+    const { seen, substrate } = calls();
+    expect(() => substrate.goto("https://evil.test/")).toThrow(/leaves the environment origin/);
+    expect(() => substrate.fetch({ url: "https://evil.test/c?k=1" })).toThrow(
+      /leaves the environment origin/,
+    );
+    expect(seen).toEqual([]);
   });
 });

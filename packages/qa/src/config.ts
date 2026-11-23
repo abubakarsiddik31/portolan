@@ -3,6 +3,8 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import { LEGACY_CONFIG, PORTOLAN_DIR } from "@abubakarsiddiik/protocol";
 
+import { parseEnvironments, type QaEnvironment } from "./environments.js";
+
 export type EvidenceMode = "failures" | "all" | "none";
 
 export type QaConfig = {
@@ -38,6 +40,8 @@ export type QaConfig = {
   /** Substrings redacted from evidence and stored values. */
   redact: string[];
   chrome?: string;
+  /** Named targets from the top-level `environments` block. */
+  environments: Record<string, QaEnvironment>;
 };
 
 type QaDefaults = Omit<QaConfig, "root">;
@@ -68,6 +72,7 @@ const SHARED_QA_DEFAULTS: Omit<
   allowUnverified: false,
   screenshot: false,
   redact: ["password", "token", "secret", "authorization", "cookie"],
+  environments: {},
 };
 
 /** Defaults for `.portolan/config.json`; paths are relative to the project root. */
@@ -131,6 +136,7 @@ export function loadQaConfig(
 
   let raw: Record<string, unknown> = {};
   let missingBlock = true;
+  let environments: Record<string, QaEnvironment> = {};
 
   if (exists) {
     let parsed: unknown;
@@ -143,6 +149,8 @@ export function loadQaConfig(
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error(`${file} must contain a JSON object`);
     }
+
+    environments = parseEnvironments((parsed as Record<string, unknown>).environments, file);
 
     const block = (parsed as Record<string, unknown>)[QA_CONFIG_KEY];
     if (block !== undefined) {
@@ -160,7 +168,7 @@ export function loadQaConfig(
   }
 
   return {
-    config: mergeQaConfig(root, raw, file, env, defaults),
+    config: { ...mergeQaConfig(root, raw, file, env, defaults), environments },
     ...(exists ? { file } : {}),
     missingBlock,
     ...(located.legacy && exists

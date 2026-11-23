@@ -242,6 +242,67 @@ describe("runMapBuild", () => {
     expect(result.draft.proposals.some((proposal) => proposal.source === "traces")).toBe(true);
   });
 
+  it("compiles a recorded write to ui, or to http with --outcome-checks", async () => {
+    const dir = tempDir();
+    const at = "2026-11-17T00:00:00.000Z";
+    const trace = {
+      scope_id: "run-1",
+      sid: "sid-1",
+      intent: "sign in",
+      effect: "write",
+      started_at: at,
+      ended_at: at,
+      entries: [
+        {
+          kind: "act",
+          at,
+          ref: "e1",
+          do: "click",
+          locator: { role: "button", name: "Sign in", ordinal: 0 },
+          doc: 1,
+          v: 1,
+          url: "http://app.test/dashboard",
+          effects: [
+            {
+              kind: "network",
+              method: "POST",
+              url: "http://app.test/api/login",
+              status: 200,
+              request_body: { email: "a@b.c" },
+              response_body: { ok: true },
+            },
+          ],
+          delta: { navigation: false, entries: [] },
+        },
+      ],
+    };
+    const tracePath = join(dir, "trace.json");
+    writeFileSync(tracePath, JSON.stringify(trace));
+    const checksPath = join(dir, "checks.json");
+    writeFileSync(checksPath, JSON.stringify({ sign_in: "whoami" }));
+
+    const base = {
+      site: "app",
+      traces: [tracePath],
+      baseUrl: "http://app.test",
+      verify: false,
+      verifyWrites: false,
+      publish: false,
+    };
+
+    const bare = await runMapBuild({ ...base, mapsDir: join(dir, "a") }, { substrate });
+    const withoutCheck = bare.draft.proposals.find((p) => p.op.name === "sign_in");
+    expect(withoutCheck?.op.impls[0]?.tier).toBe("ui");
+
+    const checked = await runMapBuild(
+      { ...base, mapsDir: join(dir, "b"), outcomeChecksPath: checksPath },
+      { substrate },
+    );
+    const withCheck = checked.draft.proposals.find((p) => p.op.name === "sign_in");
+    expect(withCheck?.op.impls[0]?.tier).toBe("http");
+    expect(withCheck?.op.outcome_check).toBe("whoami");
+  });
+
   it("keeps the verify failures in the draft when nothing verifies", async () => {
     const dir = tempDir();
     const failing: typeof import("@abubakarsiddiik/compiler").verifyOp = async (options) => ({

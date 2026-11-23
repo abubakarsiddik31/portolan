@@ -508,3 +508,79 @@ describe("QaService map links", () => {
     expect(result.summary.error).toBe(1);
   });
 });
+
+describe("QaService known failures", () => {
+  function setup() {
+    const root = mkdtempSync(join(tmpdir(), "portolan-qa-known-"));
+    const control = { button: "Sign in" };
+    const config = mergeQaConfig(root, { baseUrl: "http://app", database: ":memory:" });
+    const qa = new QaService(config, {
+      createSubstrate: (() => new FakeApp(control.button)) as never,
+    });
+    return { qa, control, config };
+  }
+
+  const known = (extra: Record<string, unknown> = {}) =>
+    loginCase({
+      id: "auth/login-button",
+      expect_failure: { reason: "the button is mislabelled", issue: "#12" },
+      ...extra,
+    });
+
+  it("promotes a case that fails the same way on every replay, and keeps the run green", async () => {
+    const { qa } = setup();
+    qa.caseWrite(known());
+
+    const [report] = await qa.verify({ ids: ["auth/login-button"] });
+    expect(report?.verified).toBe(true);
+    expect(report?.known_failure).toMatchObject({ code: "not_found" });
+    expect(qa.caseRead("auth/login-button").spec.known_failure?.code).toBe("not_found");
+
+    const result = await qa.run({ ids: ["auth/login-button"] });
+    expect(result.results[0]).toMatchObject({ status: "known_failure" });
+    expect(result.results[0]?.fail_reason).toContain("the button is mislabelled (#12)");
+    expect(result.summary).toMatchObject({ fail: 0, known_failure: 1 });
+  });
+
+  it("reports fixed when the expected failure stops, and names the cleanup", async () => {
+    const { qa, control } = setup();
+    qa.caseWrite(known());
+    await qa.verify({ ids: ["auth/login-button"] });
+
+    control.button = "Login";
+    const result = await qa.run({ ids: ["auth/login-button"] });
+
+    expect(result.results[0]).toMatchObject({ status: "fixed" });
+    expect(result.results[0]?.next?.join("\n")).toContain("remove expect_failure");
+    expect(result.results[0]?.next?.join("\n")).toContain("close #12");
+    expect(result.summary).toMatchObject({ fail: 0, fixed: 1 });
+  });
+
+  it("still marks an unmarked case that always fails as broken", async () => {
+    const { qa } = setup();
+    qa.caseWrite(loginCase({ id: "auth/plain" }));
+
+    const [report] = await qa.verify({ ids: ["auth/plain"] });
+    expect(report?.verified).toBe(false);
+    expect(qa.caseRead("auth/plain").row.status).toBe("broken");
+  });
+
+  it("does not promote a case that fails inconsistently", async () => {
+    const { qa, control } = setup();
+    qa.caseWrite(known({ id: "auth/flaky-known" }));
+
+    // The app flips between replays, so there is no single failure to record.
+    let call = 0;
+    const flipping = new QaService(setup().config, {
+      createSubstrate: (() => {
+        call += 1;
+        return new FakeApp(call % 2 === 0 ? "Login" : control.button);
+      }) as never,
+    });
+    flipping.caseWrite(known({ id: "auth/flaky-known" }));
+
+    const [report] = await flipping.verify({ ids: ["auth/flaky-known"] });
+    expect(report?.verified).toBe(false);
+    expect(report?.known_failure).toBeUndefined();
+  });
+});

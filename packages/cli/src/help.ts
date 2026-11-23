@@ -76,6 +76,7 @@ Options (build, update):
   --verify-writes        also verify writes (they run for real)
   --publish              publish verified ops (needs --verify)
   --require-complete     fail while any capability is missing or stale
+  --strict               with --require-complete, also fail on unavailable controls
 ${BROWSER_FLAGS}
 ${CONFIG_FLAG}`,
 

@@ -213,4 +213,29 @@ describe("discoverDom", () => {
     expect(result.proposals.some((proposal) => proposal.op.name === "search")).toBe(false);
     expect(result.proposals.some((proposal) => proposal.op.name === "open_cart")).toBe(false);
   });
+
+  it("records a button that is disabled as disabled, and enabled once any visit enables it", async () => {
+    const withButtons = (disabled: boolean): Snapshot =>
+      page("http://app.test/cart", [
+        node({ nodeId: "root", role: "RootWebArea", name: "Cart", childIds: ["next", "pay"] }),
+        node({ nodeId: "next", role: "button", name: "Next", properties: { disabled: true } }),
+        node({ nodeId: "pay", role: "button", name: "Pay", properties: { disabled } }),
+      ]);
+    const root = page("http://app.test/", [
+      node({ nodeId: "root", role: "RootWebArea", name: "Home", childIds: ["l1", "l2"] }),
+      node({ nodeId: "l1", role: "link", name: "One", attributes: { href: "/cart" } }),
+    ]);
+    const substrate = {
+      goto: async (url: string) => ({
+        snapshot: new URL(url).pathname === "/" ? root : withButtons(false),
+        refs: undefined,
+      }),
+    } as unknown as Substrate;
+
+    const result = await discoverDom({ site: "app", url: "http://app.test/", substrate });
+    const byName = new Map(result.surface.map((action) => [action.name, action]));
+
+    expect(byName.get("Next")?.disabled).toBe(true);
+    expect(byName.get("Pay")?.disabled).toBeUndefined();
+  });
 });

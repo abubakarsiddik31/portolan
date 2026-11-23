@@ -36,9 +36,11 @@ export type SurfaceAction = {
   /** Target state for a link. */
   target?: string;
   href?: string;
+  /** The control was disabled every time the crawl saw it. */
+  disabled?: boolean;
 };
 
-export type CapabilityStatus = "mapped" | "missing" | "excluded" | "stale";
+export type CapabilityStatus = "mapped" | "missing" | "excluded" | "stale" | "unavailable";
 
 export type CapabilitySource = "live" | "code" | "manual";
 
@@ -52,6 +54,8 @@ export type Capability = {
   op?: string;
   /** Why it is excluded or stale. */
   reason?: string;
+  /** What must be true before an `unavailable` control can be used. */
+  precondition?: string;
 };
 
 export type CapabilityLedger = {
@@ -67,6 +71,7 @@ export type CapabilityCoverage = {
   missing: number;
   excluded: number;
   stale: number;
+  unavailable: number;
   /** Mapped / (mapped + missing), 0 when everything is excluded. */
   ratio: number;
 };

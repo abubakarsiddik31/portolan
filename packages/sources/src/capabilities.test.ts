@@ -258,4 +258,32 @@ describe("buildCapabilities", () => {
     expect(byPage.get("home")).toBe("stale");
     expect(byPage.get("settings")).toBe("mapped");
   });
+
+  it("marks a control that was disabled everywhere as unavailable, not missing", () => {
+    const ledger = buildCapabilities({
+      site: "app",
+      discovery: {
+        ...discovery(),
+        surface: [
+          { page: "home", kind: "button", name: "Next", disabled: true },
+          { page: "home", kind: "button", name: "Export" },
+        ],
+      },
+      proposals: [],
+      now: "2026-11-17T00:00:00.000Z",
+    });
+
+    const next = ledger.capabilities.find((item) => item.trigger.name === "Next");
+    expect(next).toMatchObject({
+      status: "unavailable",
+      precondition: "disabled on home in this data",
+    });
+    expect(ledger.capabilities.find((item) => item.trigger.name === "Export")?.status).toBe(
+      "missing",
+    );
+
+    const coverage = coverageOf(ledger);
+    expect(coverage).toMatchObject({ missing: 1, unavailable: 1, ratio: 0 });
+    expect(gapsOf(ledger).map((item) => item.trigger.name)).toEqual(["Export"]);
+  });
 });

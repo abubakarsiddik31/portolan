@@ -79,6 +79,7 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
 
       let status: CapabilityStatus = "missing";
       let reason: string | undefined;
+      let precondition: string | undefined;
 
       if (proposal !== undefined) {
         status = "mapped";
@@ -87,6 +88,9 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
       } else if (excludedBy !== undefined) {
         status = "excluded";
         reason = "matches an exclusion pattern; record it manually if it is safe";
+      } else if (action.disabled === true) {
+        status = "unavailable";
+        precondition = `disabled on ${action.page} in this data`;
       }
 
       next.set(id, {
@@ -101,6 +105,7 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
         source: "live",
         ...(proposal !== undefined ? { op: proposal.op.name } : {}),
         ...(reason !== undefined ? { reason } : {}),
+        ...(precondition !== undefined ? { precondition } : {}),
       });
     }
   }
@@ -160,7 +165,7 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
 }
 
 export function coverageOf(ledger: CapabilityLedger): CapabilityCoverage {
-  const counts = { mapped: 0, missing: 0, excluded: 0, stale: 0 };
+  const counts = { mapped: 0, missing: 0, excluded: 0, stale: 0, unavailable: 0 };
   for (const item of ledger.capabilities) counts[item.status] += 1;
 
   const total = ledger.capabilities.length;
@@ -168,6 +173,11 @@ export function coverageOf(ledger: CapabilityLedger): CapabilityCoverage {
   const ratio = denominator === 0 ? 1 : counts.mapped / denominator;
 
   return { total, ...counts, ratio };
+}
+
+/** Controls that exist but could not be used with the data the crawl saw. */
+export function unavailableOf(ledger: CapabilityLedger): Capability[] {
+  return ledger.capabilities.filter((item) => item.status === "unavailable");
 }
 
 export function gapsOf(ledger: CapabilityLedger): Capability[] {
@@ -178,7 +188,8 @@ export function formatCoverage(coverage: CapabilityCoverage): string {
   const actionable = coverage.mapped + coverage.missing;
   const percent =
     actionable === 0 ? "nothing actionable" : `${Math.round(coverage.ratio * 100)}% of actionable`;
-  return `${coverage.mapped} mapped, ${coverage.missing} missing, ${coverage.excluded} excluded, ${coverage.stale} stale (${percent})`;
+  const unavailable = coverage.unavailable > 0 ? `, ${coverage.unavailable} unavailable` : "";
+  return `${coverage.mapped} mapped, ${coverage.missing} missing, ${coverage.excluded} excluded, ${coverage.stale} stale${unavailable} (${percent})`;
 }
 
 export function writeCapabilities(dir: string, ledger: CapabilityLedger): string {

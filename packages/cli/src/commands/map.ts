@@ -31,7 +31,8 @@ import {
   writeDraft,
 } from "@abubakarsiddiik/sources";
 import {
-  type BrowserHandle,
+  BrowserHandle,
+  type EgressPolicy,
   findChrome,
   loadPolicy,
   PlaywrightEngine,
@@ -318,12 +319,25 @@ export async function runMapBuild(
         const setup = setupFor(draft, proposal);
         let report: VerifyReport;
         try {
+          const executablePath = input.chrome ?? findChrome();
+          if (
+            deps.verify === undefined &&
+            verifyBrowser === undefined &&
+            executablePath !== undefined
+          ) {
+            verifyBrowser = await BrowserHandle.launch({
+              executablePath,
+              headless: input.headless ?? true,
+            });
+          }
+
           report = await (deps.verify ?? verifyOp)({
             map: draftMap(draft),
             op,
             paramSets: sets,
             baseUrl,
             ...(setup !== undefined ? { setup } : {}),
+            ...(verifyBrowser !== undefined ? { browser: verifyBrowser } : {}),
             ...(input.chrome !== undefined ? { executablePath: input.chrome } : {}),
             ...(input.storageState !== undefined ? { storageState: input.storageState } : {}),
             headless: input.headless ?? true,
@@ -630,6 +644,20 @@ function containsWrite(trace: Trace): boolean {
   );
 }
 
+/**
+ * `init` writes a default-deny policy with an empty `allow`, which would block
+ * the very URL the user just asked to map. Passing `--url` is the grant, so an
+ * empty allowlist falls back to that host for this run. A policy that lists
+ * anything is left exactly as written.
+ */
+export function seedPolicy(
+  policy: EgressPolicy | undefined,
+  url: string | undefined,
+): EgressPolicy | undefined {
+  if (policy === undefined || policy.allow.length > 0 || url === undefined) return policy;
+  return { ...policy, allow: [new URL(url).host] };
+}
+
 async function launchSubstrate(
   input: MapBuildInput,
 ): Promise<{ substrate: Substrate; close: () => Promise<void> }> {
@@ -644,8 +672,10 @@ async function launchSubstrate(
     ...(input.storageState !== undefined ? { storageState: input.storageState } : {}),
   });
 
-  const policy =
-    input.policiesDir === undefined ? undefined : loadPolicy(input.site, input.policiesDir);
+  const policy = seedPolicy(
+    input.policiesDir === undefined ? undefined : loadPolicy(input.site, input.policiesDir),
+    input.url ?? input.baseUrl,
+  );
 
   return {
     substrate: new Substrate(engine, policy !== undefined ? { policy } : {}),

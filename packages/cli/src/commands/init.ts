@@ -16,6 +16,8 @@ export type InitOptions = {
   /** Project root. Defaults to the working directory. */
   dir?: string;
   site?: string;
+  /** The app's URL. Its host seeds the site policy's `allow` list. */
+  url?: string;
   force?: boolean;
 };
 
@@ -89,7 +91,7 @@ export function runInit(options: InitOptions = {}): InitResult {
   writeIgnore(join(root, PORTOLAN_DIR, ".gitignore"), files, skipped);
   write(
     join(root, config.policies, `${site}.json`),
-    `${JSON.stringify({ site, allow: [] }, null, 2)}\n`,
+    `${JSON.stringify({ site, allow: options.url === undefined ? [] : [new URL(options.url).host] }, null, 2)}\n`,
   );
 
   mkdirSync(join(root, config.maps, site), { recursive: true });

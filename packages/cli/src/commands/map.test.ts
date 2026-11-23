@@ -8,7 +8,7 @@ import type { OpProposal } from "@abubakarsiddiik/sources";
 import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substrate";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runMapBuild, setupFor } from "./map.js";
+import { runMapBuild, seedPolicy, setupFor } from "./map.js";
 
 const dirs: string[] = [];
 
@@ -387,5 +387,20 @@ describe("setupFor", () => {
 
     expect(setupFor(draft([open, staticClick]), staticClick)).toBeUndefined();
     expect(setupFor(draft([click]), click)).toBeUndefined();
+  });
+});
+
+describe("seedPolicy", () => {
+  it("allows the build's host when init left the allow list empty", () => {
+    expect(seedPolicy({ site: "app", allow: [] }, "http://localhost:5173/admin")).toEqual({
+      site: "app",
+      allow: ["localhost:5173"],
+    });
+  });
+
+  it("leaves a policy that lists hosts exactly as written", () => {
+    const policy = { site: "app", allow: ["app.example.com"] };
+    expect(seedPolicy(policy, "http://localhost:5173/")).toBe(policy);
+    expect(seedPolicy(undefined, "http://localhost:5173/")).toBeUndefined();
   });
 });

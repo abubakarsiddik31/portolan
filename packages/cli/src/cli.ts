@@ -27,6 +27,7 @@ import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
 import { loadConfig } from "./config.js";
 import { formatDoctor, runDoctor } from "./doctor.js";
+import { COMMAND_HELP } from "./help.js";
 
 const packageJson = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
@@ -93,7 +94,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
   }
 
   if (command !== "qa" && (rest.includes("--help") || rest.includes("-h"))) {
-    out(USAGE);
+    out(COMMAND_HELP[command] ?? USAGE);
     return 0;
   }
 
@@ -105,6 +106,7 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
         const result = (deps.init ?? runInit)({
           ...(args.positional[0] !== undefined ? { dir: args.positional[0] } : {}),
           ...(stringFlag(args, "site") !== undefined ? { site: stringFlag(args, "site") } : {}),
+          ...(stringFlag(args, "url") !== undefined ? { url: stringFlag(args, "url") } : {}),
           force: booleanFlag(args, "force"),
         });
         out(`initialized ${result.dir}`);

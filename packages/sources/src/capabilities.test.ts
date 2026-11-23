@@ -100,6 +100,43 @@ describe("buildCapabilities", () => {
     expect(gapsOf(ledger).map((item) => item.trigger.name)).toEqual(["Add Application"]);
   });
 
+  it("does not map a trigger whose only proposal failed verification", () => {
+    const ledger = buildCapabilities({
+      site: "app",
+      discovery: discovery(),
+      proposals: [
+        proposal("open_cart", "home", "cart", { kind: "link", name: "Cart", page: "home" }),
+      ],
+      unverified: new Map([["open_cart", "open_cart did not verify: every impl failed"]]),
+      now: "2026-11-17T00:00:00.000Z",
+    });
+
+    expect(ledger.capabilities.find((item) => item.trigger.name === "Cart")).toEqual(
+      expect.objectContaining({
+        status: "missing",
+        reason: "open_cart did not verify: every impl failed",
+      }),
+    );
+  });
+
+  it("keeps a trigger mapped when a verified op also covers it", () => {
+    const ledger = buildCapabilities({
+      site: "app",
+      discovery: discovery(),
+      proposals: [
+        proposal("open_cart_2", "home", "cart", { kind: "link", name: "Cart", page: "home" }),
+        proposal("open_cart", "home", "cart", { kind: "link", name: "Cart", page: "home" }),
+      ],
+      unverified: new Map([["open_cart_2", "did not verify"]]),
+      now: "2026-11-17T00:00:00.000Z",
+    });
+
+    expect(ledger.capabilities.find((item) => item.trigger.name === "Cart")).toMatchObject({
+      status: "mapped",
+      op: "open_cart",
+    });
+  });
+
   it("keeps a manual exclusion across rediscovery", () => {
     const first = buildCapabilities({
       site: "app",

@@ -36,6 +36,8 @@ export type BuildCapabilitiesInput = {
   previous?: CapabilityLedger;
   /** Extra exclusion patterns, appended to the defaults. */
   exclude?: string[];
+  /** Proposals that failed or skipped verification, by op name, with the reason. */
+  unverified?: Map<string, string>;
   now?: string;
 };
 
@@ -45,7 +47,8 @@ export type BuildCapabilitiesInput = {
  * A capability is `mapped` only when a proposal covers the same trigger, so a
  * page-level read op never silently counts as a button or a form. Anything the
  * live app shows but the map does not cover is `missing`; destructive actions
- * are `excluded` with a reason.
+ * are `excluded` with a reason. A proposal named in `unverified` covers nothing:
+ * its trigger is `missing` and the verification failure is the reason.
  */
 export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedger {
   const exclude = [
@@ -54,6 +57,7 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
   ];
   const previous = new Map((input.previous?.capabilities ?? []).map((item) => [item.id, item]));
   const next = new Map<string, Capability>();
+  const unverified = input.unverified ?? new Map<string, string>();
 
   if (input.discovery !== undefined) {
     const seen = new Set<string>();
@@ -68,7 +72,9 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
         continue;
       }
 
-      const proposal = input.proposals.find((candidate) => covers(action, candidate));
+      const covering = input.proposals.filter((candidate) => covers(action, candidate));
+      const proposal = covering.find((candidate) => !unverified.has(candidate.op.name));
+      const failed = covering.find((candidate) => unverified.has(candidate.op.name));
       const excludedBy = exclude.find((pattern) => pattern.test(action.name));
 
       let status: CapabilityStatus = "missing";
@@ -76,6 +82,8 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
 
       if (proposal !== undefined) {
         status = "mapped";
+      } else if (failed !== undefined) {
+        reason = unverified.get(failed.op.name);
       } else if (excludedBy !== undefined) {
         status = "excluded";
         reason = "matches an exclusion pattern; record it manually if it is safe";

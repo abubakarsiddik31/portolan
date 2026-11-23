@@ -229,31 +229,37 @@ export async function runMapBuild(
       }
     }
 
-    const capabilities = buildCapabilities({
-      site: input.site,
-      ...(discovery !== undefined ? { discovery } : {}),
-      // A capability the live surface still shows stays mapped when the
-      // published map already has an op for it, even if discovery reserved
-      // that target and proposed nothing new this run.
-      proposals: [
-        ...draft.proposals,
-        ...(existing?.ops ?? []).map(
-          (op): OpProposal => ({
-            op,
-            source: "dom",
-            provenance: "existing map",
-            confidence: "high",
-          }),
-        ),
-      ],
-      ...(previous !== undefined ? { previous } : {}),
-      ...(input.exclude !== undefined ? { exclude: input.exclude } : {}),
-    });
-    const coverage = coverageOf(capabilities);
+    const ledgerFor = (unverified?: Map<string, string>): CapabilityLedger =>
+      buildCapabilities({
+        site: input.site,
+        ...(discovery !== undefined ? { discovery } : {}),
+        // A capability the live surface still shows stays mapped when the
+        // published map already has an op for it, even if discovery reserved
+        // that target and proposed nothing new this run.
+        proposals: [
+          ...draft.proposals,
+          ...(existing?.ops ?? []).map(
+            (op): OpProposal => ({
+              op,
+              source: "dom",
+              provenance: "existing map",
+              confidence: "high",
+            }),
+          ),
+        ],
+        ...(previous !== undefined ? { previous } : {}),
+        ...(input.exclude !== undefined ? { exclude: input.exclude } : {}),
+        ...(unverified !== undefined ? { unverified } : {}),
+      });
+    let capabilities = ledgerFor();
+    let coverage = coverageOf(capabilities);
     const capabilitiesPath = writeCapabilities(mapDir, capabilities);
     const written = writeDraft(mapDir, draft);
 
-    if (input.requireComplete === true && coverage.missing + coverage.stale > 0) {
+    // Without verification a draft proposal is the best evidence there is, so
+    // the gate can run now. With it, only verified ops count, and the gate
+    // moves after the verify loop.
+    if (!input.verify && input.requireComplete === true && coverage.missing + coverage.stale > 0) {
       throw new Error(
         `${formatCoverage(coverage)}; resolve the gaps in ${capabilitiesPath} or mark them excluded`,
       );
@@ -264,29 +270,34 @@ export async function runMapBuild(
 
     const reports: VerifyReport[] = [];
     const verified: string[] = [];
+    const unverified = new Map<string, string>();
 
     if (input.verify) {
       for (const proposal of candidates) {
         const op = proposal.op;
         if (op.effect !== "read" && !input.verifyWrites) {
+          const message = `${op.name} is a ${op.effect}; verify it explicitly with --verify-writes`;
+          unverified.set(op.name, message);
           draft.tasks.push({
             id: `task_${draft.tasks.length + 1}`,
             kind: "confirm_effect",
             source: proposal.source,
             op: op.name,
-            message: `${op.name} is a ${op.effect}; verify it explicitly with --verify-writes`,
+            message,
           });
           continue;
         }
 
         const sets = paramSetsFor(op, proposal, params);
         if (sets === undefined) {
+          const message = `add at least three parameter sets for ${op.name} in a params file`;
+          unverified.set(op.name, message);
           draft.tasks.push({
             id: `task_${draft.tasks.length + 1}`,
             kind: "add_params",
             source: proposal.source,
             op: op.name,
-            message: `add at least three parameter sets for ${op.name} in a params file`,
+            message,
           });
           continue;
         }
@@ -318,14 +329,30 @@ export async function runMapBuild(
           op.status = "verified";
           verified.push(op.name);
         } else {
+          const message = `${op.name} did not verify: ${report.reason ?? "every impl failed"}`;
+          unverified.set(op.name, message);
           draft.tasks.push({
             id: `task_${draft.tasks.length + 1}`,
             kind: "restore_op",
             source: proposal.source,
             op: op.name,
-            message: `${op.name} did not verify: ${report.reason ?? "every impl failed"}`,
+            message,
           });
         }
+      }
+
+      // Only verification marks an op mapped, so recount without the
+      // proposals that failed or were skipped, then gate on that.
+      capabilities = ledgerFor(unverified);
+      coverage = coverageOf(capabilities);
+      writeCapabilities(mapDir, capabilities);
+
+      if (input.requireComplete === true && coverage.missing + coverage.stale > 0) {
+        upgradeVerified(draft, verified);
+        writeDraft(mapDir, draft);
+        throw new Error(
+          `${formatCoverage(coverage)}; resolve the gaps in ${capabilitiesPath} or mark them excluded`,
+        );
       }
     }
 

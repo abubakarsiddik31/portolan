@@ -149,6 +149,22 @@ describe("runMapBuild", () => {
     expect(result.draft.tasks).toContainEqual(
       expect.objectContaining({ kind: "restore_op", op: "open_cart" }),
     );
+
+    // The ledger counts only what verified: the failed op's trigger is a gap
+    // with the verify failure as the reason.
+    expect(result.coverage).toMatchObject({ mapped: 2, missing: 2 });
+    const ledger = JSON.parse(readFileSync(result.capabilitiesPath, "utf8")) as {
+      capabilities: Array<{
+        trigger: { name: string };
+        status: string;
+        reason?: string;
+        op?: string;
+      }>;
+    };
+    const cart = ledger.capabilities.find((item) => item.trigger.name === "Cart");
+    expect(cart).toMatchObject({ status: "missing" });
+    expect(cart?.op).toBeUndefined();
+    expect(cart?.reason).toContain("open_cart did not verify: verification crashed");
   });
 
   it("passes the storage state to verification", async () => {

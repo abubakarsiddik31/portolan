@@ -49,7 +49,7 @@ export type DomDiscovery = {
   /** Every interactive element seen, for the capability ledger. */
   surface: SurfaceAction[];
   /** The API endpoints the pages called, from their own network traffic. */
-  endpoints: Endpoint[];
+  endpoints?: Endpoint[];
   visited: string[];
   /** State ids of the pages this crawl reached, so a partial crawl can tell stale from unvisited. */
   pages: string[];

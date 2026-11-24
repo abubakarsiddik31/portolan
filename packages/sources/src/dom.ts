@@ -2,6 +2,7 @@ import type {
   Effect,
   JsonSchema,
   Locator,
+  OpContext,
   OpDef,
   StateDef,
   UiStep,
@@ -161,7 +162,8 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
       const key =
         action.kind === "link" && action.target !== undefined
           ? `link\u0000${action.target}`
-          : `${action.page}\u0000${action.kind}\u0000${action.name.toLowerCase()}`;
+          : // The same label in another panel is another control, so the panel is part of the key.
+            `${action.page}\u0000${action.kind}\u0000${action.name.toLowerCase()}\u0000${action.context?.section ?? ""}`;
       const seen = surfaceSeen.get(key);
       if (seen !== undefined) {
         // Enabled on any visit of the state means the control can be used.
@@ -224,6 +226,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
           from: from.id,
           to: to.id,
           summary: clampSummary(`Open ${node.name}.`),
+          context: contextOf(node, index, snapshot),
         }),
         source: "dom",
         provenance: `link "${node.name}" on ${current.pathname}`,
@@ -284,6 +287,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
         ...(templated !== node.name ? { sample: node.name } : {}),
         ...(landmark !== undefined ? { landmark } : {}),
         ...(isDisabled(node) ? { disabled: true } : {}),
+        context: contextOf(node, index, snapshot),
       });
     }
 
@@ -330,6 +334,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
                 from: from.id,
                 to: to.id,
                 path: target.pathname,
+                context: contextOf(node, index, snapshot),
               }),
               source: "dom",
               provenance: `button "${node.name}" on ${current.pathname}`,
@@ -484,6 +489,10 @@ function formResult(input: {
       name,
       version: 1,
       summary: clampSummary(`${isRead ? "Read" : "Submit"} the "${formLabel(input.form)}" form.`),
+      context: {
+        ...contextOf(input.form, input.index, input.snapshot, submit.name),
+        section: clip(`form "${formLabel(input.form)}"`),
+      },
       params,
       returns: { type: "object" },
       from: [input.from.id],
@@ -536,11 +545,13 @@ function readLinkOp(input: {
   from: string;
   to: string;
   summary: string;
+  context?: OpContext;
 }): OpDef {
   return {
     name: input.name,
     version: 1,
     summary: input.summary,
+    ...(input.context !== undefined ? { context: input.context } : {}),
     params: {
       ...input.params,
       required: input.required,
@@ -646,6 +657,71 @@ function indexNodes(nodes: SemanticNode[]): NodeIndex {
   }
 
   return { byId, parents, ordinals };
+}
+
+const SECTION_ROLES = new Set([
+  "dialog",
+  "alertdialog",
+  "form",
+  "region",
+  "group",
+  "article",
+  "tabpanel",
+  "table",
+  "grid",
+  "list",
+  "complementary",
+]);
+const SUBJECT_ROLES = new Set(["row", "listitem", "article", "treeitem"]);
+
+/**
+ * Where a control is and what it acts on, from the page's own structure.
+ *
+ * Two "Delete" buttons are the same op until you know one is in the "Danger
+ * zone" panel and the other is on the row for "ci-prod". This reads that from
+ * the nearest named dialog, form, panel or table, and from the row or card the
+ * control sits in.
+ */
+function contextOf(
+  node: SemanticNode,
+  index: NodeIndex,
+  snapshot: Snapshot,
+  control = node.name,
+): OpContext {
+  const context: OpContext = {};
+  const page = pageHeading(snapshot);
+  if (page !== undefined) context.page = page;
+  if (control.length > 0) context.control = clip(control);
+
+  let current = index.parents.get(node.nodeId);
+  for (let depth = 0; current !== undefined && depth < 50; depth += 1) {
+    const ancestor = index.byId.get(current);
+    if (ancestor !== undefined && ancestor.name.length > 0) {
+      if (context.subject === undefined && SUBJECT_ROLES.has(ancestor.role)) {
+        context.subject = clip(ancestor.name, 80);
+      } else if (context.section === undefined && SECTION_ROLES.has(ancestor.role)) {
+        context.section = clip(`${ancestor.role} "${ancestor.name}"`);
+      }
+    }
+    if (context.section !== undefined && context.subject !== undefined) break;
+    current = index.parents.get(current);
+  }
+
+  return context;
+}
+
+function pageHeading(snapshot: Snapshot): string | undefined {
+  const headings = snapshot.nodes.filter(
+    (node) => node.visible && node.role === "heading" && node.name.length > 0,
+  );
+  const top = headings.find((node) => node.properties.level === 1) ?? headings[0];
+  const title = snapshot.title.trim();
+  return top !== undefined ? clip(top.name) : title.length > 0 ? clip(title) : undefined;
+}
+
+function clip(text: string, max = 120): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length <= max ? flat : `${flat.slice(0, max - 3)}...`;
 }
 
 function landmarkOf(node: SemanticNode, index: NodeIndex): string | undefined {
@@ -830,6 +906,7 @@ function buttonNavOp(input: {
   from: string;
   to: string;
   path: string;
+  context?: OpContext;
 }): OpDef {
   const path = input.path
     .split("/")
@@ -840,6 +917,7 @@ function buttonNavOp(input: {
     name: input.name,
     version: 1,
     summary: clampSummary(`Click ${input.button}.`),
+    ...(input.context !== undefined ? { context: input.context } : {}),
     params: { type: "object", properties: {}, required: [], additionalProperties: false },
     returns: { type: "object" },
     from: [input.from],

@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { MapStore, renderMap } from "./maps.js";
+import { describeContext, MapStore, renderMap } from "./maps.js";
 
 const MAPS = join(import.meta.dirname, "../../../maps");
 
@@ -42,5 +42,24 @@ describe("map store", () => {
     expect(text).toContain("store · map v1");
     expect(text).toContain("checkout(");
     expect(text).toContain("[irreversible]");
+  });
+
+  it("shows where an op is and what it did, so alike names can be told apart", () => {
+    const map = maps.get("store");
+    if (map === undefined) throw new Error("the store map is missing");
+
+    const op = map.ops[0];
+    if (op === undefined) throw new Error("the store map has no ops");
+    op.context = {
+      page: "API keys",
+      section: 'region "Danger zone"',
+      subject: "ci-prod",
+      observed: ["DELETE /api/keys/{id} -> 204"],
+    };
+
+    expect(renderMap(map)).toContain(
+      'where: API keys > region "Danger zone" | on: ci-prod | effects: DELETE /api/keys/{id} -> 204',
+    );
+    expect(describeContext(undefined)).toBeUndefined();
   });
 });

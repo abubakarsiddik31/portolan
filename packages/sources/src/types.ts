@@ -1,4 +1,4 @@
-import type { JsonSchema, OpDef, StateDef } from "@abubakarsiddiik/protocol";
+import type { JsonSchema, OpContext, OpDef, StateDef } from "@abubakarsiddiik/protocol";
 
 /** Where a candidate op came from. Every proposal carries its provenance. */
 export type MapSourceKind = "dom" | "codebase" | "openapi" | "har" | "traces";
@@ -46,6 +46,8 @@ export type SurfaceAction = {
   landmark?: string;
   /** The name as seen, when `name` is a template such as `Active {count}`. */
   sample?: string;
+  /** Where the control is and what it acts on, from the page's structure. */
+  context?: OpContext;
 };
 
 export type CapabilityStatus =
@@ -76,6 +78,8 @@ export type Capability = {
   pages?: string[];
   /** The name as seen, when the trigger name is a template. */
   sample?: string;
+  /** Where the control is and what it acts on; carried onto the op recorded for it. */
+  context?: OpContext;
   /** When a crawl last saw the control. */
   last_seen?: string;
   /** When an op covering it last passed verification. */

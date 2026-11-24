@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   type Effect,
   type JsonSchema,
+  type OpContext,
   type OpDef,
   parseMap,
   type SiteMap,
@@ -13,6 +14,8 @@ export type OpSummary = {
   name: string;
   summary: string;
   effect: Effect;
+  /** Where the op is and what it does, when the map recorded it. */
+  context?: OpContext;
   params: JsonSchema;
   returns: JsonSchema;
 };
@@ -62,6 +65,7 @@ export class MapStore {
           name: op.name,
           summary: op.summary,
           effect: op.effect,
+          ...(op.context !== undefined ? { context: op.context } : {}),
           params: op.params,
           returns: op.returns,
         })),
@@ -113,6 +117,8 @@ export function renderMap(map: SiteMap): string {
 
   for (const op of map.ops) {
     lines.push(`  ${op.name}(${signature(op)})  ${op.summary}  [${op.effect}]`);
+    const where = describeContext(op.context);
+    if (where !== undefined) lines.push(`    ${where}`);
   }
 
   return lines.join("\n");
@@ -122,4 +128,23 @@ function signature(op: OpDef): string {
   const properties = op.params.properties;
   if (typeof properties !== "object" || properties === null) return "";
   return Object.keys(properties).join(", ");
+}
+
+/**
+ * One line of where an op is and what it changed, for an agent choosing
+ * between ops whose names are alike.
+ */
+export function describeContext(context: OpContext | undefined): string | undefined {
+  if (context === undefined) return undefined;
+
+  const where = [context.page, context.section].filter((part) => part !== undefined).join(" > ");
+  const parts = [
+    where.length > 0 ? `where: ${where}` : undefined,
+    context.subject !== undefined ? `on: ${context.subject}` : undefined,
+    context.observed !== undefined && context.observed.length > 0
+      ? `effects: ${context.observed.join("; ")}`
+      : undefined,
+  ].filter((part) => part !== undefined);
+
+  return parts.length === 0 ? undefined : parts.join(" | ");
 }

@@ -6,9 +6,11 @@ import {
   bootstrapFromTraces,
   bootstrapMap,
   type CompiledCandidate,
+  mergeContext,
   type PublishResult,
   pool,
   publishMap,
+  summaryFor,
   type VerifyReport,
   verifyOp,
 } from "@abubakarsiddiik/compiler";
@@ -376,6 +378,12 @@ async function buildMap(input: MapBuildInput, deps: MapBuildDeps): Promise<MapBu
         const risk = riskOf(candidate, policyRules);
         const capability = capabilityByScope.get(candidate.source ?? "");
         const op = name === candidate.op.name ? candidate.op : { ...candidate.op, name };
+        // The ledger knows where the control is on the page; the run knows what it did.
+        const structure = previous?.capabilities.find((item) => item.id === capability)?.context;
+        if (structure !== undefined) {
+          op.context = mergeContext(structure, op.context ?? {});
+          op.summary = summaryFor(op.summary, op.context);
+        }
         if (risk !== undefined && op.effect === "read") op.effect = "write";
         if (risk?.category === "destructive" && op.impls.every((impl) => impl.tier === "ui")) {
           op.effect = "irreversible";

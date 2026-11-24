@@ -2,6 +2,7 @@ import type { Extractor, Impl, OpDef, PostCheck, SiteMap } from "@abubakarsiddii
 import type { Trace } from "@abubakarsiddiik/runtime";
 import type { Effect, NetworkEffect, SubstrateView } from "@abubakarsiddiik/substrate";
 
+import { runContext, summaryFor } from "./context.js";
 import { liftHttp } from "./http.js";
 import { liftUrl } from "./lift.js";
 import { type ParameterizedSegment, parameterizeTrace } from "./parameterize.js";
@@ -94,7 +95,12 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
         });
         if (lift === undefined) continue;
 
-        impl = { tier: "http", steps: lift.steps, extract: lift.extract };
+        impl = {
+          tier: "http",
+          steps: lift.steps,
+          extract: lift.extract,
+          ...(lift.auth !== undefined ? { auth: lift.auth } : {}),
+        };
       } else {
         // The url tier is read-only, so a write goes straight to ui steps.
         returns =
@@ -123,10 +129,14 @@ export async function compileCandidates(options: CompileOptions): Promise<Compil
           ? inferPost(segment.segment.actions, options.map)
           : [];
 
+      const context =
+        oracle?.context ?? runContext({ trace: input.trace, actions: segment.segment.actions });
+
       const op: OpDef = {
         name,
         version: oracle?.version ?? 1,
-        summary: label?.summary ?? oracle?.summary ?? `Compiled ${name}.`,
+        summary: summaryFor(label?.summary ?? oracle?.summary ?? `Compiled ${name}.`, context),
+        ...(Object.keys(context).length > 0 ? { context } : {}),
         params: oracle?.params ?? (isEmptySchema(segment.schema) ? EMPTY_SCHEMA : segment.schema),
         returns: returns.schema,
         from: oracle?.from ?? [segment.segment.from ?? "unknown"],

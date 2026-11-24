@@ -6,9 +6,12 @@ import { MapStore } from "@abubakarsiddiik/server";
 import {
   type CapabilityCoverage,
   coverageOf,
+  type EndpointCoverage,
+  endpointCoverage,
   formatCoverage,
   gapsOf,
   readCapabilities,
+  readEndpoints,
 } from "@abubakarsiddiik/sources";
 
 import { recipePath } from "./auth.js";
@@ -29,6 +32,8 @@ export type MapStatus = {
   version?: number;
   ops: number;
   coverage?: CapabilityCoverage;
+  /** The backend endpoints the pages called, and how many an op reaches. */
+  endpoints?: EndpointCoverage;
   gaps: number;
   uncompiled_traces: Array<{ scope_id: string; intent: string; capability?: string }>;
   last_build?: {
@@ -50,6 +55,7 @@ export async function mapStatus(input: StatusInput): Promise<MapStatus> {
   const ledger = readCapabilities(join(input.mapsDir, input.site));
   const coverage = ledger === undefined ? undefined : coverageOf(ledger);
   const gaps = ledger === undefined ? 0 : gapsOf(ledger).length;
+  const inventory = readEndpoints(join(input.mapsDir, input.site));
 
   const traces = await new TraceStore(input.tracesDir).all().catch(() => []);
   const compiled = new Set(map?.compiled_from ?? []);
@@ -69,6 +75,7 @@ export async function mapStatus(input: StatusInput): Promise<MapStatus> {
     ...(map !== undefined ? { version: map.version } : {}),
     ops: map?.ops.length ?? 0,
     ...(coverage !== undefined ? { coverage } : {}),
+    ...(inventory !== undefined ? { endpoints: endpointCoverage(inventory.endpoints) } : {}),
     gaps,
     uncompiled_traces: uncompiled,
     ...(last !== undefined
@@ -168,6 +175,11 @@ export function formatStatus(status: MapStatus): string[] {
     `${status.site}: ${status.version === undefined ? "no published map" : `v${status.version}, ${status.ops} ops`}`,
   ];
   if (status.coverage !== undefined) lines.push(`  coverage: ${formatCoverage(status.coverage)}`);
+  if (status.endpoints !== undefined) {
+    lines.push(
+      `  endpoints: ${status.endpoints.covered} of ${status.endpoints.total} called by an op, ${status.endpoints.uncoveredWrites} writes no op reaches (maps/${status.site}/endpoints.json)`,
+    );
+  }
   if (status.uncompiled_traces.length > 0) {
     lines.push(`  ${status.uncompiled_traces.length} recorded runs not compiled`);
   }

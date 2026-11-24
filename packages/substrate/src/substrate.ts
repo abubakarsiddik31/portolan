@@ -1,5 +1,5 @@
 import { type HttpAuth, readAuthExpression } from "./auth.js";
-import type { Action, Effect, Engine, Snapshot } from "./engine.js";
+import type { Action, Effect, Engine, NetworkEffect, Snapshot } from "./engine.js";
 import { EngineError } from "./engine.js";
 import { type BlockedRequest, EgressGuard, type EgressPolicy, type Resolver } from "./policy.js";
 import { type RefMap, RefRegistry } from "./refs.js";
@@ -270,6 +270,11 @@ export class Substrate {
     await this.guard?.checkResolved(url, "GET");
     await this.engine.navigate(url);
     return options.settle === false ? this.view() : this.settle();
+  }
+
+  /** The API calls the page made since the last call, for building an endpoint inventory. */
+  async drainApiCalls(): Promise<NetworkEffect[]> {
+    return (await this.engine.drainApiCalls?.()) ?? [];
   }
 
   /** The last captured document and refs, without taking a new snapshot. */

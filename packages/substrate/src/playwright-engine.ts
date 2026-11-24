@@ -32,6 +32,25 @@ type AuthLocation = {
   path?: string;
 };
 
+export type ScreencastFrame = {
+  /** Base64 JPEG. */
+  data: string;
+  width: number;
+  height: number;
+  url: string;
+};
+
+export type ScreencastOptions = {
+  /** JPEG quality, 0 to 100. Default 60. */
+  quality?: number;
+  /** Default 1280. */
+  maxWidth?: number;
+  /** Default 800. */
+  maxHeight?: number;
+  /** Called with the URL after each main-frame navigation. */
+  onNavigate?: (url: string) => void;
+};
+
 export type PlaywrightEngineOptions = {
   executablePath: string;
   headless?: boolean;
@@ -442,6 +461,53 @@ export class PlaywrightEngine implements Engine {
 
   async screenshot(): Promise<Uint8Array> {
     return this.page.screenshot({ type: "png" });
+  }
+
+  /**
+   * Stream the page as JPEG frames, for a person watching the run.
+   *
+   * Chrome sends a frame only when the page repaints, so an idle page costs
+   * nothing. The stream uses its own DevTools session, so it never interleaves
+   * with the commands that drive the page. Returns the stop function.
+   */
+  async screencast(
+    onFrame: (frame: ScreencastFrame) => void,
+    options: ScreencastOptions = {},
+  ): Promise<() => Promise<void>> {
+    const session = await this.context.newCDPSession(this.page);
+
+    session.on("Page.screencastFrame", (event) => {
+      const { data, sessionId, metadata } = event as unknown as {
+        data: string;
+        sessionId: number;
+        metadata: { deviceWidth: number; deviceHeight: number };
+      };
+      void session.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
+      onFrame({
+        data,
+        width: Math.round(metadata.deviceWidth),
+        height: Math.round(metadata.deviceHeight),
+        url: this.page.url(),
+      });
+    });
+
+    await session.send("Page.startScreencast", {
+      format: "jpeg",
+      quality: options.quality ?? 60,
+      maxWidth: options.maxWidth ?? 1280,
+      maxHeight: options.maxHeight ?? 800,
+    });
+
+    const onNavigate = (frame: Frame): void => {
+      if (frame === this.page.mainFrame()) options.onNavigate?.(frame.url());
+    };
+    this.page.on("framenavigated", onNavigate);
+
+    return async () => {
+      this.page.off("framenavigated", onNavigate);
+      await session.send("Page.stopScreencast").catch(() => {});
+      await session.detach().catch(() => {});
+    };
   }
 
   async close(): Promise<void> {

@@ -11,7 +11,10 @@ import {
 import {
   type FallbackScope,
   FallbackScopes,
+  isCredentialValue,
+  isSensitiveKey,
   MemoryWriteLedger,
+  REDACTED,
   recognizeState,
   runWrite,
   type Trace,
@@ -29,6 +32,7 @@ import {
 import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
+import type { ActivityFeed } from "./activity.js";
 import {
   type OpAudit,
   type OpExecutor,
@@ -62,6 +66,8 @@ export type McpDeps = {
   releaseSubstrate?: (sid: string) => Promise<void> | void;
   /** Tools for the mapping loop: status, gaps, exclusions, recording, builds. */
   mapping?: MappingTools;
+  /** Records every tool call and its outcome for `portolan mcp --watch`. */
+  activity?: ActivityFeed;
 };
 
 /**
@@ -136,6 +142,33 @@ export function createMcpServer(deps: McpDeps): McpServer {
   /** Raw entry URL for a mapless explore session, keyed by sid. */
   const exploreUrls = new Map<string, string>();
   const substrates = new Map<string, Promise<FallbackSubstrate>>();
+
+  if (deps.activity !== undefined) observeTools(server, deps.activity, watchedArgs);
+
+  /**
+   * The arguments a watcher may see. A value typed into a password field is
+   * blanked, judged the same way a trace is: by the target's accessible name
+   * or by the value's own shape.
+   */
+  async function watchedArgs(
+    tool: string,
+    args: unknown,
+  ): Promise<{ args: unknown; secrets: string[] }> {
+    if (tool !== "act" || typeof args !== "object" || args === null) return { args, secrets: [] };
+
+    const input = args as { ref?: unknown; value?: unknown };
+    if (typeof input.value !== "string") return { args, secrets: [] };
+
+    const pending = currentSid === undefined ? undefined : substrates.get(currentSid);
+    const substrate = await pending?.catch(() => undefined);
+    const locator =
+      typeof input.ref === "string" ? substrate?.state()?.refs.byRef.get(input.ref) : undefined;
+
+    if (isSensitiveKey(locator?.name) || isCredentialValue(input.value)) {
+      return { args: { ...input, value: REDACTED }, secrets: [input.value] };
+    }
+    return { args, secrets: [] };
+  }
 
   /**
    * Close a session and free its browser. Opening a new site replaces the
@@ -870,6 +903,46 @@ export function createMcpServer(deps: McpDeps): McpServer {
   if (deps.mapping !== undefined) registerMappingTools(server, deps.mapping);
 
   return server;
+}
+
+/**
+ * Report every tool call to the activity feed, including the per-site tools
+ * `open_site` registers later. The handler runs exactly as before; a watcher
+ * only sees it.
+ */
+function observeTools(
+  server: McpServer,
+  feed: ActivityFeed,
+  describe: (tool: string, args: unknown) => Promise<{ args: unknown; secrets: string[] }>,
+): void {
+  const register = server.registerTool.bind(server) as (
+    name: string,
+    config: unknown,
+    handler: (...args: unknown[]) => unknown,
+  ) => RegisteredTool;
+
+  (server as { registerTool: unknown }).registerTool = (
+    name: string,
+    config: unknown,
+    handler: (...args: unknown[]) => unknown,
+  ): RegisteredTool =>
+    register(name, config, async (...callArgs: unknown[]) => {
+      const takesInput = callArgs.length > 1;
+      const { args, secrets } = await describe(name, takesInput ? callArgs[0] : {}).catch(() => ({
+        args: {},
+        secrets: [],
+      }));
+      const id = feed.call(name, args);
+      const started = Date.now();
+      try {
+        const outcome = await handler(...callArgs);
+        feed.result(id, name, outcome, Date.now() - started, secrets);
+        return outcome;
+      } catch (error) {
+        feed.thrown(id, name, error, Date.now() - started);
+        throw error;
+      }
+    });
 }
 
 function registerMappingTools(server: McpServer, mapping: MappingTools): void {

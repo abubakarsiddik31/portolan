@@ -1,3 +1,4 @@
+export * from "./activity.js";
 export * from "./browsers.js";
 export * from "./canary.js";
 export * from "./credentials.js";
@@ -10,4 +11,5 @@ export * from "./mcp.js";
 export * from "./server.js";
 export * from "./stdio.js";
 export * from "./store.js";
+export * from "./watch.js";
 export * from "./write-ledger.js";

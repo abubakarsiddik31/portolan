@@ -35,7 +35,14 @@ ${CONFIG_FLAG}
 Serve MCP over stdio, for an MCP client to spawn.
 
 Options:
-${CONFIG_FLAG}`,
+${CONFIG_FLAG}
+  --headed               show the browser window
+  --watch                open a Chrome window you can watch and click, starting on
+                         a live view of every tool call at http://127.0.0.1:4300;
+                         the window stays open until the server exits
+                         (or set PORTOLAN_WATCH=1)
+  --watch-port <n>       port for the live view; implies --watch
+  --headless             with --watch, keep Chrome hidden and use only the live view`,
 
   auth: `portolan auth <login|refresh|status> [options]
 

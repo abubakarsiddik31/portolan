@@ -18,6 +18,7 @@ const BOOLEAN_FLAGS = new Set([
   "force",
   "gaps",
   "headed",
+  "headless",
   "json",
   "list",
   "no-dedupe",
@@ -29,6 +30,7 @@ const BOOLEAN_FLAGS = new Set([
   "strict",
   "verify",
   "verify-writes",
+  "watch",
   "writes",
 ]);
 

@@ -3,6 +3,7 @@ import type { TraceStore, WriteLedger } from "@abubakarsiddiik/runtime";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
+import type { ActivityFeed } from "./activity.js";
 import type { BrowserRegistry } from "./browsers.js";
 import type { OpExecutor, RuntimeExecutorOptions } from "./executor.js";
 import { MapStore } from "./maps.js";
@@ -33,6 +34,8 @@ export type StdioServerOptions = {
   traceStore?: TraceStore;
   /** Tools for the mapping loop, so an MCP-only client can finish a map. */
   mapping?: MappingTools;
+  /** Records every tool call for a watcher. */
+  activity?: ActivityFeed;
 };
 
 export type StdioServerHandle = {
@@ -61,6 +64,7 @@ export async function startStdioServer(
     ledger: options.ledger ?? sessions.writeLedger(),
     ...(options.traceStore !== undefined ? { traceStore: options.traceStore } : {}),
     ...(options.mapping !== undefined ? { mapping: options.mapping } : {}),
+    ...(options.activity !== undefined ? { activity: options.activity } : {}),
     ...(options.executor !== undefined ? { executor: options.executor } : {}),
     ...(options.substrateFactory !== undefined
       ? { substrateFactory: options.substrateFactory }

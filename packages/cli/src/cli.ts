@@ -31,7 +31,7 @@ import { runCoverageDiff } from "./commands/diff.js";
 import { runExportSkills } from "./commands/export-skills.js";
 import { runInit } from "./commands/init.js";
 import { type MapBuildInput, runMapBuild } from "./commands/map.js";
-import { runMcp } from "./commands/mcp.js";
+import { runMcp, watchPortFrom } from "./commands/mcp.js";
 import { runMigrate } from "./commands/migrate.js";
 import { blockedHosts, runPolicyAllow } from "./commands/policy.js";
 import { runQa } from "./commands/qa.js";
@@ -166,8 +166,21 @@ export async function main(argv: string[], deps: CliDeps = {}): Promise<number> 
       }
 
       case "mcp": {
-        const config = loadConfig(stringFlag(args, "config"));
-        const handle = await (deps.mcp ?? runMcp)({ config });
+        const loaded = loadConfig(stringFlag(args, "config"));
+        const watchPort = watchPortFrom(
+          booleanFlag(args, "watch"),
+          numberFlag(args, "watch-port"),
+          process.env.PORTOLAN_WATCH,
+        );
+        // Watching means a window a person can see, unless asked to stay hidden.
+        const headed =
+          booleanFlag(args, "headed") ||
+          (watchPort !== undefined && !booleanFlag(args, "headless"));
+        const config = headed ? { ...loaded, headless: false } : loaded;
+        const handle = await (deps.mcp ?? runMcp)({
+          config,
+          ...(watchPort !== undefined ? { watchPort } : {}),
+        });
         installShutdown(deps.mcp === undefined, handle, { stdin: true });
         return 0;
       }

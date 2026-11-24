@@ -23,6 +23,7 @@ import { runBench } from "./commands/bench.js";
 import { runCompile } from "./commands/compile.js";
 import { runExportSkills } from "./commands/export-skills.js";
 import { runInit } from "./commands/init.js";
+import { type McpInput, watchPortFrom } from "./commands/mcp.js";
 import { runMigrate } from "./commands/migrate.js";
 import { runServe } from "./commands/serve.js";
 import { runVerify } from "./commands/verify.js";
@@ -744,6 +745,51 @@ describe("main", () => {
       }),
     ).toBe(0);
     expect(sink.lines).toEqual([]);
+  });
+
+  it("passes --watch and --headed to mcp", async () => {
+    const sink = capture();
+    const handle = { close: async () => undefined } as unknown as StdioServerHandle;
+    const inputs: McpInput[] = [];
+
+    expect(
+      await main(["mcp", "--watch", "--headed"], {
+        ...sink,
+        mcp: async (input) => {
+          inputs.push(input);
+          return handle;
+        },
+      }),
+    ).toBe(0);
+    expect(inputs[0]?.watchPort).toBe(4300);
+    expect(inputs[0]?.config.headless).toBe(false);
+    expect(sink.lines).toEqual([]);
+  });
+
+  it("shows Chrome when watching unless --headless is passed", async () => {
+    const handle = { close: async () => undefined } as unknown as StdioServerHandle;
+    const inputs: McpInput[] = [];
+    const mcp = async (input: McpInput) => {
+      inputs.push(input);
+      return handle;
+    };
+
+    await main(["mcp", "--watch"], { ...capture(), mcp });
+    await main(["mcp", "--watch", "--headless"], { ...capture(), mcp });
+    await main(["mcp"], { ...capture(), mcp });
+
+    expect(inputs.map((input) => input.config.headless)).toEqual([false, true, true]);
+  });
+
+  it("reads the watch port from a flag or PORTOLAN_WATCH", () => {
+    expect(watchPortFrom(false, undefined, undefined)).toBeUndefined();
+    expect(watchPortFrom(false, undefined, "0")).toBeUndefined();
+    expect(watchPortFrom(false, undefined, "false")).toBeUndefined();
+    expect(watchPortFrom(true, undefined, undefined)).toBe(4300);
+    expect(watchPortFrom(false, undefined, "1")).toBe(4300);
+    expect(watchPortFrom(false, undefined, "4411")).toBe(4411);
+    expect(watchPortFrom(false, 5000, "4411")).toBe(5000);
+    expect(() => watchPortFrom(false, undefined, "yes please")).toThrow(/PORTOLAN_WATCH/);
   });
 
   it("runs bench --list through the dispatcher", async () => {

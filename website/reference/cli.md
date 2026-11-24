@@ -19,7 +19,7 @@ portolan <command> [options]
 | `portolan map record --gaps` | Record a one-click run for each missing capability, tagged with its capability id. Flags: `--kind`, `--only`, `--max`, `--writes`. |
 | `portolan map coverage` | Report `mapped`, `missing`, `excluded`, `unavailable`, `stale`, and `removed` capabilities. `--older-than 7d` lists entries no crawl has seen recently. |
 | `portolan map capability` | Add a capability manually or set its status/reason (`add` / `set`). |
-| `portolan mcp` | Serve MCP over stdio for a client to spawn. |
+| `portolan mcp` | Serve MCP over stdio for a client to spawn. `--watch` opens a Chrome window you can watch, plus a live timeline of every tool call. |
 | `portolan serve` | Start the HTTP and MCP server. |
 | `portolan compile <trace...>` | Compile traces into candidates, verify them, and publish the ones that pass as a new map version. Flags: `--map`, `--base-url`, `--outcome-checks`, `--params`, `--verify-writes`. |
 | `portolan verify` | Verify a map's operations on a fresh session. |
@@ -92,6 +92,10 @@ portolan init ./my-site --site store
 # serve MCP over stdio (what a client spawns)
 portolan mcp
 
+# the same, and watch the agent work: a visible Chrome window that stays open,
+# starting on a live timeline at http://127.0.0.1:4300
+portolan mcp --watch
+
 # serve MCP over streamable HTTP
 portolan serve --port 4200
 
@@ -127,5 +131,26 @@ The CLI reads `.portolan/config.json` and these variables:
 | `PORTOLAN_STORAGE_STATE` | Playwright storage state for authenticated pages. |
 | `CHROME_PATH` | Chrome binary when `chrome` is unset. |
 | `PORTOLAN_AUTH_TOKEN` | Bearer token for a non-loopback `serve` bind. |
+| `PORTOLAN_WATCH` | `1` turns on `portolan mcp --watch`; a number sets the timeline port. Easier than an argument in an MCP client config. |
 
 See [Configuration](/reference/configuration) for every option.
+
+## Watching an agent
+
+`portolan mcp --watch` lets a person see what the agent does without changing
+it. Chrome opens as a normal window on a timeline at `http://127.0.0.1:4300`
+that lists every tool call: its arguments, its result or typed error, and how
+long it took. Each session the agent opens gets its own window in that Chrome,
+and the timeline mirrors it live. The window stays open until the server
+exits, and you can click in it, though a page you change under the agent can
+make its next `act` miss.
+
+- `--watch-port <n>` picks the port; the next free one is used if it is taken.
+- `--headless` keeps Chrome hidden; the timeline still mirrors the page.
+- Values typed into password fields and credential-shaped text are redacted
+  before they reach the timeline. It binds to loopback only.
+- `http` ops run from a saved session have no page, so they appear only in
+  the timeline.
+
+In an MCP client config, add `"PORTOLAN_WATCH": "1"` to the server's `env`
+or `"--watch"` to its `args`.

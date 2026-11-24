@@ -1,3 +1,5 @@
+import type { AuthSource } from "./auth.js";
+
 export type NavigateResult = {
   url: string;
   title: string;
@@ -51,6 +53,11 @@ export type NetworkEffect = {
   request_body?: unknown;
   /** Parsed JSON response body, when the response had one. */
   response_body?: unknown;
+  /**
+   * How the request authenticated: the header and where the page keeps its
+   * token. The token itself is never recorded.
+   */
+  auth?: AuthSource;
 };
 
 export type NavigationEffect = {

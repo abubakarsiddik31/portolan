@@ -120,10 +120,29 @@ export type HttpStep = {
   bind?: Record<string, string>;
 };
 
+/**
+ * Where the site keeps the credential its frontend sends. A reference only:
+ * the value is read from the live session when the op runs.
+ */
+export type HttpAuth =
+  | { kind: "cookie" }
+  | {
+      kind: "bearer";
+      source: "localStorage" | "sessionStorage" | "cookie";
+      key: string;
+      /** Dot path inside a JSON value, for a persisted store. */
+      path?: string;
+      /** Header the token travels in. Default `authorization`. */
+      header?: string;
+      /** Prefix before the token. Default `Bearer`. */
+      scheme?: string;
+    };
+
 export type HttpImpl = {
   tier: "http";
   steps: HttpStep[];
   extract: Extractor;
+  auth?: HttpAuth;
 };
 
 export type UiStep =

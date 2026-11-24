@@ -81,9 +81,24 @@ export async function runHttpOp(input: HttpRunInput): Promise<HttpRunResult> {
       };
     }
 
-    const response = await substrate.fetch({ method: step.method, url, headers, body });
+    const response = await substrate.fetch({
+      method: step.method,
+      url,
+      headers,
+      body,
+      ...(impl.auth !== undefined ? { auth: impl.auth } : {}),
+    });
     last = response;
     lastUrl = url;
+
+    if (response.error !== undefined) {
+      return {
+        ok: false,
+        code: "op_broken",
+        message: `step ${index}: ${response.error}`,
+        details: { auth_missing: true },
+      };
+    }
 
     if (response.status < 200 || response.status >= 300) {
       return {

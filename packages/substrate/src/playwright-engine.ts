@@ -12,6 +12,7 @@ import {
   type Page,
 } from "playwright-core";
 
+import { findAuthExpression } from "./auth.js";
 import {
   type Action,
   type DispatchResult,
@@ -24,6 +25,12 @@ import {
   type SemanticNode,
   type Snapshot,
 } from "./engine.js";
+
+type AuthLocation = {
+  source: "localStorage" | "sessionStorage" | "cookie";
+  key: string;
+  path?: string;
+};
 
 export type PlaywrightEngineOptions = {
   executablePath: string;
@@ -75,7 +82,13 @@ type RawAxNode = {
 
 type RequestEvent = {
   requestId: string;
-  request: { method: string; url: string; postData?: string; hasPostData?: boolean };
+  request: {
+    method: string;
+    url: string;
+    headers?: Record<string, string>;
+    postData?: string;
+    hasPostData?: boolean;
+  };
   type?: string;
 };
 
@@ -192,6 +205,7 @@ export class PlaywrightEngine implements Engine {
   private readonly networkSeqOf = new Map<string, number>();
   private networkSeq = 0;
   private readonly requestCaptures = new Map<string, Promise<void>>();
+  private readonly authLocations = new Map<string, AuthLocation | null>();
   private readonly responseCaptures = new Map<string, Promise<void>>();
   private downloadStarted = false;
   private downloadPromise: Promise<DownloadInfo | undefined> | undefined;
@@ -533,6 +547,8 @@ export class PlaywrightEngine implements Engine {
       this.captureRequestBody(event.requestId, effect);
     }
 
+    this.captureAuth(event, effect);
+
     this.network.set(event.requestId, effect);
     this.networkOrder.push(event.requestId);
     this.networkSeqOf.set(event.requestId, this.networkSeq);
@@ -553,6 +569,42 @@ export class PlaywrightEngine implements Engine {
 
     effect.status = event.response.status;
     if (event.response.mimeType !== undefined) effect.mime_type = event.response.mimeType;
+  }
+
+  /**
+   * Note how a write authenticated. The header's token is looked up in the
+   * page's storage and only the location is kept, so a lifted op can read a
+   * fresh token later and the secret never lands in a trace or a map.
+   */
+  private captureAuth(event: RequestEvent, effect: NetworkEffect): void {
+    const raw = Object.entries(event.request.headers ?? {}).find(
+      ([name]) => name.toLowerCase() === "authorization",
+    )?.[1];
+    if (raw === undefined || raw === "") return;
+
+    const space = raw.indexOf(" ");
+    const scheme = space > 0 ? raw.slice(0, space) : "";
+    const token = space > 0 ? raw.slice(space + 1) : raw;
+    effect.auth = { header: "authorization", scheme };
+
+    const capture = (async () => {
+      try {
+        // Every API call carries the same token, so look it up once.
+        let found = this.authLocations.get(token);
+        if (found === undefined) {
+          found = await this.evaluate<AuthLocation | null>(findAuthExpression(token));
+          this.authLocations.set(token, found);
+        }
+        if (found !== null) effect.auth = { header: "authorization", scheme, ...found };
+      } catch {
+        // The page moved on; the effect keeps the header and scheme only.
+      }
+    })();
+
+    this.requestCaptures.set(`${event.requestId}:auth`, capture);
+    void capture.finally(() => {
+      this.requestCaptures.delete(`${event.requestId}:auth`);
+    });
   }
 
   /**
@@ -623,6 +675,9 @@ export class PlaywrightEngine implements Engine {
 
       const request = this.requestCaptures.get(requestId);
       if (request !== undefined) pending.push(request);
+
+      const auth = this.requestCaptures.get(`${requestId}:auth`);
+      if (auth !== undefined) pending.push(auth);
 
       const response = this.responseCaptures.get(requestId);
       if (response !== undefined) pending.push(response);

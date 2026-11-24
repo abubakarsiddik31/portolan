@@ -1,5 +1,6 @@
 import type {
   Extractor,
+  HttpAuth,
   HttpImpl,
   HttpMethod,
   HttpStep,
@@ -14,9 +15,29 @@ import type { InferredReturns } from "./returns.js";
 export type HttpLift = {
   steps: HttpStep[];
   extract: Extractor;
+  /** How the site's own requests authenticated, as a reference to the page's storage. */
+  auth?: HttpAuth;
   params: string[];
   outcome_check?: string;
 };
+
+/** The auth reference a lifted write can replay with, from the captured requests. */
+export function authOf(effects: NetworkEffect[]): HttpAuth | undefined {
+  for (const effect of effects) {
+    const auth = effect.auth;
+    if (auth?.source === undefined || auth.key === undefined) continue;
+
+    return {
+      kind: "bearer",
+      source: auth.source,
+      key: auth.key,
+      ...(auth.path !== undefined ? { path: auth.path } : {}),
+      ...(auth.header !== "authorization" ? { header: auth.header } : {}),
+      ...(auth.scheme !== "Bearer" ? { scheme: auth.scheme } : {}),
+    };
+  }
+  return undefined;
+}
 
 /**
  * Lift a write segment to the site's own HTTP calls.
@@ -68,6 +89,7 @@ export function liftHttp(input: {
   return {
     steps,
     extract: input.returns.extractor,
+    ...(authOf(effects) !== undefined ? { auth: authOf(effects) as HttpAuth } : {}),
     params: [...params],
     ...(input.outcomeCheck !== undefined ? { outcome_check: input.outcomeCheck } : {}),
   };
@@ -84,6 +106,7 @@ export function withHttpLift(
     tier: "http",
     steps: lift.steps,
     extract: lift.extract,
+    ...(lift.auth !== undefined ? { auth: lift.auth } : {}),
   };
 
   const check = outcomeCheck ?? lift.outcome_check ?? op.outcome_check;

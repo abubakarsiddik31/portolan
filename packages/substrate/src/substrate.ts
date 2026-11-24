@@ -1,3 +1,4 @@
+import { type HttpAuth, readAuthExpression } from "./auth.js";
 import type { Action, Effect, Engine, Snapshot } from "./engine.js";
 import { EngineError } from "./engine.js";
 import { type BlockedRequest, EgressGuard, type EgressPolicy, type Resolver } from "./policy.js";
@@ -13,6 +14,8 @@ export type HttpRequest = {
   url: string;
   headers?: Record<string, string>;
   body?: unknown;
+  /** The credential the site's own frontend sends. Read from the page, never stored. */
+  auth?: HttpAuth;
 };
 
 export type HttpResponse = {
@@ -21,6 +24,8 @@ export type HttpResponse = {
   json: unknown;
   /** The final URL after redirects, when the engine reports it. */
   url?: string;
+  /** Set when the request was not sent, e.g. the auth token was not in the page. */
+  error?: string;
 };
 
 export type ActRequest = {
@@ -213,12 +218,29 @@ export class Substrate {
     const body =
       request.body === undefined ? "undefined" : `JSON.stringify(${JSON.stringify(request.body)})`;
 
+    const auth = request.auth;
+    const bearer = auth?.kind === "bearer" ? auth : undefined;
+    const header = (bearer?.header ?? "authorization").toLowerCase();
+    const credentials = auth?.kind === "cookie" ? "include" : "same-origin";
+
     const expression = `(async () => {
+      const headers = ${JSON.stringify(request.headers ?? {})};
+      ${
+        bearer === undefined
+          ? ""
+          : `const value = ${readAuthExpression(bearer)};
+      if (value === null) {
+        return { status: 0, text: "", json: undefined, error: ${JSON.stringify(
+          `no ${bearer.source} entry "${bearer.key}" to authenticate with; sign in again`,
+        )} };
+      }
+      headers[${JSON.stringify(header)}] = value;`
+      }
       const response = await fetch(${JSON.stringify(request.url)}, {
         method: ${JSON.stringify(request.method)},
-        headers: ${JSON.stringify(request.headers ?? {})},
+        headers,
         body: ${body},
-        credentials: "same-origin",
+        credentials: ${JSON.stringify(credentials)},
         redirect: "follow",
       });
       const text = await response.text();

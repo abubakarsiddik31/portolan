@@ -92,6 +92,50 @@ describe("liftHttp", () => {
     expect(lift?.params.sort()).toEqual(["product_id", "qty", "variant_id"]);
   });
 
+  it("keeps where the site stores its token, for a write on another origin", () => {
+    const write = request({
+      method: "POST",
+      url: "http://api.shop.test/api/cart/items",
+      request_body: { product_id: "p_101" },
+      response_body: { ok: true },
+    });
+    write.auth = {
+      header: "authorization",
+      scheme: "Bearer",
+      source: "localStorage",
+      key: "auth-store",
+      path: "state.token",
+    };
+
+    const lift = liftHttp({
+      segment: segment([act([write])]),
+      returns: inferJsonReturns({ ok: true }),
+    });
+
+    expect(lift?.auth).toEqual({
+      kind: "bearer",
+      source: "localStorage",
+      key: "auth-store",
+      path: "state.token",
+    });
+  });
+
+  it("leaves auth off when the token was not found in the page", () => {
+    const write = request({
+      method: "POST",
+      url: "http://shop.test/api/cart/items",
+      request_body: { product_id: "p_101" },
+    });
+    write.auth = { header: "authorization", scheme: "Bearer" };
+
+    const lift = liftHttp({
+      segment: segment([act([write])]),
+      returns: inferJsonReturns({ ok: true }),
+    });
+
+    expect(lift?.auth).toBeUndefined();
+  });
+
   it("binds a value from one response into the next request", () => {
     const lift = liftHttp({
       segment: segment([

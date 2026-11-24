@@ -46,6 +46,8 @@ export const StepSchema = z.union([
     op: z.string().min(1),
     params: z.record(z.string(), z.unknown()).optional(),
     confirm: z.boolean().optional(),
+    /** Overrides the key the runner derives for this write. */
+    idempotency_key: z.string().min(1).optional(),
   }),
   z.object({ goto: z.string().min(1) }),
   DoStepSchema,

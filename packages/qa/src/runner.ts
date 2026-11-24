@@ -1,8 +1,15 @@
+import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { SiteMap } from "@abubakarsiddiik/protocol";
-import { matchingNodes } from "@abubakarsiddiik/runtime";
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import {
+  MemoryWriteLedger,
+  matchingNodes,
+  runWrite,
+  type WriteExecution,
+  type WriteLedger,
+} from "@abubakarsiddiik/runtime";
 import {
   EngineError,
   findChrome,
@@ -97,6 +104,11 @@ export type RunInput = {
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
   runId?: string;
+  /**
+   * Where write ops record their idempotency keys and outcomes. Point it at
+   * the server's ledger to share it with MCP writes; default is per process.
+   */
+  ledger?: WriteLedger;
   /**
    * Run as a named environment and profile: its saved session, its origin,
    * and its write policy. Absent means the single `baseUrl` behaviour.
@@ -268,6 +280,8 @@ async function attemptCore(
   const redact = input.redact ?? [];
 
   let substrate: QaSubstrate | undefined;
+  // Unique per attempt, so a rerun never replays the last run's stored write.
+  const attemptNonce = randomUUID();
 
   try {
     const create = input.createSubstrate ?? defaultCreateSubstrate;
@@ -306,6 +320,8 @@ async function attemptCore(
           timeoutMs: input.timeoutMs ?? 15_000,
           sleep: input.sleep ?? sleep,
           now,
+          ...(input.ledger !== undefined ? { ledger: input.ledger } : {}),
+          writeKey: `qa:${attemptNonce}:setup${offset}`,
           map:
             governedMap(spec) === undefined
               ? undefined
@@ -345,6 +361,8 @@ async function attemptCore(
           timeoutMs: input.timeoutMs ?? 15_000,
           sleep: input.sleep ?? sleep,
           now,
+          ...(input.ledger !== undefined ? { ledger: input.ledger } : {}),
+          writeKey: `qa:${attemptNonce}:step${offset}`,
           map:
             governedMap(spec) === undefined
               ? undefined
@@ -469,10 +487,13 @@ export async function replaySteps(input: {
   redact?: string[];
   environment?: RunEnvironment;
   loadMap?: (site: string, version?: number) => SiteMap | undefined;
+  ledger?: WriteLedger;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
 }): Promise<void> {
   const secrets = new Set<string>();
+  const replayNonce = randomUUID();
+  let counter = 0;
   const substrate =
     input.environment === undefined
       ? input.substrate
@@ -503,6 +524,8 @@ export async function replaySteps(input: {
           timeoutMs: input.timeoutMs ?? 15_000,
           sleep: input.sleep ?? sleep,
           now: input.now ?? (() => new Date()),
+          ...(input.ledger !== undefined ? { ledger: input.ledger } : {}),
+          writeKey: `qa:replay:${replayNonce}:${counter++}`,
           ...(map !== undefined ? { map } : {}),
         });
       }
@@ -538,6 +561,44 @@ function originOf(url: string): string {
   }
 }
 
+const defaultLedger = new MemoryWriteLedger();
+
+type TierOutcome = { ok: true; result: unknown } | { ok: false; failures: string[] };
+
+/** Try an op's impls in the map's order; the first that succeeds wins. */
+async function runOpTiers(input: {
+  map: SiteMap;
+  op: OpDef;
+  params: Record<string, unknown>;
+  substrate: QaSubstrate;
+  baseUrl: string;
+}): Promise<TierOutcome> {
+  const { map, op, params, baseUrl } = input;
+  const substrate = input.substrate as unknown as Substrate;
+  const runtime = await import("@abubakarsiddiik/runtime");
+  const failures: string[] = [];
+
+  for (const impl of op.impls) {
+    const run =
+      impl.tier === "ui"
+        ? runtime.runUiOp
+        : impl.tier === "url"
+          ? runtime.runUrlOp
+          : impl.tier === "http"
+            ? runtime.runHttpOp
+            : undefined;
+    if (run === undefined) continue;
+
+    const result = await run({ map, op, params, substrate, baseUrl });
+    if (result.ok) {
+      return { ok: true, result: "result" in result ? result.result : undefined };
+    }
+    failures.push(`${impl.tier}: ${result.message}`);
+  }
+
+  return { ok: false, failures };
+}
+
 async function executeStep(
   step: QaStep,
   substrate: QaSubstrate,
@@ -549,6 +610,10 @@ async function executeStep(
     map?: SiteMap;
     /** An environment run may not navigate off this origin. */
     origin?: string;
+    /** The ledger write ops are recorded in. */
+    ledger?: WriteLedger;
+    /** Idempotency key for this step's write, unless the step names one. */
+    writeKey?: string;
   },
 ): Promise<void> {
   if ("goto" in step) {
@@ -602,58 +667,61 @@ async function executeStep(
     if (options.map === undefined) {
       throw new QaError("precondition_failed", `op "${step.op}" needs a loaded map`);
     }
+    const map = options.map;
 
-    const op = options.map.ops.find((candidate) => candidate.name === step.op);
+    const op = map.ops.find((candidate) => candidate.name === step.op);
     if (op === undefined) {
       throw new QaError("precondition_failed", `map has no op "${step.op}"`);
     }
 
     const params = (step.params ?? {}) as Record<string, unknown>;
-    const failures: string[] = [];
+    const tiers = (target: OpDef, args: Record<string, unknown>) =>
+      runOpTiers({ map, op: target, params: args, substrate, baseUrl: options.baseUrl });
 
-    for (const impl of op.impls) {
-      if (impl.tier === "ui") {
-        const { runUiOp } = await import("@abubakarsiddiik/runtime");
-        const result = await runUiOp({
-          map: options.map,
-          op,
-          params,
-          substrate: substrate as unknown as Substrate,
-        });
-        if (result.ok) return;
-        failures.push(`${impl.tier}: ${result.message}`);
-        continue;
-      }
-
-      if (impl.tier === "url") {
-        const { runUrlOp } = await import("@abubakarsiddiik/runtime");
-        const result = await runUrlOp({
-          map: options.map,
-          op,
-          params,
-          substrate: substrate as unknown as Substrate,
-          baseUrl: options.baseUrl,
-        });
-        if (result.ok) return;
-        failures.push(`${impl.tier}: ${result.message}`);
-        continue;
-      }
-
-      if (impl.tier === "http") {
-        const { runHttpOp } = await import("@abubakarsiddiik/runtime");
-        const result = await runHttpOp({
-          map: options.map,
-          op,
-          params,
-          substrate: substrate as unknown as Substrate,
-          baseUrl: options.baseUrl,
-        });
-        if (result.ok) return;
-        failures.push(`${impl.tier}: ${result.message}`);
-      }
+    if (op.effect === "read") {
+      const outcome = await tiers(op, params);
+      if (outcome.ok) return;
+      throw new QaError("op_failed", `op "${step.op}" failed`, { failures: outcome.failures });
     }
 
-    throw new QaError("op_failed", `op "${step.op}" failed`, { failures });
+    // A write goes through the same guard as an MCP write: confirmation for an
+    // irreversible op, an idempotency key in the ledger, and the op's
+    // outcome_check when the result is in doubt.
+    const failures: string[] = [];
+    const safety = await runWrite({
+      map,
+      op,
+      confirm: step.confirm,
+      idempotencyKey: step.idempotency_key ?? options.writeKey,
+      ledger: options.ledger ?? defaultLedger,
+      execute: async (): Promise<WriteExecution> => {
+        const outcome = await tiers(op, params);
+        if (outcome.ok) return { ok: true, result: outcome.result };
+        failures.push(...outcome.failures);
+        return { ok: false, code: "op_broken", message: outcome.failures.join("; ") };
+      },
+      check:
+        op.outcome_check === undefined
+          ? undefined
+          : async () => {
+              const checkOp = map.ops.find((candidate) => candidate.name === op.outcome_check);
+              if (checkOp === undefined) return { outcome: "unknown" };
+              const outcome = await tiers(checkOp, {});
+              return outcome.ok
+                ? { outcome: "done", result: outcome.result }
+                : { outcome: "unknown" };
+            },
+    });
+
+    if (safety.ok) return;
+    if (safety.code === "needs_confirmation") {
+      throw new QaError("precondition_failed", safety.message, { code: safety.code });
+    }
+    throw new QaError("op_failed", `op "${step.op}" failed: ${safety.message}`, {
+      code: safety.code,
+      failures,
+      ...(safety.details !== undefined ? { details: safety.details } : {}),
+    });
   }
 
   const locator = step.target ?? { role: "textbox" };

@@ -318,6 +318,13 @@ op's step needs `confirm: true`. A case whose link is wrong is not run; it retur
 `invalid_request` error that says what is wrong. Until a write compiles into an op, `pending`
 makes the placeholder explicit, and `qa sync` lists those cases.
 
+A write op runs through the same guard as an MCP write. An irreversible op without `confirm`
+is refused before anything is dispatched. Each write gets an idempotency key (derived per
+attempt, or `idempotency_key` on the step), recorded in the write ledger, and when the result is
+in doubt the op's `outcome_check` decides whether it happened. A key already `done` replays its
+result instead of writing again, and an `unknown` outcome is never retried. Pass the server's
+ledger to `QaService` (`deps.ledger`) to keep QA writes and MCP writes in one ledger.
+
 A case written to catch a known bug can never replay green, so it would stay unverified and
 every run would skip it. Mark it `expect_failure: { reason, issue? }`. `qa verify` promotes it
 when it fails with the same code and step on every replay, and records that failure on the

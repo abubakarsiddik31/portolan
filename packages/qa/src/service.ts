@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 
 import { parseMap, type SiteMap } from "@abubakarsiddiik/protocol";
+import type { WriteLedger } from "@abubakarsiddiik/runtime";
 
 import type { QaConfig } from "./config.js";
 import {
@@ -125,6 +126,8 @@ export type QaServiceDeps = {
   createSubstrate?: CreateSubstrate;
   /** Overrides where environment sessions are read from (`PORTOLAN_HOME`). */
   home?: string;
+  /** The write ledger op writes are recorded in; share the server's to unify them. */
+  ledger?: WriteLedger;
 };
 
 /**
@@ -139,6 +142,7 @@ export class QaService {
   private readonly now: () => Date;
   private readonly createSubstrate?: CreateSubstrate;
   private readonly home: string | undefined;
+  private readonly ledger: WriteLedger | undefined;
 
   constructor(
     readonly config: QaConfig,
@@ -149,6 +153,7 @@ export class QaService {
     this.now = deps.now ?? (() => new Date());
     this.createSubstrate = deps.createSubstrate;
     this.home = deps.home;
+    this.ledger = deps.ledger;
     this.sync();
   }
 
@@ -335,6 +340,7 @@ export class QaService {
           env: process.env,
           redact: this.config.redact,
           loadMap: (site, version) => this.loadMap(site, version),
+          ...(this.ledger !== undefined ? { ledger: this.ledger } : {}),
         });
       } catch (error) {
         const reason = error instanceof QaError ? `${error.code}: ${error.message}` : String(error);
@@ -522,6 +528,7 @@ export class QaService {
         env: process.env,
         redact: this.config.redact,
         loadMap: (site, version) => this.loadMap(site, version),
+        ...(this.ledger !== undefined ? { ledger: this.ledger } : {}),
       });
     } catch (error) {
       this.store.finishRun(run.id, "error");
@@ -603,6 +610,7 @@ export class QaService {
           env: process.env,
           redact: this.config.redact,
           loadMap: (site, version) => this.loadMap(site, version),
+          ...(this.ledger !== undefined ? { ledger: this.ledger } : {}),
         });
         results.push(...outcome.results);
       }

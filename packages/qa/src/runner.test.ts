@@ -2,6 +2,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { OpDef, SiteMap } from "@abubakarsiddiik/protocol";
+import { MemoryWriteLedger } from "@abubakarsiddiik/runtime";
 import type { ActResult, SemanticNode, Snapshot } from "@abubakarsiddiik/substrate";
 import { buildRefMap } from "@abubakarsiddiik/substrate";
 import { describe, expect, it } from "vitest";
@@ -607,5 +609,107 @@ describe("failure evidence", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("write ops", () => {
+  function writeOp(overrides: Partial<OpDef> = {}): OpDef {
+    return {
+      name: "checkout",
+      version: 1,
+      summary: "check out",
+      params: { type: "object", properties: {}, additionalProperties: false },
+      returns: { type: "object", properties: {}, additionalProperties: false },
+      from: [],
+      to: [],
+      post: [],
+      effect: "irreversible",
+      confirm: true,
+      impls: [
+        {
+          tier: "ui",
+          steps: [{ do: "click", target: { role: "button", name: "Go" } }],
+          extract: { kind: "none" },
+        },
+      ],
+      status: "verified",
+      ...overrides,
+    };
+  }
+
+  const MAP: SiteMap = {
+    site: "store",
+    origins: ["http://app"],
+    version: 1,
+    states: [],
+    ops: [writeOp()],
+    entities: {},
+    compiled_from: [],
+    verified_at: "2026-11-08T00:00:00Z",
+  };
+
+  function runWrite(step: Record<string, unknown>, ledger: MemoryWriteLedger) {
+    return runCases({
+      baseUrl: "http://app",
+      cases: [
+        caseSpec({
+          effect: "irreversible",
+          map: { site: "store", version: 1, op: "checkout" },
+          steps: [{ op: "checkout", ...step }],
+          expect: [],
+        }),
+      ],
+      trusted: ["auth/login"],
+      evidence: "none",
+      ledger,
+      loadMap: () => MAP,
+      createSubstrate: () => new FakeSubstrate(),
+    });
+  }
+
+  it("refuses an irreversible op that is called without confirm", async () => {
+    const outcome = await runWrite({}, new MemoryWriteLedger());
+
+    expect(outcome.results[0]?.fail_code).toBe("precondition_failed");
+    expect(outcome.results[0]?.fail_reason).toMatch(/confirm/);
+  });
+
+  it("replays a write that the ledger already holds instead of running it again", async () => {
+    const ledger = new MemoryWriteLedger();
+    ledger.put({
+      key: "k1",
+      site: "store",
+      op: "checkout",
+      status: "done",
+      result: { order_id: "ord_1" },
+      updatedAt: "2026-11-08T00:00:00Z",
+    });
+
+    const outcome = await runWrite({ confirm: true, idempotency_key: "k1" }, ledger);
+
+    expect(outcome.results[0]?.status).toBe("pass");
+  });
+
+  it("does not retry a write whose earlier attempt has an unknown outcome", async () => {
+    const ledger = new MemoryWriteLedger();
+    ledger.put({
+      key: "k2",
+      site: "store",
+      op: "checkout",
+      status: "unknown",
+      updatedAt: "2026-11-08T00:00:00Z",
+    });
+
+    const outcome = await runWrite({ confirm: true, idempotency_key: "k2" }, ledger);
+
+    expect(outcome.results[0]?.fail_code).toBe("op_failed");
+    expect(outcome.results[0]?.fail_reason).toMatch(/do not retry/);
+  });
+
+  it("records a write it runs in the ledger", async () => {
+    const ledger = new MemoryWriteLedger();
+    await runWrite({ confirm: true, idempotency_key: "k3" }, ledger);
+
+    expect(ledger.get("k3")).toMatchObject({ site: "store", op: "checkout" });
   });
 });

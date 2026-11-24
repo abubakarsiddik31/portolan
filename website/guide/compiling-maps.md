@@ -317,6 +317,17 @@ op that opens it in `--params`.
 `portolan init` installs `.portolan/skills/portolan-map/SKILL.md`, the companion skill that
 tells a coding agent how to work the ledger until it is complete.
 
+## The backend's endpoints
+
+While `map build` crawls, it also records the API calls each page makes. They are grouped into
+endpoints (same method, same path once ids become `{id}`) and written to `endpoints.json` next to
+`capabilities.json`, with the query parameters, the JSON body and response keys, the status codes,
+the pages that call them and whether the request was authenticated.
+
+`map status` reports how many of them an op's `http` impl reaches and how many writes no op
+reaches. A map built from buttons describes the view; this is the list of what the backend can do,
+so a write that no button exposed is a visible gap instead of a missing feature nobody noticed.
+
 ## Optional: hand-written seed
 
 For a precise contract you can still write `.portolan/maps/<site>/v0.json` by hand and

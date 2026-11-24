@@ -11,6 +11,7 @@ import { isIdLike, templateName } from "@abubakarsiddiik/protocol";
 import type { SemanticNode, Snapshot, Substrate } from "@abubakarsiddiik/substrate";
 
 import { slug, uniqueName } from "./draft.js";
+import { type ApiCall, clusterEndpoints, type Endpoint } from "./endpoints.js";
 import { routeShape } from "./routes.js";
 import type { DraftTask, OpProposal, SurfaceAction } from "./types.js";
 
@@ -47,6 +48,8 @@ export type DomDiscovery = {
   tasks: DraftTask[];
   /** Every interactive element seen, for the capability ledger. */
   surface: SurfaceAction[];
+  /** The API endpoints the pages called, from their own network traffic. */
+  endpoints?: Endpoint[];
   visited: string[];
   /** State ids of the pages this crawl reached, so a partial crawl can tell stale from unvisited. */
   pages: string[];
@@ -112,6 +115,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
   const visited: string[] = [];
   const pages = new Set<string>();
   const surface: SurfaceAction[] = [];
+  const apiCalls: ApiCall[] = [];
   const surfaceSeen = new Map<string, SurfaceAction>();
   const seenPages = new Set<string>();
   const usedNames = new Set<string>(options.reserved?.names ?? []);
@@ -157,6 +161,11 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
     const index = indexNodes(snapshot.nodes);
     const from = stateFor(snapshot.url, states);
     pages.add(from.id);
+
+    // What loading the page asked the backend for.
+    for (const effect of (await options.substrate.drainApiCalls?.()) ?? []) {
+      apiCalls.push({ page: from.id, effect });
+    }
 
     const recordSurface = (action: SurfaceAction): void => {
       const key =
@@ -314,6 +323,9 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
         try {
           const result = await options.substrate.act({ ref, do: "click" });
           if (result.ok) landed = result.url;
+          for (const effect of (await options.substrate.drainApiCalls?.()) ?? []) {
+            apiCalls.push({ page: from.id, effect });
+          }
         } catch {
           // A button that cannot be clicked is not a route.
         }
@@ -369,6 +381,7 @@ export async function discoverDom(options: DomDiscoverOptions): Promise<DomDisco
     proposals,
     tasks,
     surface,
+    endpoints: clusterEndpoints(apiCalls, start.origin),
     visited,
     pages: [...pages],
     ...(unreached.length > 0 ? { unreached } : {}),

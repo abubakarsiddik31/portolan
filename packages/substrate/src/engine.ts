@@ -153,5 +153,10 @@ export interface Engine {
   evaluate<T>(expression: string): Promise<T>;
   /** A PNG of the viewport, when the engine can capture one. */
   screenshot?(): Promise<Uint8Array>;
+  /**
+   * The API calls (XHR and fetch) the page made since the last call: what
+   * loading it asked the site's backend for. Bodies are parsed JSON.
+   */
+  drainApiCalls?(): Promise<NetworkEffect[]>;
   close(): Promise<void>;
 }

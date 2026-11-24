@@ -27,17 +27,22 @@ import {
   type DomDiscovery,
   type DraftTask,
   discoverDom,
+  type Endpoint,
+  endpointCoverage,
   formatCoverage,
+  linkEndpoints,
   type MapDraft,
   mineRoutes,
   type OpProposal,
   type RouteFramework,
   readCapabilities,
+  readEndpoints,
   readRoutesFile,
   uniqueName,
   upgradeVerified,
   writeCapabilities,
   writeDraft,
+  writeEndpoints,
 } from "@abubakarsiddiik/sources";
 import {
   BrowserHandle,
@@ -454,6 +459,25 @@ async function buildMap(input: MapBuildInput, deps: MapBuildDeps): Promise<MapBu
     let capabilities = ledgerFor();
     let coverage = coverageOf(capabilities);
     const capabilitiesPath = writeCapabilities(mapDir, capabilities);
+
+    // The backend's own endpoints, from what the pages called while crawling.
+    // An endpoint no op calls is a gap in the map that no button shows.
+    const writeInventory = (): void => {
+      const seen = discovery?.endpoints ?? [];
+      const kept = (readEndpoints(mapDir)?.endpoints ?? []).filter(
+        (old) => !seen.some((endpoint) => endpoint.id === old.id),
+      );
+      const ops = [...draft.proposals.map((proposal) => proposal.op), ...(existing?.ops ?? [])];
+      const endpoints: Endpoint[] = linkEndpoints([...seen, ...kept], ops);
+      if (endpoints.length === 0) return;
+      writeEndpoints(mapDir, {
+        schema: 1,
+        site: input.site,
+        generated_at: new Date().toISOString(),
+        endpoints,
+      });
+    };
+    writeInventory();
     const written = writeDraft(mapDir, draft);
 
     // Without verification a draft proposal is the best evidence there is, so
@@ -719,6 +743,7 @@ async function buildMap(input: MapBuildInput, deps: MapBuildDeps): Promise<MapBu
         }
       }
       writeCapabilities(mapDir, capabilities);
+      writeInventory();
 
       if (
         input.requireComplete === true &&

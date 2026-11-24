@@ -141,4 +141,21 @@ describe.skipIf(!ENABLED)("http auth", () => {
     });
     expect(JSON.stringify(result.effects)).not.toContain(TOKEN);
   });
+
+  it("drains the API calls a page made, once", async () => {
+    if (substrate === undefined) throw new Error("no substrate");
+    await substrate.goto(pageUrl);
+    await substrate.drainApiCalls();
+
+    const view = await substrate.view();
+    const button = [...view.refs.byRef.values()].find((entry) => entry.name === "Create");
+    if (button === undefined) throw new Error("no Create button");
+    await substrate.act({ ref: button.ref, do: "click" });
+
+    const calls = await substrate.drainApiCalls();
+    expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`)).toContain(
+      "POST /keys",
+    );
+    expect(await substrate.drainApiCalls()).toEqual([]);
+  });
 });

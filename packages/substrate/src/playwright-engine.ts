@@ -204,6 +204,7 @@ export class PlaywrightEngine implements Engine {
   private networkOrder: string[] = [];
   private readonly networkSeqOf = new Map<string, number>();
   private networkSeq = 0;
+  private apiMark = 0;
   private readonly requestCaptures = new Map<string, Promise<void>>();
   private readonly authLocations = new Map<string, AuthLocation | null>();
   private readonly responseCaptures = new Map<string, Promise<void>>();
@@ -663,6 +664,21 @@ export class PlaywrightEngine implements Engine {
     void capture.finally(() => {
       this.responseCaptures.delete(event.requestId);
     });
+  }
+
+  async drainApiCalls(): Promise<NetworkEffect[]> {
+    const mark = this.apiMark;
+    this.apiMark = this.networkSeq;
+    await this.finishNetwork(mark);
+
+    const calls: NetworkEffect[] = [];
+    for (const requestId of this.networkOrder) {
+      const seq = this.networkSeqOf.get(requestId);
+      if (seq === undefined || seq < mark) continue;
+      const effect = this.network.get(requestId);
+      if (effect?.resource_type === "XHR" || effect?.resource_type === "Fetch") calls.push(effect);
+    }
+    return calls;
   }
 
   /** Wait for the body captures that belong to the action starting at `mark`. */

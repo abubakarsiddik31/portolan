@@ -1,5 +1,6 @@
 export * from "./bootstrap.js";
 export * from "./compile.js";
+export * from "./context.js";
 export * from "./http.js";
 export * from "./lift.js";
 export * from "./parameterize.js";

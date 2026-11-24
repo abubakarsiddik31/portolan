@@ -144,6 +144,7 @@ export function buildCapabilities(input: BuildCapabilitiesInput): CapabilityLedg
         ...(category !== undefined ? { category } : {}),
         ...(action.pages !== undefined ? { pages: action.pages } : {}),
         ...(action.sample !== undefined ? { sample: action.sample } : {}),
+        ...(action.context !== undefined ? { context: action.context } : {}),
         last_seen: now,
         ...lastVerified(
           proposal !== undefined && input.verified?.has(proposal.op.name) === true

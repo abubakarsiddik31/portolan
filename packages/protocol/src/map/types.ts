@@ -176,10 +176,32 @@ export type StateDef = {
   not?: Locator[];
 };
 
+/**
+ * What an agent needs to know about an op beyond its name: where the control
+ * is, what it acts on, and what happened when it was run. A bare "click Save"
+ * is the same op on every page; the context is what tells them apart.
+ */
+export type OpContext = {
+  /** The goal the op was recorded for, in the words of whoever recorded it. */
+  intent?: string;
+  /** The page it lives on: its heading or title, or its path. */
+  page?: string;
+  /** The dialog, form, panel or table the control sits in, by its name. */
+  section?: string;
+  /** The control as a person sees it, e.g. a button's label. */
+  control?: string;
+  /** What the control acts on when it sits in a row or card, e.g. "ci-prod". */
+  subject?: string;
+  /** What changed when it ran: requests sent, pages reached, messages shown. */
+  observed?: string[];
+};
+
 export type OpDef = {
   name: string;
   version: number;
   summary: string;
+  /** Where the op is and what it does, so a short name is not the only signal. */
+  context?: OpContext;
   params: JsonSchema;
   returns: JsonSchema;
   from: string[];

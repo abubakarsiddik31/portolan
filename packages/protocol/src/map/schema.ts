@@ -397,6 +397,18 @@ export const MAP_SCHEMA = {
         name: { $ref: "#/$defs/id" },
         version: { type: "integer", minimum: 1 },
         summary: { type: "string", minLength: 1, maxLength: 200 },
+        context: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            intent: { type: "string", maxLength: 400 },
+            page: { type: "string", maxLength: 200 },
+            section: { type: "string", maxLength: 200 },
+            control: { type: "string", maxLength: 200 },
+            subject: { type: "string", maxLength: 200 },
+            observed: { type: "array", items: { type: "string", maxLength: 200 }, maxItems: 12 },
+          },
+        },
         params: { $ref: "#/$defs/jsonSchema" },
         returns: { $ref: "#/$defs/jsonSchema" },
         from: { type: "array", minItems: 1, items: { $ref: "#/$defs/id" } },

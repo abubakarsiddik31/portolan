@@ -64,6 +64,22 @@ export function lintMap(map: SiteMap): LintIssue[] {
     lintReturns(op.returns, `${base}/returns`, issues);
     lintSummary(op.summary, `${base}/summary`, issues);
 
+    // "Click Save" says nothing about which Save. A ui op with no params and no
+    // context is the same sentence on every page.
+    if (
+      op.context === undefined &&
+      op.impls.every((impl) => impl.tier === "ui") &&
+      Object.keys(op.params.properties ?? {}).length === 0 &&
+      /^(click|open|recorded|compiled|submit)\b/i.test(op.summary)
+    ) {
+      issues.push({
+        path: `${base}/context`,
+        rule: "op/no-context",
+        severity: "warning",
+        message: `"${op.summary}" does not say where it is or what it changes; add a context`,
+      });
+    }
+
     // An http op is verified by its response status and returns schema; a
     // missing DOM post-check is not a gap for it.
     if (op.post.length === 0 && !op.impls.some((impl) => impl.tier === "http")) {

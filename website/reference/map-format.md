@@ -69,6 +69,27 @@ The loader enforces these beyond the schema:
 - Every `from`, `to`, `post.state`, and `await_state` state must exist.
 - Op names and state ids are unique.
 
+### `OpContext`
+
+An op's optional `context` keeps what a name and a summary cannot: where the control is and what
+it did. Two `click_delete` ops, one in a row and one in a "Danger zone" panel, are the same
+sentence without it.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `intent` | string | The goal the op was recorded for, in the recorder's words. |
+| `page` | string | The page's heading or title, or its path. |
+| `section` | string | The named dialog, form, panel or table the control sits in. |
+| `control` | string | The control as a person sees it, such as a button's label. |
+| `subject` | string | What the control acts on when it sits in a row or card. |
+| `observed` | string[] | What changed when it ran: requests, pages reached, messages shown. |
+
+`map build` fills it from the page's structure (heading, nearest named region, the row or card)
+and from the recorded run (the goal, the API calls, the messages that appeared). A recorded op
+whose summary would only say "Recorded: click Save." gets the goal as its summary. `open_site`
+and the native tool descriptions show it, and `map lint` warns about a parameterless `ui` op that
+has none.
+
 ## `Locator`
 
 A locator is semantic, never a CSS selector and never a ref. Use exactly one of

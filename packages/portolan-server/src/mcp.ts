@@ -30,7 +30,7 @@ import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server
 import { z } from "zod";
 
 import { type OpAudit, type OpExecutor, runtimeExecutor } from "./executor.js";
-import { type MapStore, renderMap } from "./maps.js";
+import { describeContext, type MapStore, renderMap } from "./maps.js";
 import type { SessionStore } from "./store.js";
 
 const UNTRUSTED_NOTICE =
@@ -443,7 +443,9 @@ export function createMcpServer(deps: McpDeps): McpServer {
       const registered = server.registerTool(
         name,
         {
-          description: `${op.summary} [${op.effect}]`,
+          description: [`${op.summary} [${op.effect}]`, describeContext(op.context)]
+            .filter((line) => line !== undefined)
+            .join(" "),
           inputSchema: nativeZodShape(op),
         },
         async (args) => {

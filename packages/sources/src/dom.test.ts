@@ -240,6 +240,50 @@ describe("discoverDom", () => {
   });
 });
 
+describe("discoverDom context", () => {
+  it("tells two Delete buttons apart by the row or panel they sit in", async () => {
+    const keys = page("http://app.test/keys", [
+      node({
+        nodeId: "root",
+        role: "RootWebArea",
+        name: "Keys",
+        childIds: ["h1", "table", "danger"],
+      }),
+      node({ nodeId: "h1", role: "heading", name: "API keys", properties: { level: 1 } }),
+      node({ nodeId: "table", role: "table", name: "Keys", childIds: ["row"] }),
+      node({ nodeId: "row", role: "row", name: "ci-prod  created today", childIds: ["del1"] }),
+      node({ nodeId: "del1", role: "button", name: "Delete" }),
+      node({ nodeId: "danger", role: "region", name: "Danger zone", childIds: ["del2"] }),
+      node({ nodeId: "del2", role: "button", name: "Delete" }),
+    ]);
+
+    const result = await discoverDom({
+      site: "app",
+      url: "http://app.test/keys",
+      substrate: {
+        goto: async () => ({ snapshot: keys, refs: undefined }),
+      } as unknown as Substrate,
+      maxPages: 1,
+    });
+
+    const contexts = result.surface
+      .filter((action) => action.name === "Delete")
+      .map((action) => action.context);
+
+    expect(contexts).toContainEqual({
+      page: "API keys",
+      control: "Delete",
+      subject: "ci-prod created today",
+      section: 'table "Keys"',
+    });
+    expect(contexts).toContainEqual({
+      page: "API keys",
+      control: "Delete",
+      section: 'region "Danger zone"',
+    });
+  });
+});
+
 describe("templateName", () => {
   it("templates data in a name but keeps a leading number", () => {
     expect(templateName("Active 1")).toBe("Active {count}");

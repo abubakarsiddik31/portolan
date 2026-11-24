@@ -4,7 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
 import type { BrowserRegistry } from "./browsers.js";
-import type { OpExecutor } from "./executor.js";
+import type { OpExecutor, RuntimeExecutorOptions } from "./executor.js";
 import { MapStore } from "./maps.js";
 import { createMcpServer, type FallbackSubstrate, type MappingTools } from "./mcp.js";
 import { SessionStore } from "./store.js";
@@ -19,6 +19,8 @@ export type StdioServerOptions = {
   executor?: OpExecutor;
   /** Creates the browser substrate used by view, act, and read. */
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
+  /** Sends `http` ops from a saved session with no browser. */
+  pageless?: RuntimeExecutorOptions["pageless"];
   /** Browsers owned by sessions; closed with the server. */
   browsers?: BrowserRegistry;
   /** Idle time after which a session's browser is closed. Default 30 minutes. */
@@ -63,6 +65,7 @@ export async function startStdioServer(
     ...(options.substrateFactory !== undefined
       ? { substrateFactory: options.substrateFactory }
       : {}),
+    ...(options.pageless !== undefined ? { pageless: options.pageless } : {}),
     ...(options.browsers !== undefined
       ? { releaseSubstrate: (sid: string) => options.browsers?.close(sid) }
       : {}),

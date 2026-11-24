@@ -6,7 +6,7 @@ import {
   startStdioServer,
 } from "@abubakarsiddiik/server";
 
-import { createBrowserFactory } from "../browser.js";
+import { createBrowserFactory, createPageless } from "../browser.js";
 import type { CliConfig } from "../config.js";
 import { createMappingTools } from "./mapping.js";
 
@@ -29,6 +29,7 @@ export type McpDeps = {
 export async function runMcp(input: McpInput, deps: McpDeps = {}): Promise<StdioServerHandle> {
   const browsers = new BrowserRegistry();
   const factory = deps.substrateFactory ?? createBrowserFactory(input.config, browsers);
+  const pageless = createPageless(input.config);
   const start = deps.start ?? startStdioServer;
 
   return start({
@@ -39,6 +40,7 @@ export async function runMcp(input: McpInput, deps: McpDeps = {}): Promise<Stdio
     sessionTtlMs: input.config.sessionTtlMs,
     cleanupIntervalMs: input.config.cleanupIntervalMs,
     ...(factory !== undefined ? { substrateFactory: factory } : {}),
+    ...(pageless !== undefined ? { pageless } : {}),
     mapping: createMappingTools(input.config),
   });
 }

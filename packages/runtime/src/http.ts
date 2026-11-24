@@ -1,14 +1,16 @@
 import type { Extractor, HttpImpl, OpDef, SiteMap } from "@abubakarsiddiik/protocol";
-import type { HttpResponse, Substrate } from "@abubakarsiddiik/substrate";
+import type { HttpResponse } from "@abubakarsiddiik/substrate";
 
 import { type ExtractResult, validateReturns } from "./extract.js";
+import type { HttpTransport } from "./session-http.js";
 import { fillRoute, fillTemplate } from "./template.js";
 
 export type HttpRunInput = {
   map: SiteMap;
   op: OpDef;
   params: Record<string, unknown>;
-  substrate: Substrate;
+  /** A live page's `fetch`, or a saved session sent from Node (`sessionTransport`). */
+  substrate: HttpTransport;
   /** Override the map's origin, e.g. a fixture on an ephemeral port. */
   baseUrl?: string;
 };
@@ -24,7 +26,7 @@ export type HttpRunResult =
 
 /**
  * Run an `http` op: a sequence of fetches inside the live page, with the
- * page's cookies and origin.
+ * page's cookies and origin, or from a saved session with no page at all.
  *
  * `bind` captures a value from a response for a later step, which is how a
  * CSRF token or an id returned by the first request reaches the second one.

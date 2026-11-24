@@ -5,7 +5,13 @@ import type {
   SessionRecord,
   SiteMap,
 } from "@abubakarsiddiik/protocol";
-import { recognizeState, runHttpOp, runUiOp, runUrlOp } from "@abubakarsiddiik/runtime";
+import {
+  type HttpTransport,
+  recognizeState,
+  runHttpOp,
+  runUiOp,
+  runUrlOp,
+} from "@abubakarsiddiik/runtime";
 import type { Substrate } from "@abubakarsiddiik/substrate";
 
 export type OpAudit = {
@@ -24,6 +30,11 @@ export type OpExecutorInput = {
   idempotencyKey?: string;
   /** The live substrate. Absent when the server has no browser factory. */
   substrate?: Substrate;
+  /**
+   * Opens the substrate only when an op needs a page, so an `http` op that a
+   * saved session can serve never launches Chrome.
+   */
+  getSubstrate?: () => Promise<Substrate | undefined>;
   /** Override the map's first origin, e.g. a fixture on an ephemeral port. */
   baseUrl?: string;
   /** Optional: report how the op ran, for the audit log. */
@@ -41,6 +52,11 @@ export type OpExecutor = (input: OpExecutorInput) => Promise<ResultEnvelope>;
 export type RuntimeExecutorOptions = {
   /** Default origin when the map has none. */
   baseUrl?: string;
+  /**
+   * A way to send an op's requests with no browser: a saved session in Node.
+   * Return undefined when there is no session for the site.
+   */
+  pageless?: (input: { map: SiteMap; baseUrl: string }) => HttpTransport | undefined;
 };
 
 /**
@@ -52,14 +68,58 @@ export type RuntimeExecutorOptions = {
  * this function only runs the op.
  */
 export function runtimeExecutor(options: RuntimeExecutorOptions = {}): OpExecutor {
-  return async ({ map, op, params, substrate, baseUrl, audit }) => {
-    if (substrate === undefined) {
-      return broken(op, "the server has no browser substrate");
-    }
+  return async (input) => {
+    const { map, op, params, baseUrl, audit } = input;
 
     const base = baseUrl ?? options.baseUrl ?? map.origins[0];
     if (base === undefined) {
       return broken(op, `site "${map.site}" has no origin`);
+    }
+
+    // An http op needs no page: a saved session carries the cookies and the
+    // token. Try it first, and only open a browser when it cannot be served.
+    const firstTier = op.impls.find((impl) => impl.tier !== "webmcp")?.tier;
+    const transport = firstTier === "http" ? options.pageless?.({ map, baseUrl: base }) : undefined;
+    let pagelessFailure: ResultEnvelope | undefined;
+
+    if (transport !== undefined) {
+      let result: Awaited<ReturnType<typeof runHttpOp>>;
+      try {
+        result = await runHttpOp({ map, op, params, substrate: transport, baseUrl: base });
+      } catch (error) {
+        result = {
+          ok: false,
+          code: "op_broken",
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+
+      if (result.ok) {
+        audit?.({
+          tier: "http",
+          requests: [{ method: "HTTP", url: result.url, status: result.status }],
+        });
+        return { ok: true, result: result.result };
+      }
+
+      // A write that reached the site must not be sent again through a page;
+      // the write guard decides what happens to it. Only a request that was
+      // never sent (no token, blocked) may fall back.
+      const sent = result.details?.status !== undefined;
+      pagelessFailure = {
+        ok: false,
+        error: {
+          code: result.code,
+          message: result.message,
+          ...(result.details !== undefined ? { details: result.details } : {}),
+        },
+      };
+      if (sent && op.effect !== "read") return pagelessFailure;
+    }
+
+    const substrate = input.substrate ?? (await input.getSubstrate?.());
+    if (substrate === undefined) {
+      return pagelessFailure ?? broken(op, "the server has no browser substrate");
     }
 
     const before = stateOf(map, await substrate.view());

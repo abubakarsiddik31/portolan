@@ -1,5 +1,24 @@
 # @abubakarsiddiik/skills
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies [d0b420d]
+- Updated dependencies [7b21b90]
+- Updated dependencies [730069f]
+- Updated dependencies [9c8d776]
+- Updated dependencies [1692e2e]
+- Updated dependencies [9862d0a]
+- Updated dependencies [ed7603d]
+- Updated dependencies [71f3e62]
+- Updated dependencies [282b1c5]
+- Updated dependencies [3e3e5f2]
+- Updated dependencies [0eed231]
+  - @abubakarsiddiik/compiler@0.3.0
+  - @abubakarsiddiik/protocol@0.3.0
+  - @abubakarsiddiik/runtime@0.2.0
+
 ## 0.1.6
 
 ### Patch Changes

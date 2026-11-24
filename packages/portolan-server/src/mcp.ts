@@ -29,7 +29,12 @@ import {
 import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { type OpAudit, type OpExecutor, runtimeExecutor } from "./executor.js";
+import {
+  type OpAudit,
+  type OpExecutor,
+  type RuntimeExecutorOptions,
+  runtimeExecutor,
+} from "./executor.js";
 import { describeContext, type MapStore, renderMap } from "./maps.js";
 import type { SessionStore } from "./store.js";
 
@@ -51,6 +56,8 @@ export type McpDeps = {
   traceStore?: TraceStore;
   /** Creates the substrate used by view, act, and read. */
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
+  /** Sends `http` ops from a saved session with no browser. See `RuntimeExecutorOptions`. */
+  pageless?: RuntimeExecutorOptions["pageless"];
   /** Releases what the factory created for a session, e.g. its browser. */
   releaseSubstrate?: (sid: string) => Promise<void> | void;
   /** Tools for the mapping loop: status, gaps, exclusions, recording, builds. */
@@ -118,7 +125,9 @@ export type CallInput = {
  */
 export function createMcpServer(deps: McpDeps): McpServer {
   const server = new McpServer({ name: "portolan", version: "0.0.1" });
-  const executor = deps.executor ?? runtimeExecutor();
+  const executor =
+    deps.executor ??
+    runtimeExecutor(deps.pageless !== undefined ? { pageless: deps.pageless } : {});
   const ledger = deps.ledger ?? new MemoryWriteLedger();
   const scopes = deps.scopes ?? new FallbackScopes();
   const budget = deps.toolBudget ?? 30;
@@ -212,8 +221,6 @@ export function createMcpServer(deps: McpDeps): McpServer {
       confirm: boolean | undefined,
       idempotencyKey: string | undefined,
     ) => {
-      const substrate = await substrateFor();
-
       return executor({
         session,
         map,
@@ -221,7 +228,10 @@ export function createMcpServer(deps: McpDeps): McpServer {
         params: targetParams,
         confirm,
         idempotencyKey,
-        ...(isExecutableSubstrate(substrate) ? { substrate } : {}),
+        getSubstrate: async () => {
+          const substrate = await substrateFor();
+          return isExecutableSubstrate(substrate) ? substrate : undefined;
+        },
         audit:
           target === opDef
             ? (info) => {

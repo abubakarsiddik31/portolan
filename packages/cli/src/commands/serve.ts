@@ -10,7 +10,7 @@ import {
 } from "@abubakarsiddiik/server";
 import type { FastifyInstance } from "fastify";
 
-import { createBrowserFactory } from "../browser.js";
+import { createBrowserFactory, createPageless } from "../browser.js";
 import type { CliConfig } from "../config.js";
 
 export type ServeInput = {
@@ -53,12 +53,14 @@ export async function runServe(input: ServeInput, deps: ServeDeps = {}): Promise
   const store = deps.store ?? new SessionStore(database);
   const browsers = new BrowserRegistry();
   const factory = deps.substrateFactory ?? createBrowserFactory(input.config, browsers);
+  const pageless = createPageless(input.config);
   const create = deps.createApp ?? createServer;
   const app = create({
     store,
     maps: new MapStore(maps),
     browsers,
     traceStore: new TraceStore(process.env.TRACES_DIR ?? input.config.traces),
+    ...(pageless !== undefined ? { pageless } : {}),
     ...(factory !== undefined ? { substrateFactory: factory } : {}),
     ...(authToken !== undefined ? { authToken } : {}),
     logger: true,

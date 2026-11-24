@@ -12,7 +12,7 @@ import Fastify, {
 import type { ZodError } from "zod";
 import { BrowserRegistry } from "./browsers.js";
 import type { CanaryScheduler } from "./canary.js";
-import type { OpExecutor } from "./executor.js";
+import type { OpExecutor, RuntimeExecutorOptions } from "./executor.js";
 import { mergeHealth } from "./health.js";
 import type { Logger } from "./log.js";
 import type { MapStore } from "./maps.js";
@@ -45,6 +45,8 @@ export type ServerOptions = {
   traceStore?: TraceStore;
   /** Creates the browser substrate used by view, act, and read. */
   substrateFactory?: (session: SessionRecord) => Promise<FallbackSubstrate> | FallbackSubstrate;
+  /** Sends `http` ops from a saved session with no browser. */
+  pageless?: RuntimeExecutorOptions["pageless"];
   /** When set, every route except /v1/health requires this bearer token. */
   authToken?: string;
 };
@@ -241,6 +243,7 @@ export function createServer(options: ServerOptions): FastifyInstance {
         ...(options.substrateFactory !== undefined
           ? { substrateFactory: options.substrateFactory }
           : {}),
+        ...(options.pageless !== undefined ? { pageless: options.pageless } : {}),
         releaseSubstrate: (sid) => browsers.close(sid),
       });
 

@@ -94,6 +94,8 @@ const input = (target: OpDef, fake: Substrate | undefined) => ({
   ...(fake !== undefined ? { substrate: fake } : {}),
 });
 
+const SESSION = { sid: "s", created_at: "t", last_used_at: "t" };
+
 describe("runtimeExecutor", () => {
   it("runs a url read and reports the tier", async () => {
     const audits: unknown[] = [];
@@ -232,5 +234,87 @@ describe("runtimeExecutor", () => {
     );
 
     expect(result).toMatchObject({ ok: false, error: { code: "op_broken" } });
+  });
+
+  describe("without a page", () => {
+    const HTTP = op({
+      name: "list_keys",
+      impls: [
+        {
+          tier: "http",
+          steps: [{ method: "GET", url: "/api/keys" }],
+          extract: { kind: "json", path: "" },
+        },
+      ],
+    });
+
+    function transport(response: { status: number; json?: unknown; error?: string }) {
+      const calls: string[] = [];
+      return {
+        calls,
+        fetch: async (request: { url: string }) => {
+          calls.push(request.url);
+          return { text: "", json: undefined, ...response };
+        },
+      };
+    }
+
+    it("serves an http op from the saved session and never opens a browser", async () => {
+      const t = transport({ status: 200, json: { keys: [] } });
+      let opened = 0;
+
+      const result = await runtimeExecutor({ pageless: () => t })({
+        session: SESSION,
+        map: MAP,
+        op: HTTP,
+        params: {},
+        getSubstrate: async () => {
+          opened += 1;
+          return undefined;
+        },
+      });
+
+      expect(result).toEqual({ ok: true, result: { keys: [] } });
+      expect(t.calls).toEqual(["http://x/api/keys"]);
+      expect(opened).toBe(0);
+    });
+
+    it("falls back to a page when the saved session cannot authenticate", async () => {
+      const t = transport({ status: 0, error: "no localStorage entry; sign in again" });
+      let opened = 0;
+
+      const result = await runtimeExecutor({ pageless: () => t })({
+        session: SESSION,
+        map: MAP,
+        op: HTTP,
+        params: {},
+        getSubstrate: async () => {
+          opened += 1;
+          return substrate({ initial: HOME, fetchJson: { keys: ["a"] } });
+        },
+      });
+
+      expect(opened).toBe(1);
+      expect(result).toEqual({ ok: true, result: { keys: ["a"] } });
+    });
+
+    it("does not send a write again through a page after the site answered it", async () => {
+      const t = transport({ status: 500, json: { detail: "boom" } });
+      let opened = 0;
+
+      const result = await runtimeExecutor({ pageless: () => t })({
+        session: SESSION,
+        map: MAP,
+        op: { ...HTTP, effect: "write" },
+        params: {},
+        getSubstrate: async () => {
+          opened += 1;
+          return undefined;
+        },
+      });
+
+      expect(opened).toBe(0);
+      expect(result).toMatchObject({ ok: false, error: { code: "op_broken" } });
+    });
   });
 });

@@ -99,6 +99,20 @@ The codes are a contract. The ones an agent branches on most:
 | `stale_ref` | Re-read and use the replacement ref. |
 | `op_broken` | Fall back to `view` / `act` / `read`. |
 
+## `http` ops without a browser
+
+An op whose first impl is `http` does not need a page. When a saved session exists
+(`PORTOLAN_STORAGE_STATE` or `storageState` in the config, the file `auth login` writes), `call`
+sends the op's requests from the server itself, with the session's cookies for the URL and the
+bearer token the impl's `auth` points at (read from the app's saved `localStorage`). No Chrome is
+launched, nothing is rendered and nothing is settled. The site's egress policy applies as it does
+in a page, and the session file is read on each call, so a new `auth login` takes effect at once.
+
+Chrome opens only when the request was never sent: no saved session, a token that is not in the
+saved storage (a token kept in `sessionStorage` is not saved), or a request the policy blocked.
+A write the site has already answered is not sent again through a page; the write guard reports
+it.
+
 ## Transports
 
 - **stdio:** `portolan mcp`. A client spawns it. Nothing but protocol frames

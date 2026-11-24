@@ -111,7 +111,7 @@ In preference order. The first verified impl that fits the state runs.
 |---|---|---|
 | `webmcp` | `tool` | Call a page-provided tool. |
 | `url` | `route`, `extract` | Navigate to a route template. Read-only. |
-| `http` | `steps`, `extract` | Run requests inside the page, with its cookies. |
+| `http` | `steps`, `extract`, `auth`? | Run requests inside the page, with its cookies or its token. |
 | `ui` | `steps`, `extract` | Act through the semantic UI. |
 
 A `url` route must start with `/` or `http`. `{param}` placeholders are filled
@@ -126,6 +126,27 @@ and URL-encoded.
 | `headers` | object of string | no | Header templates. |
 | `body` | any | no | Body template; strings fill `{param}` recursively. |
 | `bind` | object of string | no | Capture a value from this response for later steps; the value is a dot path. |
+
+### `HttpAuth`
+
+An `http` impl's optional `auth` says where the site keeps the credential its own frontend
+sends, so a request to an API on another origin carries it. It is a reference: the value is read
+from the live page when the op runs, so a refreshed token keeps working and nothing secret is
+stored in the map.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `kind` | `cookie` \| `bearer` | `cookie` sends the browser's cookies, including to another origin. `bearer` adds a token header. |
+| `source` | `localStorage` \| `sessionStorage` \| `cookie` | Where the page keeps the token (`bearer`). |
+| `key` | string | The storage key or cookie name. |
+| `path` | string | Dot path inside a JSON value, for a persisted store such as `state.token`. |
+| `header` | string | Header the token travels in. Default `authorization`. |
+| `scheme` | string | Prefix before the token. Default `Bearer`; `""` sends it bare. |
+
+`map build` fills `auth` from the requests it records: when a request carries an
+`Authorization` header, the token is looked up in the page's storage and only its location is
+kept. If the token is not there when the op runs, the op fails with `auth_missing` and asks for a
+new sign-in.
 
 ### `UiStep`
 

@@ -221,6 +221,30 @@ export const MAP_SCHEMA = {
       },
     },
 
+    httpAuth: {
+      oneOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind"],
+          properties: { kind: { const: "cookie" } },
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind", "source", "key"],
+          properties: {
+            kind: { const: "bearer" },
+            source: { enum: ["localStorage", "sessionStorage", "cookie"] },
+            key: { type: "string", minLength: 1 },
+            path: { type: "string" },
+            header: { type: "string", minLength: 1 },
+            scheme: { type: "string" },
+          },
+        },
+      ],
+    },
+
     impl: {
       oneOf: [
         {
@@ -254,6 +278,7 @@ export const MAP_SCHEMA = {
               items: { $ref: "#/$defs/httpStep" },
             },
             extract: { $ref: "#/$defs/extractor" },
+            auth: { $ref: "#/$defs/httpAuth" },
           },
         },
         {
